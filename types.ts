@@ -53,6 +53,7 @@ export interface ExtractedData {
   // Neu: KI Klassifizierung / Kontierung
   kontierungskonto?: string; // ID from AccountDefinition
   steuerkategorie?: string;  // Value from TaxCategoryDefinition
+  kontierungBegruendung?: string; // UI: "Warum dieses Konto?"
   
   // Legacy / Fallbacks
   kontogruppe: string; 
@@ -146,16 +147,81 @@ export interface OCRConfig {
   validation_rules: ValidationRules;
 }
 
+export type ElsterRechtsform =
+  | 'einzelunternehmen'
+  | 'gmbh'
+  | 'ug'
+  | 'gbr'
+  | 'ohg'
+  | 'kg'
+  | 'ev'
+  | 'sonstiges';
+
+export type ElsterBesteuerungUst = 'ist' | 'soll' | 'unbekannt';
+
+export interface ElsterStammdaten {
+  // Pflicht-Minimum
+  unternehmensName: string;
+  land: string; // ISO-3166-1 Alpha-2, z.B. DE
+  plz: string;
+  ort: string;
+  strasse: string;
+  hausnummer: string;
+  eigeneSteuernummer: string;
+
+  // Optional
+  eigeneUstIdNr?: string;
+  finanzamtName?: string;
+  finanzamtNr?: string;
+  rechtsform?: ElsterRechtsform;
+  besteuerungUst?: ElsterBesteuerungUst;
+  kleinunternehmer?: boolean;
+  iban?: string;
+  kontaktEmail?: string;
+}
+
+export interface StartupChecklist {
+  uploadErsterBeleg: boolean;
+  datevKonfiguriert: boolean;
+  elsterStammdatenKonfiguriert: boolean;
+}
+
 export interface AppSettings {
   id: string;
   // New Configs
   taxDefinitions: TaxCategoryDefinition[];
   accountDefinitions: AccountDefinition[];
+
+  // DATEV / Steuerberater-Übergabe
+  datevConfig?: DatevConfig;
+
+  // ELSTER (Mandanten-/Stammdaten)
+  elsterStammdaten?: ElsterStammdaten;
+
+  // Onboarding
+  startupChecklist?: StartupChecklist;
   
   // Legacy
   accountGroups: AccountGroupDefinition[]; 
   ocrConfig: OCRConfig;
   taxCategories?: string[]; 
+}
+
+export interface DatevConfig {
+  // Pflichtangaben für DATEV-Import (abhängig von Kanzlei/DATEV-Umgebung)
+  beraterNr: string; // numeric string
+  mandantNr: string; // numeric string
+  wirtschaftsjahrBeginn: string; // YYYYMMDD
+  sachkontenlaenge: number; // z.B. 4
+  waehrung: string; // z.B. EUR
+
+  // Optional
+  herkunftKz: string; // z.B. RE
+  diktatkuerzel?: string;
+  stapelBezeichnung?: string;
+
+  // Mapping: interne Steuerkategorie -> DATEV BU-Schlüssel
+  taxCategoryToBuKey: Record<string, string>;
 }
 
 export interface VendorRule {
@@ -165,4 +231,9 @@ export interface VendorRule {
   taxCategoryValue?: string; // New
   lastUpdated: string;
   useCount: number;
+}
+
+// OCR Provider Interface for interchangeability
+export interface OcrProvider {
+  analyzeDocument(base64Data: string, mimeType: string): Promise<Partial<ExtractedData>>;
 }

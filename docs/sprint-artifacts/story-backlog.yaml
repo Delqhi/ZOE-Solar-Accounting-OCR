@@ -1,0 +1,107 @@
+generated: "2025-12-14T21:47:55Z"
+project: "ZOE-Solar-Accounting-OCR"
+
+# Minimaler Story-Backlog (Startpunkt)
+# Statuswerte: backlog | drafted | ready | in-progress | review | done
+
+stories:
+  - id: A1
+    epic: Sicherheit & Konfiguration
+    title: Hardcodierten Fallback-API-Key entfernen
+    status: done
+  - id: A2
+    epic: Sicherheit & Konfiguration
+    title: Env-Var Naming vereinheitlichen (GEMINI_API_KEY) + README
+    status: done
+  - id: B1
+    epic: OCR-Pipeline Robustheit
+    title: OCR Provider Schnittstelle definieren
+    status: done
+  - id: B2
+    epic: OCR-Pipeline Robustheit
+    title: Parsing/Schema-Validierung härten (defensiv gegen Partial/Null-Felder)
+    status: done
+  - id: B3
+    epic: OCR-Pipeline Robustheit
+    title: PDF-Stitching Grenzen/Regeln dokumentieren und testen (max pages/size)
+    status: done
+  - id: C1
+    epic: Datenmodell & Persistenz
+    title: IndexedDB Migrationen dokumentieren
+    status: done
+  - id: C2
+    epic: Datenmodell & Persistenz
+    title: Export-Schema (SQL) mit Modell-Feldern synchron halten
+    status: done
+  - id: D1
+    epic: UI Review & Bedienbarkeit
+    title: Duplikat UX klarer + sichere Aktionen
+    status: done
+  - id: D2
+    epic: UI Review & Bedienbarkeit
+    title: Merge-Flow besser absichern (nicht in Duplikate mergen, Feedback)
+    status: done
+
+  - id: E2
+    epic: Release/QA Runbook
+    title: Release/QA Runbook (Smoke + Export + Duplicate/Merge)
+    status: done
+
+  - id: F1
+    epic: Stabilität & Edgecases
+    title: Guardrails bei OCR/Parsing (Feldkonflikte, Datumsformate, Rundungslogik)
+    status: done
+  - id: F2
+    epic: Stabilität & Edgecases
+    title: Bessere Fehlermeldungen/Statusanzeigen bei OCR-Fail/Fallback-Fail
+    status: done
+
+  - id: G1
+    epic: Datenqualität & Export
+    title: Export-Validierung / Preflight (Pflichtfelder, Summenprüfung)
+    status: done
+  - id: G2
+    epic: Datenqualität & Export
+    title: Steuerlogik/Rule-Engine Finetuning + „Warum dieses Konto“
+    status: done
+
+  - id: H1
+    epic: Workflow/UX Feinschliff
+    title: Review-Shortcuts (Tastatur/Fokus), weniger Klicks
+    status: done
+  - id: H2
+    epic: Workflow/UX Feinschliff
+    title: Klareres Handling für „Fehler“-Status (Handlungsempfehlungen)
+    status: done
+
+  - id: I1
+    epic: Export/Reporting Feinschliff
+    title: CSV-Export finalisieren/standardisieren
+    status: done
+  - id: I2
+    epic: Export/Reporting Feinschliff
+    title: Export-Dateinamen & Metadaten verbessern
+    status: done
+
+  - id: J1
+    epic: DATEV/Steuerberater-Übergabe
+    title: DATEV-kompatibler Buchungsstapel-Export (CSV)
+    status: done
+  - id: J2
+    epic: DATEV/Steuerberater-Übergabe
+    title: DATEV-Preflight & Steuer-/Konten-Mapping
+    status: done
+
+  - id: K1
+    epic: Belegdaten-Vollständigkeit & Export-Schema
+    title: Feldkatalog + Datenmodell-Abgleich
+    status: drafted
+  - id: K2
+    epic: Belegdaten-Vollständigkeit & Export-Schema
+    title: CSV/SQL Export erweitern (fehlende Spalten + Positionen)
+    status: drafted
+
+  - id: L2
+    epic: ELSTER (UStVA/EÜR Vorbereitung)
+    title: ELSTER UStVA XML/ERiC Export (je Monat/Quartal)
+    status: drafted

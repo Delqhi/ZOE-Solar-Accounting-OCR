@@ -1,7 +1,8 @@
 
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { ExtractedData } from "../types";
+import { ExtractedData, OcrProvider } from "../types";
 import { analyzeDocumentWithFallback } from "./fallbackService";
+import { normalizeExtractedData } from "./extractedDataNormalization";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -116,14 +117,31 @@ export const analyzeDocumentWithGemini = async (base64Data: string, mimeType: st
         jsonString = jsonString.replace(/^```/, '').replace(/```$/, '');
     }
     
-    return JSON.parse(jsonString);
+    const parsed = JSON.parse(jsonString);
+    return normalizeExtractedData(parsed);
 
   } catch (error: any) {
     console.warn("Gemini OCR Error (or Quota limit). Switching to Fallback Service immediately.", error);
 
+    const geminiMsg = (() => {
+        const status = error?.status ? ` (HTTP ${error.status})` : '';
+        const msg = typeof error?.message === 'string' ? error.message : '';
+        const base = (msg || 'Unbekannter Fehler').replace(/\s+/g, ' ').trim();
+        return (base + status).trim();
+    })();
+
     // UNCONDITIONAL FALLBACK:
-    // This will now ALWAYS return an object, even if it's just a blank "Manual Entry" template.
-    // It will NOT throw, so the app will not show "Error".
-    return await analyzeDocumentWithFallback(base64Data, mimeType);
+    // We still return an object, but we keep a clear, user-actionable rationale.
+    const fallback = await analyzeDocumentWithFallback(base64Data, mimeType);
+    const normalized = normalizeExtractedData(fallback);
+    const existing = normalized.ocr_rationale ? normalized.ocr_rationale.trim() : '';
+    const prefix = `Gemini fehlgeschlagen: ${geminiMsg}`;
+    normalized.ocr_rationale = existing ? `${prefix} | ${existing}` : prefix;
+    return normalized;
   }
+};
+
+// OCR Provider implementation
+export const geminiProvider: OcrProvider = {
+  analyzeDocument: analyzeDocumentWithGemini
 };

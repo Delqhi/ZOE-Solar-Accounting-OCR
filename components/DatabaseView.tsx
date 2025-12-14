@@ -69,21 +69,32 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                     const isSelected = selectedId === doc.id;
                     const isChecked = selectedIds.includes(doc.id);
                     const isDup = doc.status === DocumentStatus.DUPLICATE;
+                    const isError = doc.status === DocumentStatus.ERROR;
+                    const isReview = doc.status === DocumentStatus.REVIEW_NEEDED;
                     const isDragTarget = dragTargetId === doc.id;
                     const score = doc.data?.ocr_score || 0;
                     
                     let scoreBadge = "bg-emerald-100 text-emerald-700";
                     if (score < 9) scoreBadge = "bg-amber-100 text-amber-700";
                     if (score < 6) scoreBadge = "bg-rose-100 text-rose-700";
+                    if (isReview) scoreBadge = "bg-amber-100 text-amber-700";
+                    if (isError) scoreBadge = "bg-rose-100 text-rose-700";
                     if (isDup) scoreBadge = "bg-red-500 text-white shadow-red-200 shadow-md";
+
+                    const statusLabel = isDup ? 'Duplikat' : isError ? 'Fehler' : isReview ? 'Prüfen' : `Score ${score}`;
+                    const rowTitle = isDup
+                        ? `Duplikat: ${doc.duplicateReason}`
+                        : (isError || isReview)
+                            ? (doc.error || doc.data?.ocr_rationale || 'Analyse fehlgeschlagen')
+                            : '';
 
                     return (
                         <tr 
                             key={doc.id}
-                            draggable={!isDup} // Disable dragging for duplicates
-                            title={isDup ? `Duplikat: ${doc.duplicateReason}` : ''}
+                            draggable={!isDup && !isError && !isReview} // Disable dragging for blocked statuses
+                            title={rowTitle}
                             onDragStart={(e) => {
-                                if (isDup) {
+                                if (isDup || isError || isReview) {
                                     e.preventDefault();
                                     return;
                                 }
@@ -91,7 +102,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                                 e.dataTransfer.effectAllowed = 'move';
                             }}
                             onDragOver={(e) => {
-                                if (!isDup) {
+                                if (!isDup && !isError && !isReview) {
                                     e.preventDefault();
                                     setDragTargetId(doc.id);
                                 }
@@ -101,8 +112,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                                 e.preventDefault();
                                 setDragTargetId(null);
                                 
-                                // Do not allow merging INTO a duplicate
-                                if (isDup) return;
+                                // Do not allow merging INTO blocked rows
+                                if (isDup || isError || isReview) return;
 
                                 const sourceId = e.dataTransfer.getData('text/plain');
                                 if (sourceId && sourceId !== doc.id) {
@@ -140,12 +151,12 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                             </td>
                             <td className="px-4 py-3 text-center">
                                 <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold tracking-wide uppercase ${scoreBadge}`}>
-                                    {isDup && (
+                                    {(isDup || isError || isReview) && (
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
                                             <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
                                         </svg>
                                     )}
-                                    {isDup ? 'Duplikat' : `Score ${score}`}
+                                    {statusLabel}
                                 </span>
                             </td>
                         </tr>

@@ -1,0 +1,20 @@
+{
+  "schema_version": "bmm-document-project-state-1",
+  "project": "ZOE-Solar-Accounting-OCR",
+  "mode": "initial_scan",
+  "scan_level": "quick",
+  "last_updated": "2025-12-14T19:33:01Z",
+  "output_folder": "docs",
+  "project_classification": {
+    "project_type_id": "web-spa",
+    "language": "TypeScript",
+    "framework": "React",
+    "build_tool": "Vite",
+    "storage": "IndexedDB"
+  },
+  "findings_summary": {
+    "ui": ["React SPA", "Split-View Detail (Preview+Data)", "Settings Editor"],
+    "services": ["Gemini OCR", "Vision Fallback", "Rule Engine", "IndexedDB Storage"],
+    "external_integrations": ["Google GenAI", "SiliconFlow Vision", "PDF.js"]
+  }
+}

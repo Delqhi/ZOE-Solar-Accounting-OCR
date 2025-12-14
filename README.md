@@ -47,6 +47,63 @@ Das System nutzt eine strikte Logik, um Doppelbuchungen zu verhindern:
 *   **SQL:** Exportiert ein Schema mit `belege`, `kontierungskonten` und `steuerkategorien` inkl. `soll_konto` und `haben_konto` Feldern.
 *   **CSV:** Standardisierter Export.
 
+#### CSV-Export (Format)
+
+- **Umfang:** Exportiert die aktuell gefilterte Dokumentliste (Jahr/Quartal/Monat) aus der Übersicht.
+- **Kodierung:** UTF-8
+- **Trennzeichen:** `;`
+- **Quoting:** Alle Werte werden in `"..."` geschrieben (auch Zahlen), um Sonderzeichen/Zeilenumbrüche robust zu handhaben.
+- **Datumsformat:** ISO `YYYY-MM-DD`
+- **Zahlenformat:** Immer mit 2 Nachkommastellen (z.B. `"123.45"`).
+
+**Export-Dateien:**
+
+1) `zoe_belege_*.csv` (1 Zeile pro Beleg)
+
+**Spalten (in dieser Reihenfolge):**
+
+1. `datum`
+2. `lieferant`
+3. `adresse`
+4. `steuernummer`
+5. `belegnummer_lieferant`
+6. `interne_nummer`
+7. `zahlungsmethode`
+8. `zahlungsdatum`
+9. `zahlungsstatus`
+10. `rechnungs_empfaenger`
+11. `aufbewahrungsort`
+12. `netto`
+13. `mwst_satz_0`
+14. `mwst_0`
+15. `mwst_satz_7`
+16. `mwst_7`
+17. `mwst_satz_19`
+18. `mwst_19`
+19. `brutto`
+20. `steuerkategorie`
+21. `kontierungskonto`
+22. `soll_konto`
+23. `haben_konto`
+24. `reverse_charge`
+25. `vorsteuerabzug`
+26. `kleinbetrag`
+27. `privatanteil`
+28. `ocr_score`
+29. `ocr_rationale`
+30. `beschreibung`
+31. `text_content`
+32. `status`
+
+2) `zoe_positionen_*.csv` (Positionen / 1:n)
+
+**Spalten:**
+
+1. `doc_id`
+2. `line_index`
+3. `description`
+4. `amount`
+
 ---
 
 ## 🛠 Tech Stack
@@ -78,17 +135,35 @@ npm install
 ```
 
 ### 3. Umgebungsvariablen konfigurieren
-Erstellen Sie eine `.env` Datei im Root-Verzeichnis:
+Erstellen Sie eine `.env` Datei im Root-Verzeichnis (oder kopieren Sie `.env.example` nach `.env`):
 ```env
 # Google Gemini API Key (Zwingend erforderlich)
-API_KEY="AIzaSy..."
+GEMINI_API_KEY="AIzaSy..."
+
+# SiliconFlow API Key (Fallback für Gemini)
+SILICONFLOW_API_KEY="sk-..."
 ```
+
+Hinweis: Wenn ein API-Key versehentlich in einem Chat/Issue/Screenshot gelandet ist, sollten Sie ihn beim Anbieter **rotieren** (neuen Key erzeugen, alten deaktivieren) und danach nur den neuen Key lokal in `.env` eintragen.
 
 ### 4. Starten
 ```bash
 npm start
 # oder
 npm run dev
+```
+
+### 5. Checks (empfohlen)
+`vite build` ist nicht immer ein verlässlicher TypeScript-/JSX-Check. Daher zusätzlich ausführen:
+
+```bash
+npm run typecheck
+```
+
+Oder als Einzeiler (Typecheck + Build):
+
+```bash
+npm run check
 ```
 
 ---
@@ -142,8 +217,8 @@ interface ExtractedData {
 ## ⚠️ Troubleshooting
 
 **KI antwortet nicht / Fallback greift nicht:**
-*   Prüfen Sie, ob der `API_KEY` korrekt gesetzt ist.
-*   SiliconFlow Key ist aktuell hardcodiert in `fallbackService.ts` – für Produktion sollte dieser in `.env` ausgelagert werden.
+*   Prüfen Sie, ob der `GEMINI_API_KEY` korrekt gesetzt ist.
+*   Falls Gemini überlastet ist, prüfen Sie `SILICONFLOW_API_KEY` in der `.env` Datei.
 
 **PDF Vorschau unscharf:**
 *   Die Vorschau nutzt `pdf.js` mit Scale 2.0. Bei sehr kleinen Displays kann es zu Skalierungseffekten kommen. Nutzen Sie Zoom (Mausrad + Ctrl).

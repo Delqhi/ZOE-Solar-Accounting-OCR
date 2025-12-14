@@ -1,0 +1,63 @@
+generated: "2025-12-14T21:47:55Z"
+project: "ZOE-Solar-Accounting-OCR"
+project_key: "zoe-ocr"
+tracking_system: "file-system"
+story_location: "docs/sprint-artifacts"
+
+development_status:
+  # Epics
+  epic-a-sicherheit-konfiguration: completed
+  epic-b-ocr-pipeline-robustheit: completed
+  epic-c-datenmodell-persistenz: completed
+  epic-d-ui-review-bedienbarkeit: completed
+  epic-e-quality-gate-ci: completed
+  epic-f-stabilitaet-edgecases: completed
+  epic-g-datenqualitaet-export: completed
+  epic-h-workflow-ux-feinschliff: completed
+  epic-i-export-reporting-feinschliff: completed
+  epic-j-datev-steuerberater-uebergabe: completed
+  epic-k-belegdaten-vollstaendigkeit-export-schema: backlog
+  epic-l-elster-ustva-euer-vorbereitung: backlog
+
+  # Stories
+  a1: completed
+  a2: completed
+  b1: completed
+  b2: completed
+  b3: completed
+  c1: completed
+  c2: completed
+  d1: completed
+  d2: completed
+
+  # Next epic (planned)
+  e2: completed
+
+  # Planned
+  f1: completed
+  f2: completed
+  g1: completed
+  g2: completed
+  h1: completed
+  h2: completed
+
+  # Sprint 7 (planned)
+  i1: completed
+  i2: completed
+
+  # Sprint 8 (planned)
+  j1: completed
+  j2: completed
+
+  # Sprint 9 (planned)
+  k1: backlog
+  k2: backlog
+
+  # Sprint 10 (planned)
+  l2: backlog
+
+  # Optional retros
+  epic-a-retrospective: completed
+  epic-b-retrospective: completed
+  epic-c-retrospective: completed
+  epic-d-retrospective: completed
