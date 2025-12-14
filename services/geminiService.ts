@@ -1,25 +1,27 @@
 
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { ExtractedData } from "../types";
+import { analyzeDocumentWithFallback } from "./fallbackService";
 
-// Define the schema for structured output
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
 const accountingSchema: Schema = {
   type: Type.OBJECT,
   properties: {
-    belegDatum: { type: Type.STRING, description: "Date of the receipt formatted as YYYY-MM-DD" },
-    belegNummerLieferant: { type: Type.STRING, description: "Invoice number from the vendor" },
-    lieferantName: { type: Type.STRING, description: "Full legal name of the vendor (Lieferant)" },
-    lieferantAdresse: { type: Type.STRING, description: "Address of the vendor" },
-    steuernummer: { type: Type.STRING, description: "Tax ID or VAT ID of the vendor" },
-    
-    nettoBetrag: { type: Type.NUMBER, description: "Total Net amount excluding tax" },
-    mwstSatz7: { type: Type.NUMBER, description: "The reduced tax rate (0.07) if present on the document, otherwise 0" },
-    mwstBetrag7: { type: Type.NUMBER, description: "The calculated tax amount for the 7% rate" },
-    mwstSatz19: { type: Type.NUMBER, description: "The standard tax rate (0.19) if present on the document, otherwise 0" },
-    mwstBetrag19: { type: Type.NUMBER, description: "The calculated tax amount for the 19% rate" },
-    bruttoBetrag: { type: Type.NUMBER, description: "Total Gross amount (Gesamtsumme)" },
-    zahlungsmethode: { type: Type.STRING, description: "Payment method (Bar, EC, Überweisung, PayPal, Kreditkarte)" },
-    
+    belegDatum: { type: Type.STRING, description: "YYYY-MM-DD" },
+    belegNummerLieferant: { type: Type.STRING },
+    lieferantName: { type: Type.STRING },
+    lieferantAdresse: { type: Type.STRING },
+    steuernummer: { type: Type.STRING },
+    nettoBetrag: { type: Type.NUMBER },
+    mwstSatz0: { type: Type.NUMBER },
+    mwstBetrag0: { type: Type.NUMBER },
+    mwstSatz7: { type: Type.NUMBER },
+    mwstBetrag7: { type: Type.NUMBER },
+    mwstSatz19: { type: Type.NUMBER },
+    mwstBetrag19: { type: Type.NUMBER },
+    bruttoBetrag: { type: Type.NUMBER, description: "The final total amount (Zahlbetrag)" },
+    zahlungsmethode: { type: Type.STRING },
     lineItems: {
       type: Type.ARRAY,
       items: {
@@ -28,81 +30,100 @@ const accountingSchema: Schema = {
           description: { type: Type.STRING },
           amount: { type: Type.NUMBER }
         }
-      },
-      description: "List of items/positions on the invoice"
+      }
     },
-
-    kostenstelle: { type: Type.STRING },
-    projekt: { type: Type.STRING, description: "Project name or order reference if visible" },
-    
-    // Status info implicitly found in text
-    zahlungsDatum: { type: Type.STRING, description: "Date of payment if mentioned (YYYY-MM-DD)" },
-    zahlungsStatus: { type: Type.STRING, description: "'bezahlt' if receipt indicates payment, otherwise 'offen'" },
-    
-    reverseCharge: { type: Type.BOOLEAN, description: "True if 'Reverse Charge' or 'Steuerschuldnerschaft' is mentioned" },
-    
-    beschreibung: { type: Type.STRING, description: "Short summary of the purchase content (Verwendungszweck)" },
-    textContent: { type: Type.STRING, description: "Full OCR text content for rule processing" },
+    textContent: { type: Type.STRING, description: "Summary of visible text for categorization keywords" },
+    beschreibung: { type: Type.STRING },
+    kontogruppe: { type: Type.STRING, description: "Calculated by rule engine later" }
   },
-  required: ["belegDatum", "lieferantName", "bruttoBetrag"],
+  required: ["belegDatum", "lieferantName", "bruttoBetrag"]
 };
 
+// IMPROVED PROMPT WITH MATH VERIFICATION
 const SYSTEM_INSTRUCTION = `
-You are the OCR extraction engine for "ZOE Solar". 
-Extract data EXACTLY as it appears on the document.
+You are an elite German Accounting Data Extraction AI.
+Your goal is 100% ACCURACY for "Bruttobetrag" (Total Amount).
 
-Context:
-- The company is "ZOE Solar" (Photovoltaics).
-- Documents are typically invoices (Rechnungen), receipts (Belege), or fuel receipts (Tankbelege).
+CRITICAL EXTRACTION PROTOCOL:
+1. **Find the Total**: Look for keywords: "Zahlbetrag", "Gesamtbetrag", "Rechnungsbetrag", "Summe". It is usually the last number at the bottom right, often bold.
+2. **Math Check**: Identify Netto and VAT (MwSt). Verify: Netto + MwSt = Brutto.
+   - If they match exactly, confidence is high.
+   - If they do NOT match, trust the explicitly printed "Zahlbetrag" over the sum of line items.
+   - Watch out for "Pfand" or "Rabatt" which might affect the total.
+3. **Common Pitfalls**:
+   - Do NOT confuse the "Unterschrift" date with the "Belegdatum".
+   - Do NOT confuse the "Kunden-Nr" with the "Rechnungs-Nr".
+   - 5 vs 6 vs 8: Look closely at the pixel structure.
+   - 1 vs 7: Look for the crossbar.
 
-Extraction Rules:
-1. **Dates**: Format YYYY-MM-DD.
-2. **Amounts**: 
-   - Extract strictly. Use decimal point.
-   - Differentiate between 7% and 19% VAT. 
-   - Note: Photovoltaic components (PV modules, inverters) often have 0% tax (§12 Abs. 3 UStG). In this case, tax amounts are 0.
-3. **Vendor**: Extract the full legal name.
-4. **Payment**: Identify if paid by "Bar", "EC", "Überweisung", "PayPal", "Kreditkarte".
-5. **Reverse Charge**: Check for keywords like "Reverse Charge", "Innergemeinschaftliche Lieferung", "Steuerschuldnerschaft".
-
-Return raw JSON fitting the schema.
+DATA STANDARDS:
+- Dates: YYYY-MM-DD only.
+- Numbers: Float format (12.99). Use dots, no commas.
+- Tax: Distinguish 0%, 7%, 19%. Put 0% or "Steuerfrei" in mwstSatz0.
+- Language: Summaries in German.
 `;
 
-export const analyzeDocumentWithGemini = async (
-  base64Data: string,
-  mimeType: string
-): Promise<Partial<ExtractedData>> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Reduced retries to 1 to switch to fallback faster
+async function generateWithRetry(model: string, params: any, config: any, retries = 1): Promise<any> {
+    try {
+        return await ai.models.generateContent({
+            model,
+            contents: params,
+            config
+        });
+    } catch (error: any) {
+        const isTransient = error.status === 429 || error.status === 503 || error.message?.includes("429") || error.message?.includes("503") || error.message?.includes("Quota");
+        if (isTransient && retries > 0) {
+            console.warn(`Gemini busy (429/503). Retrying once in 1500ms...`);
+            await delay(1500);
+            return generateWithRetry(model, params, config, retries - 1);
+        }
+        throw error;
+    }
+}
+
+export const analyzeDocumentWithGemini = async (base64Data: string, mimeType: string): Promise<Partial<ExtractedData>> => {
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: {
+    // Attempt Primary: Gemini 2.5 Flash
+    console.log("Attempting Gemini OCR...");
+    
+    const response = await generateWithRetry(
+      "gemini-2.5-flash",
+      {
         parts: [
-          {
-            inlineData: {
-              mimeType: mimeType,
-              data: base64Data,
-            },
-          },
-          {
-            text: "Extract accounting data from this invoice for ZOE Solar.",
-          },
-        ],
+          { inlineData: { mimeType: mimeType, data: base64Data } },
+          { text: "Extract accounting data accurately. Double check the Total Amount." }
+        ]
       },
-      config: {
+      {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
         responseSchema: accountingSchema,
-      },
-    });
+        temperature: 0, // Keep 0 to reduce hallucination
+      }
+    );
 
-    const jsonText = response.text;
-    if (!jsonText) throw new Error("No response from AI");
+    const text = response.text;
+    if (!text) throw new Error("No response from AI");
     
-    return JSON.parse(jsonText) as Partial<ExtractedData>;
-  } catch (error) {
-    console.error("Gemini Analysis Error:", error);
-    throw error;
+    // Robust JSON parsing handling potential markdown wrappers
+    let jsonString = text.trim();
+    if (jsonString.startsWith('```json')) {
+        jsonString = jsonString.replace(/^```json/, '').replace(/```$/, '');
+    } else if (jsonString.startsWith('```')) {
+        jsonString = jsonString.replace(/^```/, '').replace(/```$/, '');
+    }
+    
+    return JSON.parse(jsonString);
+
+  } catch (error: any) {
+    console.warn("Gemini OCR Error (or Quota limit). Switching to Fallback Service immediately.", error);
+
+    // UNCONDITIONAL FALLBACK:
+    // This will now ALWAYS return an object, even if it's just a blank "Manual Entry" template.
+    // It will NOT throw, so the app will not show "Error".
+    return await analyzeDocumentWithFallback(base64Data, mimeType);
   }
 };

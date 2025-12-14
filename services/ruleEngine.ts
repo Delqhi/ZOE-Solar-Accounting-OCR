@@ -1,183 +1,175 @@
 
-import { ExtractedData, DocumentRecord } from '../types';
+import { ExtractedData, DocumentRecord, AppSettings, AccountDefinition, TaxCategoryDefinition } from '../types';
 
-/**
- * ZOE Solar Accounting Rules Engine
- * Implements strict rules for Soll/Haben/Steuerkategorie.
- * 
- * Logic Order:
- * 1. Habenkonto: Strict (Cash=1000, Rest=1800)
- * 2. Sollkonto: Vendor Mapping > Keyword Fallback > Default (3100)
- * 3. Tax: PV 0% > Reverse Charge > 7% > 19%
- */
+export const generateZoeInvoiceId = (dateStr: string, existingDocs: DocumentRecord[]): string => {
+    if (!dateStr) return '';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return '';
+
+        const yy = d.getFullYear().toString().slice(-2);
+        const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+        const prefix = `ZOE${yy}${mm}`;
+        
+        let max = 0;
+        existingDocs.forEach(doc => {
+            const nr = doc.data?.eigeneBelegNummer || '';
+            if (nr.startsWith(prefix)) {
+                const parts = nr.split('.');
+                if (parts.length > 1) {
+                    const n = parseInt(parts[1], 10);
+                    if (!isNaN(n) && n > max) max = n;
+                }
+            }
+        });
+
+        return `${prefix}.${(max + 1).toString().padStart(3, '0')}`;
+    } catch (e) {
+        return '';
+    }
+};
+
+const calculateOCRScore = (data: ExtractedData, taxDefs: TaxCategoryDefinition[]): { score: number, rationale: string } => {
+    let score = 10;
+    const rationaleParts: string[] = [];
+
+    // 1. Basic Fields Presence
+    if (!data.belegDatum) {
+        score -= 2;
+        rationaleParts.push("Datum fehlt (-2)");
+    }
+    if (!data.lieferantName || data.lieferantName.length < 3) {
+        score -= 2;
+        rationaleParts.push("Lieferant unklar (-2)");
+    }
+    if (!data.bruttoBetrag && data.bruttoBetrag !== 0) {
+        score -= 3;
+        rationaleParts.push("Betrag fehlt (-3)");
+    }
+
+    // 2. Tax Consistency
+    const has19 = (data.mwstBetrag19 || 0) > 0;
+    const has7 = (data.mwstBetrag7 || 0) > 0;
+    
+    // Heuristic: If tax 19% is present, but potential category implies 0%
+    if (has19 && data.steuerkategorie === '0_pv') {
+        score -= 2;
+        rationaleParts.push("Steuerkonflikt: 19% erkannt aber 0% gewählt (-2)");
+    }
+
+    // 3. Logic Checks
+    if (data.nettoBetrag && data.bruttoBetrag) {
+        const calcBrutto = data.nettoBetrag + (data.mwstBetrag19 || 0) + (data.mwstBetrag7 || 0);
+        const diff = Math.abs(calcBrutto - data.bruttoBetrag);
+        if (diff > 0.05) {
+            score -= 2;
+            rationaleParts.push("Rechenfehler Summe (-2)");
+        }
+    }
+
+    // Clamp
+    score = Math.max(0, Math.min(10, score));
+    return { score, rationale: rationaleParts.join(", ") || "Perfekt" };
+};
+
+const PV_MATERIAL_KEYWORDS = [
+    'modul', 'solar', 'panel', 'kabel', 'leitung', 'stecker', 'mc4', 'schiene', 
+    'profil', 'dachhaken', 'schraube', 'klemme', 'wechselrichter', 'inverter', 
+    'speicher', 'batterie', 'akku', 'montage', 'lieferung', 'fracht', 'spedition', 
+    'versand', 'material', 'baustoff', 'unterkonstruktion', 'ziegel', 'lüfter'
+];
+
+const determineAccount = (data: ExtractedData, accounts: AccountDefinition[]): AccountDefinition | null => {
+    // Combine all relevant text sources
+    const fullText = (
+        (data.lieferantName || '') + ' ' + 
+        (data.textContent || '') + ' ' + 
+        (data.beschreibung || '') + ' ' +
+        (data.lineItems?.map(i => i.description).join(' ') || '')
+    ).toLowerCase();
+
+    // 1. Priority Check: Material / Wareneingang via Line Item Keywords
+    // If we find specific hardware keywords, we prioritize the Material account
+    const hasMaterialKeyword = PV_MATERIAL_KEYWORDS.some(kw => fullText.includes(kw));
+    if (hasMaterialKeyword) {
+        const materialAccount = accounts.find(a => a.id === 'wareneingang');
+        if (materialAccount) return materialAccount;
+    }
+
+    // 2. Standard Name Match
+    for (const acc of accounts) {
+        if (fullText.includes(acc.name.toLowerCase())) return acc;
+    }
+    
+    // 3. Specific Hardcoded Fallbacks
+    if (fullText.includes('tank') || fullText.includes('aral') || fullText.includes('shell') || fullText.includes('jet ')) return accounts.find(a => a.id === 'fuhrpark') || null;
+    if (fullText.includes('adobe') || fullText.includes('software') || fullText.includes('google')) return accounts.find(a => a.id === 'software') || null;
+    if (fullText.includes('telekom') || fullText.includes('o2') || fullText.includes('vodafone')) return accounts.find(a => a.id === 'internet') || null;
+    
+    return null;
+};
+
 export const applyAccountingRules = (
-  data: ExtractedData, 
-  existingDocs: DocumentRecord[]
+    data: ExtractedData, 
+    existingDocs: DocumentRecord[], 
+    settings: AppSettings,
+    forcedVendorRule?: { accountId?: string, taxCategoryValue?: string }
 ): ExtractedData => {
   const enriched = { ...data };
+  const accounts = settings.accountDefinitions || [];
+  const taxes = settings.taxDefinitions || [];
+
+  // 1. Determine Account
+  let matchedAccount: AccountDefinition | null | undefined = null;
   
-  // Helper for normalization and matching
-  const lower = (s: string) => (s || '').toLowerCase();
-  const containsAny = (source: string, keywords: string[]) => keywords.some(k => source.includes(k));
-
-  const vendor = lower(enriched.lieferantName);
-  const payment = lower(enriched.zahlungsmethode);
+  if (forcedVendorRule?.accountId) {
+      matchedAccount = accounts.find(a => a.id === forcedVendorRule.accountId);
+      if (matchedAccount) enriched.ruleApplied = true;
+  }
   
-  // Combine all text sources for context searching
-  const combinedText = `${vendor} ${lower(enriched.beschreibung)} ${lower(enriched.textContent)} ${enriched.lineItems?.map(l => lower(l.description)).join(' ') || ''}`;
-
-  // --- 1. Habenkonto Regeln (Money Account) ---
-  // Konsequente Regel: Bar -> 1000, Alles andere -> 1800
-  let haben = '1800'; 
-  if (containsAny(payment, ['bar', 'cash', 'kasse'])) {
-    haben = '1000';
-  }
-  enriched.habenKonto = haben;
-
-
-  // --- 2. Sollkonto Regeln (Expense Account) ---
-  // Strategie: Erst Vendor prüfen, dann Keywords, Fallback 3100
-  
-  let soll = '3100'; // Default: Fremdleistungen / Material
-
-  // A) Vendor-Specific Rules (Primary Source)
-  if (containsAny(vendor, ['telekom', 'vodafone', 'o2', 'telefonica', 'congstar'])) {
-    soll = '4220'; // Telefon
-  } 
-  else if (containsAny(vendor, ['ionos', 'strato', '1&1', 'domain', 'hetzner', 'all-inkl'])) {
-    soll = '4225'; // Internet / Webhosting
-  } 
-  else if (containsAny(vendor, ['obeta', 'conrad', 'hornbach', 'bauhaus', 'würth', 'toom', 'hagebau'])) {
-    soll = '3100'; // Material / Fremdleistungen
-  } 
-  else if (containsAny(vendor, ['allianz', 'versicherung', 'huk', 'vpv'])) {
-    soll = '4610'; // Versicherung
-  } 
-  else if (containsAny(vendor, ['stadtwerke', 'e.on', 'vattenfall', 'strom', 'gas', 'attenfall'])) {
-    soll = '4330'; // Energie / Strom
-  } 
-  else if (containsAny(vendor, ['hotel', 'airbnb', 'booking', 'motel'])) {
-    soll = '4660'; // Reisekosten Unterkunft
-  } 
-  else if (containsAny(vendor, ['db vertrieb', 'bahn', 'lufthansa', 'uber', 'bolt', 'taxi', 'free now'])) {
-    soll = '4670'; // Reisekosten Fahrt
-  }
-  // Complex Vendor: Tankstellen (Unterscheidung Sprit vs. Shop)
-  else if (containsAny(vendor, ['shell', 'aral', 'total', 'jet', 'tankstelle', 'esso', 'hem', 'star'])) {
-    if (containsAny(combinedText, ['diesel', 'benzin', 'super', 'kraftstoff', 'adblue'])) {
-        soll = '4830'; // Kraftstoff
-    } else {
-        soll = '4110'; // Kfz Kosten allgemein (Wäsche, Öl, Shop)
-    }
-  } 
-  // Complex Vendor: Supermärkte (Unterscheidung Bewirtung vs. Büro/Sonstiges)
-  else if (containsAny(vendor, ['edeka', 'rewe', 'lidl', 'aldi', 'kaufland', 'dm', 'rossmann', 'metro'])) {
-    if (containsAny(combinedText, ['bewirtung', 'trinkgeld', 'restaurant'])) {
-        soll = '4650'; // Bewirtung
-    } else {
-        soll = '4230'; // Raumkosten / Sonstiges / Verpflegung
-    }
+  if (!matchedAccount) {
+      matchedAccount = determineAccount(enriched, accounts);
   }
 
-  // B) Keyword / Category Fallback (Only if still default 3100)
-  // Dies fängt Fälle ab, wo der Vendor unbekannt ist, aber der Inhalt eindeutig ist.
-  if (soll === '3100') {
-    if (containsAny(combinedText, ['photovoltaik', 'solar', 'modul', 'wechselrichter', 'unterkonstruktion', 'pv-anlage'])) {
-      soll = '4810'; // PV-Wareneingang
-    } else if (containsAny(combinedText, ['kraftstoff', 'diesel', 'benzin'])) {
-      soll = '4830'; // Kraftstoff
-    } else if (containsAny(combinedText, ['reparatur', 'wartung']) && combinedText.includes('kfz')) {
-      soll = '4820'; // Fahrzeug Instandhaltung
-    } else if (containsAny(combinedText, ['bewirtung', 'trinkgeld', 'restaurant', 'speisen', 'getränke'])) {
-      soll = '4650'; // Bewirtung
-    } else if (containsAny(combinedText, ['büro', 'papier', 'toner', 'ordner', 'schreibwaren', 'stifte'])) {
-      soll = '4930'; // Bürobedarf
-    } else if (containsAny(combinedText, ['porto', 'dhl', 'post', 'briefmarke', 'einschreiben'])) {
-      soll = '4910'; // Porto
-    }
+  // Set Account & SKR03
+  if (matchedAccount) {
+      enriched.kontierungskonto = matchedAccount.id;
+      enriched.kontogruppe = matchedAccount.name; // Legacy compatibility
+      
+      // NEW: Set Soll / Haben
+      enriched.sollKonto = matchedAccount.skr03 || '0000';
+      
+      // Default Haben for EÜR (Usually Bank 1200 or 70000 Creditors)
+      // Since this is receipt processing, let's default to Bank 1200 as most are paid
+      // Or we could try to guess from "zahlungsmethode"
+      if (enriched.zahlungsmethode?.toLowerCase().includes('paypal')) enriched.habenKonto = '1200'; // Bank/Paypal
+      else if (enriched.zahlungsmethode?.toLowerCase().includes('bar')) enriched.habenKonto = '1000'; // Kasse
+      else enriched.habenKonto = '1200'; // Default Bank
+
+  } else {
+      enriched.kontierungskonto = 'sonstiges'; // Fallback
+      enriched.kontogruppe = 'Sonstiges';
+      enriched.sollKonto = '4900';
+      enriched.habenKonto = '1200';
   }
 
-  enriched.sollKonto = soll;
-
-
-  // --- 3. Steuerkategorie Regeln ---
-  // Priority: 0% PV > Reverse Charge > 7% > 19% (Default)
-  
-  let taxCat = '19% Vorsteuer'; // Default fallback
-
-  const hasTax7 = (enriched.mwstBetrag7 > 0) || (enriched.mwstSatz7 > 0);
-  const hasTax19 = (enriched.mwstBetrag19 > 0) || (enriched.mwstSatz19 > 0);
-  const isZeroTax = !hasTax7 && !hasTax19;
-
-  // PV Context Check
-  const isSolarContext = soll === '4810' || containsAny(combinedText, ['solar', 'photovoltaik', 'pv-anlage', '§12']);
-  
-  if (isSolarContext && isZeroTax) {
-    taxCat = '0% PV (Steuerfrei)';
-  } 
-  else if (enriched.reverseCharge || (enriched.steuernummer && /^(AT|NL|PL|FR|ES|IT)/i.test(enriched.steuernummer))) {
-    taxCat = '0% IGL / Reverse Charge';
-    enriched.reverseCharge = true;
-  }
-  else if (hasTax7 && !hasTax19) {
-    taxCat = '7% Vorsteuer';
-  }
-  else if ((soll === '4610' || soll === '4910') && isZeroTax) {
-     taxCat = 'Steuerfrei (Sonstiges)';
-  }
-  else {
-    taxCat = '19% Vorsteuer';
+  // 2. Determine Tax Category
+  if (forcedVendorRule?.taxCategoryValue) {
+      enriched.steuerkategorie = forcedVendorRule.taxCategoryValue;
+  } else if (matchedAccount && matchedAccount.steuerkategorien.length === 1) {
+      enriched.steuerkategorie = matchedAccount.steuerkategorien[0];
+  } else {
+      // Logic based on amounts
+      if ((data.mwstBetrag19 || 0) > 0) enriched.steuerkategorie = '19_pv';
+      else if ((data.mwstBetrag7 || 0) > 0) enriched.steuerkategorie = '7_pv';
+      else if (data.mwstBetrag19 === 0 && data.bruttoBetrag > 0) enriched.steuerkategorie = '0_pv'; 
+      else enriched.steuerkategorie = '19_pv'; 
   }
 
-  enriched.steuerKategorie = taxCat;
-
-
-  // --- 4. ZOE-Specific Organisatorische Regeln ---
-
-  // A) Eigene Belegnummer: ZOEyyMM.n
-  if (data.belegDatum) {
-    try {
-        const dateObj = new Date(data.belegDatum);
-        if (!isNaN(dateObj.getTime())) {
-            const yy = dateObj.getFullYear().toString().slice(-2);
-            const mm = (dateObj.getMonth() + 1).toString().padStart(2, '0');
-            const prefix = `ZOE${yy}${mm}`;
-            
-            // Suche nach der höchsten existierenden Nummer mit diesem Präfix
-            let maxNum = 0;
-            existingDocs.forEach(d => {
-                const existingNr = d.data?.eigeneBelegNummer || '';
-                if (existingNr.startsWith(prefix)) {
-                    const parts = existingNr.split('.');
-                    if (parts.length === 2) {
-                        const n = parseInt(parts[1], 10);
-                        if (!isNaN(n) && n > maxNum) maxNum = n;
-                    }
-                }
-            });
-            enriched.eigeneBelegNummer = `${prefix}.${maxNum + 1}`;
-        }
-    } catch (e) { /* ignore invalid dates */ }
-  }
-
-  // B) Statische Daten
-  enriched.rechnungsEmpfaenger = 'ZOE Solar, Inh. Jeremy Schulze\nKurfürstenstr. 124, 10785 Berlin';
-  enriched.aufbewahrungsOrt = 'Betriebseigene Cloud-Storage';
-
-  // C) Zahlungsstatus
-  if (!enriched.zahlungsStatus) {
-    if (haben === '1000' || containsAny(payment, ['karte', 'paypal', 'apple', 'google'])) {
-        enriched.zahlungsStatus = 'bezahlt';
-        if (!enriched.zahlungsDatum) enriched.zahlungsDatum = enriched.belegDatum;
-    } else {
-        enriched.zahlungsStatus = 'offen';
-    }
-  }
-
-  // D) Flags
-  enriched.kleinbetrag = (enriched.bruttoBetrag || 0) <= 250;
-  enriched.vorsteuerabzug = taxCat.includes('Vorsteuer') || taxCat.includes('IGL') || taxCat.includes('PV');
-  if (enriched.privatanteil === undefined) enriched.privatanteil = false;
+  // 3. Calculate Score
+  const scoreResult = calculateOCRScore(enriched, taxes);
+  enriched.ocr_score = scoreResult.score;
+  enriched.ocr_rationale = scoreResult.rationale;
 
   return enriched;
 };
