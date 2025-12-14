@@ -1,8 +1,40 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { DocumentRecord, ExtractedData, AppSettings, Attachment, DocumentStatus, LineItem } from '../types';
 import { PdfViewer } from './PdfViewer';
 import { getSettings } from '../services/storageService';
+
+const isPresent = (value: unknown): boolean => {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'string') return value.trim().length > 0;
+    if (typeof value === 'number') return Number.isFinite(value);
+    if (typeof value === 'boolean') return true;
+    return true;
+};
+
+const getErrorNextSteps = (message: string): string[] => {
+    const msg = (message || '').toLowerCase();
+    const steps: string[] = [];
+
+    // Always actionable first
+    steps.push('Retry OCR (Button oben rechts).');
+
+    if (/gemini_api_key|gemini|api key|apikey|unauthorized|forbidden|\b401\b|\b403\b/.test(msg)) {
+        steps.push('API-Keys prüfen/setzen: GEMINI_API_KEY (Pflicht), SILICONFLOW_API_KEY (Fallback).');
+    }
+    if (/\b429\b|quota|rate limit|too many requests/.test(msg)) {
+        steps.push('Quota/Rate-Limit: später erneut versuchen oder Fallback nutzen.');
+    }
+    if (/pdf|page|pages|size|zu gro[ßs]|too large|max/.test(msg)) {
+        steps.push('PDF verkleinern/splitten (weniger Seiten/Dateigröße) und erneut hochladen.');
+    }
+    if (/failed to fetch|network|timeout|econn|offline/.test(msg)) {
+        steps.push('Netzwerk/Firewall/Adblock prüfen (Requests zu KI-Providern).');
+    }
+
+    steps.push('Fehlende Felder manuell ergänzen (Datum/Lieferant/Beträge) und erneut exportieren.');
+    return steps;
+};
 
 interface DocumentDetailProps {
   document: DocumentRecord;
@@ -37,6 +69,14 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
   const [mergeQuery, setMergeQuery] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+    const belegDatumRef = useRef<HTMLInputElement>(null);
+    const lieferantNameRef = useRef<HTMLInputElement>(null);
+    const bruttoBetragRef = useRef<HTMLInputElement>(null);
+
+    const latestFormDataRef = useRef<Partial<ExtractedData>>(formData);
+    useEffect(() => {
+        latestFormDataRef.current = formData;
+    }, [formData]);
 
   useEffect(() => {
     getSettings().then(setSettings);
@@ -82,6 +122,10 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
       setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleCheckboxChange = (field: keyof ExtractedData, checked: boolean) => {
+      setFormData(prev => ({ ...prev, [field]: checked }));
+  };
+
   // --- Line Item Handlers ---
   const handleLineItemChange = (index: number, field: keyof LineItem, value: any) => {
       const newItems = [...(formData.lineItems || [])];
@@ -105,6 +149,10 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
 
   const handleBlur = () => {
       onSave({ ...document, data: formData as ExtractedData });
+  };
+
+  const handleSaveNow = () => {
+      onSave({ ...document, data: latestFormDataRef.current as ExtractedData });
   };
 
   const handleMergeClick = (targetDoc: DocumentRecord) => {
@@ -148,6 +196,7 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
 
   const filteredMergeCandidates = allDocuments
     .filter(d => d.id !== document.id)
+        .filter(d => d.status !== DocumentStatus.DUPLICATE && d.status !== DocumentStatus.ERROR && d.status !== DocumentStatus.REVIEW_NEEDED)
     .filter(d => {
         const term = mergeQuery.toLowerCase();
         return d.fileName.toLowerCase().includes(term) || 
@@ -159,6 +208,94 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
 
   const totalPages = 1 + (document.attachments?.length || 0);
   const isDuplicate = document.status === DocumentStatus.DUPLICATE;
+    const isError = document.status === DocumentStatus.ERROR;
+    const isReview = document.status === DocumentStatus.REVIEW_NEEDED;
+    const errorMessage = (document.error || document.data?.ocr_rationale || '').trim();
+    const originalDoc = document.duplicateOfId ? allDocuments.find(d => d.id === document.duplicateOfId) : undefined;
+
+  const shortcutHint = useMemo(() => {
+      // Minimal hint, only where it helps most.
+      if (!(isError || isReview)) return '';
+      return 'Shortcuts: Esc schließen · Strg+S speichern · Alt+←/→ nächster/vorheriger Beleg';
+  }, [isError, isReview]);
+
+  const errorNextSteps = useMemo(() => {
+      if (!isError) return [] as string[];
+      return getErrorNextSteps(errorMessage);
+  }, [isError, errorMessage]);
+
+  // H1: Fokus-Handling (fehlende Pflichtfelder)
+  useEffect(() => {
+      if (!settings) return;
+      if (!(isReview || isError)) return;
+
+      const required = settings.ocrConfig?.required_fields || [];
+      const focusOrder = required.length > 0 ? required : ['belegDatum', 'lieferantName', 'bruttoBetrag'];
+
+      const tryFocus = (field: string): boolean => {
+          if (field === 'belegDatum') {
+              if (!isPresent(formData.belegDatum)) {
+                  setMobileTab('data');
+                  requestAnimationFrame(() => belegDatumRef.current?.focus());
+                  return true;
+              }
+          }
+          if (field === 'lieferantName') {
+              if (!isPresent(formData.lieferantName)) {
+                  setMobileTab('data');
+                  requestAnimationFrame(() => lieferantNameRef.current?.focus());
+                  return true;
+              }
+          }
+          if (field === 'bruttoBetrag') {
+              if (!isPresent(formData.bruttoBetrag)) {
+                  setMobileTab('data');
+                  requestAnimationFrame(() => bruttoBetragRef.current?.focus());
+                  return true;
+              }
+          }
+          return false;
+      };
+
+      for (const field of focusOrder) {
+          if (tryFocus(field)) return;
+      }
+
+      // Fallback: fokus auf Lieferant (meistens relevant)
+      setMobileTab('data');
+      requestAnimationFrame(() => lieferantNameRef.current?.focus());
+  }, [document.id, settings, isReview, isError]);
+
+  // H1: Tastatur-Shortcuts
+  useEffect(() => {
+      const onKeyDown = (e: KeyboardEvent) => {
+          if (e.key === 'Escape') {
+              e.preventDefault();
+              onClose();
+              return;
+          }
+
+          const key = e.key.toLowerCase();
+          if ((e.ctrlKey || e.metaKey) && key === 's') {
+              e.preventDefault();
+              handleSaveNow();
+              return;
+          }
+
+          if (e.altKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+              e.preventDefault();
+              const idx = allDocuments.findIndex(d => d.id === document.id);
+              if (idx < 0) return;
+              const nextIndex = e.key === 'ArrowRight' ? idx + 1 : idx - 1;
+              const nextDoc = allDocuments[nextIndex];
+              if (nextDoc) onSelectDocument(nextDoc);
+              return;
+          }
+      };
+
+      window.addEventListener('keydown', onKeyDown);
+      return () => window.removeEventListener('keydown', onKeyDown);
+  }, [allDocuments, document.id, onClose, onSelectDocument]);
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -179,7 +316,7 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
          
          {/* Merge Search */}
          <div className="hidden md:block relative">
-             {!showMergeSearch ? (
+             {!isDuplicate && (!showMergeSearch ? (
                  <button 
                     onClick={() => setShowMergeSearch(true)}
                     className="flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-full border border-slate-200 hover:border-blue-200 transition-all"
@@ -219,11 +356,16 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
                         )}
                      </div>
                  </div>
-             )}
+             ))}
          </div>
 
          <div className="flex gap-2">
-            <button onClick={() => onRetryOCR(document)} className="hidden md:inline-flex px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 shadow-sm transition-colors">
+                        <button
+                            onClick={() => onRetryOCR(document)}
+                            disabled={isDuplicate}
+                            className="hidden md:inline-flex px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={isDuplicate ? 'Retry ist für Duplikate deaktiviert' : ''}
+                        >
                 Retry OCR
             </button>
             <button onClick={() => onDelete(document.id)} className="p-2 md:px-3 md:py-1.5 bg-white border border-red-100 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-50 hover:border-red-200 shadow-sm transition-colors">
@@ -304,8 +446,48 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
                          <div>
                             <strong className="block font-semibold">Duplikat erkannt</strong>
                             <p className="opacity-90 mt-1">{document.duplicateReason}</p>
+                                                        <p className="opacity-90 mt-2">Nächste Schritte: Original prüfen und dieses Duplikat löschen.</p>
+                                                        {originalDoc && (
+                                                            <button
+                                                                onClick={() => onSelectDocument(originalDoc)}
+                                                                className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-red-200 rounded-lg text-xs font-semibold text-red-700 hover:bg-red-100/50 transition-colors"
+                                                            >
+                                                                Original öffnen
+                                                            </button>
+                                                        )}
                          </div>
                      </div>
+                )}
+
+                {(isError || isReview) && (
+                    <div className={`${isError ? 'bg-rose-50 border-rose-100 text-rose-700' : 'bg-amber-50 border-amber-100 text-amber-800'} border rounded-xl p-4 text-sm flex gap-3 items-start`}
+                         title={errorMessage}
+                    >
+                        <svg className="w-5 h-5 flex-none mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        <div>
+                            <strong className="block font-semibold">{isError ? 'OCR Fehler' : 'OCR prüfen'}</strong>
+                            <p className="opacity-90 mt-1">
+                                {errorMessage || 'Analyse war nicht erfolgreich. Bitte Werte manuell prüfen/ergänzen.'}
+                            </p>
+                            {isError ? (
+                                <div className="opacity-95 mt-2">
+                                    <div className="font-semibold text-xs uppercase tracking-wide mb-1">Nächste Schritte</div>
+                                    <ul className="list-disc pl-5 space-y-1">
+                                        {errorNextSteps.map((s, i) => (
+                                            <li key={i}>{s}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : (
+                                <p className="opacity-90 mt-2">
+                                    Nächste Schritte: Werte prüfen/ergänzen, dann erneut exportieren.
+                                </p>
+                            )}
+                            {shortcutHint && (
+                                <p className="opacity-80 mt-3 text-xs">{shortcutHint}</p>
+                            )}
+                        </div>
+                    </div>
                 )}
 
                 <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-100 rounded-2xl p-5 shadow-sm">
@@ -344,7 +526,13 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
                                     const acc = accounts.find(a => a.id === accId);
                                     
                                     // Update basic account info
-                                    const updates: any = { kontierungskonto: accId };
+                                    const updates: any = {
+                                        kontierungskonto: accId,
+                                        ruleApplied: false,
+                                        kontierungBegruendung: acc
+                                            ? `Manuell gewählt: "${acc.name}".`
+                                            : 'Manuell gewählt.'
+                                    };
                                     
                                     // Auto-update tax if strictly defined
                                     if (acc && acc.steuerkategorien.length > 0 && (!formData.steuerkategorie || !acc.steuerkategorien.includes(formData.steuerkategorie))) {
@@ -365,6 +553,12 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
                             </select>
                             <svg className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
                         </div>
+                        {formData.kontierungBegruendung && (
+                            <div className="mt-2 text-xs text-slate-500 leading-relaxed">
+                                <span className="font-semibold text-slate-600">Warum dieses Konto?</span>{' '}
+                                {formData.kontierungBegruendung}
+                            </div>
+                        )}
                     </div>
                     
                     {/* SOLL / HABEN Row (NEW) */}
@@ -396,6 +590,7 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
                             <label className={LABEL_CLASS}>Datum</label>
                             <input 
                                 type="date"
+                                ref={belegDatumRef}
                                 value={formData.belegDatum || ''} 
                                 onChange={e => handleInputChange('belegDatum', e.target.value)} 
                                 onBlur={handleBlur}
@@ -435,6 +630,7 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
                         <div className="md:col-span-2">
                             <label className={LABEL_CLASS}>Lieferant</label>
                             <input 
+                                ref={lieferantNameRef}
                                 value={formData.lieferantName || ''} 
                                 onChange={e => handleInputChange('lieferantName', e.target.value)} 
                                 onBlur={handleBlur}
@@ -450,6 +646,147 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
                                 className={INPUT_CLASS} 
                                 placeholder="Straße, PLZ, Ort"
                             />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className={LABEL_CLASS}>Steuernummer</label>
+                            <input 
+                                value={formData.steuernummer || ''}
+                                onChange={e => handleInputChange('steuernummer', e.target.value)}
+                                onBlur={handleBlur}
+                                className={`${INPUT_CLASS} font-mono`}
+                                placeholder="z.B. DE123456789"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    <h4 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <span className="w-1 h-6 bg-cyan-600 rounded-full"></span>
+                        Zahlung
+                    </h4>
+
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className={LABEL_CLASS}>Zahlungsmethode</label>
+                                <input
+                                    value={formData.zahlungsmethode || ''}
+                                    onChange={e => handleInputChange('zahlungsmethode', e.target.value)}
+                                    onBlur={handleBlur}
+                                    className={INPUT_CLASS}
+                                    placeholder="z.B. Überweisung, Karte, Lastschrift"
+                                />
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASS}>Zahlungsdatum</label>
+                                <input
+                                    type="date"
+                                    value={formData.zahlungsDatum || ''}
+                                    onChange={e => handleInputChange('zahlungsDatum', e.target.value)}
+                                    onBlur={handleBlur}
+                                    className={INPUT_CLASS}
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className={LABEL_CLASS}>Zahlungsstatus</label>
+                                <select
+                                    value={formData.zahlungsStatus || ''}
+                                    onChange={e => handleInputChange('zahlungsStatus', e.target.value)}
+                                    onBlur={handleBlur}
+                                    className={`${INPUT_CLASS} appearance-none`}
+                                >
+                                    <option value="">(leer)</option>
+                                    <option value="offen">offen</option>
+                                    <option value="bezahlt">bezahlt</option>
+                                    <option value="teilbezahlt">teilbezahlt</option>
+                                    <option value="storniert">storniert</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    <h4 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <span className="w-1 h-6 bg-slate-500 rounded-full"></span>
+                        Organisation
+                    </h4>
+
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className={LABEL_CLASS}>Aufbewahrungsort</label>
+                                <input
+                                    value={formData.aufbewahrungsOrt || ''}
+                                    onChange={e => handleInputChange('aufbewahrungsOrt', e.target.value)}
+                                    onBlur={handleBlur}
+                                    className={INPUT_CLASS}
+                                    placeholder="z.B. Drive/Ordner/Schrank"
+                                />
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASS}>Rechnungsempfänger</label>
+                                <input
+                                    value={formData.rechnungsEmpfaenger || ''}
+                                    onChange={e => handleInputChange('rechnungsEmpfaenger', e.target.value)}
+                                    onBlur={handleBlur}
+                                    className={INPUT_CLASS}
+                                    placeholder="z.B. ZOE Solar GmbH"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    <h4 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <span className="w-1 h-6 bg-amber-500 rounded-full"></span>
+                        Flags
+                    </h4>
+
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                                <input
+                                    type="checkbox"
+                                    checked={!!formData.kleinbetrag}
+                                    onChange={e => handleCheckboxChange('kleinbetrag', e.target.checked)}
+                                    onBlur={handleBlur}
+                                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                Kleinbetrag
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                                <input
+                                    type="checkbox"
+                                    checked={!!formData.vorsteuerabzug}
+                                    onChange={e => handleCheckboxChange('vorsteuerabzug', e.target.checked)}
+                                    onBlur={handleBlur}
+                                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                Vorsteuerabzug
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                                <input
+                                    type="checkbox"
+                                    checked={!!formData.reverseCharge}
+                                    onChange={e => handleCheckboxChange('reverseCharge', e.target.checked)}
+                                    onBlur={handleBlur}
+                                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                Reverse Charge
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                                <input
+                                    type="checkbox"
+                                    checked={!!formData.privatanteil}
+                                    onChange={e => handleCheckboxChange('privatanteil', e.target.checked)}
+                                    onBlur={handleBlur}
+                                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                Privatanteil
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -531,8 +868,8 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
                                 <label className={LABEL_CLASS}>Netto</label>
                                 <input 
                                     type="number" 
-                                    value={formData.nettoBetrag || ''} 
-                                    onChange={e => handleInputChange('nettoBetrag', parseFloat(e.target.value))} 
+                                    value={formData.nettoBetrag ?? ''} 
+                                    onChange={e => handleInputChange('nettoBetrag', e.target.value === '' ? 0 : parseFloat(e.target.value))} 
                                     onBlur={handleBlur}
                                     className={INPUT_CLASS} 
                                 />
@@ -578,13 +915,47 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
                             </div>
                         </div>
 
+                        <div className="grid grid-cols-3 gap-4 mb-6">
+                            <div>
+                                <label className={LABEL_CLASS}>MwSt Satz 0</label>
+                                <input
+                                    type="number"
+                                    value={formData.mwstSatz0 ?? ''}
+                                    onChange={e => handleInputChange('mwstSatz0', e.target.value === '' ? 0 : parseFloat(e.target.value))}
+                                    onBlur={handleBlur}
+                                    className={`${INPUT_CLASS} text-slate-600`}
+                                />
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASS}>MwSt Satz 7</label>
+                                <input
+                                    type="number"
+                                    value={formData.mwstSatz7 ?? ''}
+                                    onChange={e => handleInputChange('mwstSatz7', e.target.value === '' ? 0 : parseFloat(e.target.value))}
+                                    onBlur={handleBlur}
+                                    className={`${INPUT_CLASS} text-slate-600`}
+                                />
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASS}>MwSt Satz 19</label>
+                                <input
+                                    type="number"
+                                    value={formData.mwstSatz19 ?? ''}
+                                    onChange={e => handleInputChange('mwstSatz19', e.target.value === '' ? 0 : parseFloat(e.target.value))}
+                                    onBlur={handleBlur}
+                                    className={`${INPUT_CLASS} text-slate-600`}
+                                />
+                            </div>
+                        </div>
+
                         <div className="pt-4 border-t border-slate-200">
                              <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Gesamtbetrag (Brutto)</label>
                              <div className="relative">
                                  <input 
                                     type="number" 
-                                    value={formData.bruttoBetrag || ''} 
-                                    onChange={e => handleInputChange('bruttoBetrag', parseFloat(e.target.value))} 
+                                                ref={bruttoBetragRef}
+                                                value={formData.bruttoBetrag ?? ''} 
+                                                onChange={e => handleInputChange('bruttoBetrag', e.target.value === '' ? 0 : parseFloat(e.target.value))} 
                                     onBlur={handleBlur}
                                     className="w-full bg-white border-none rounded-xl py-3 pl-8 text-3xl font-bold text-slate-900 outline-none shadow-inner ring-1 ring-slate-200 focus:ring-blue-500 transition-all" 
                                 />
@@ -603,6 +974,106 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
                         className={`${INPUT_CLASS} min-h-[100px] resize-none leading-relaxed`} 
                         placeholder="Zusätzliche Infos..."
                     />
+                </div>
+
+                <div className="space-y-6">
+                    <h4 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <span className="w-1 h-6 bg-slate-300 rounded-full"></span>
+                        OCR / Text
+                    </h4>
+
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className={LABEL_CLASS}>OCR Score</label>
+                                <input
+                                    value={String(formData.ocr_score ?? '')}
+                                    readOnly
+                                    className={`${INPUT_CLASS} font-mono bg-slate-100 text-slate-600`}
+                                />
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASS}>Dokumenttyp</label>
+                                <input
+                                    value={formData.documentType || ''}
+                                    onChange={e => handleInputChange('documentType', e.target.value)}
+                                    onBlur={handleBlur}
+                                    className={INPUT_CLASS}
+                                    placeholder="z.B. Rechnung, Quittung"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className={LABEL_CLASS}>OCR Rationale</label>
+                            <textarea
+                                value={formData.ocr_rationale || ''}
+                                onChange={e => handleInputChange('ocr_rationale', e.target.value)}
+                                onBlur={handleBlur}
+                                className={`${INPUT_CLASS} min-h-[80px] resize-none`}
+                                placeholder="(optional)"
+                            />
+                        </div>
+
+                        <div>
+                            <label className={LABEL_CLASS}>Text Content</label>
+                            <textarea
+                                value={formData.textContent || ''}
+                                onChange={e => handleInputChange('textContent', e.target.value)}
+                                onBlur={handleBlur}
+                                className={`${INPUT_CLASS} min-h-[80px] resize-none`}
+                                placeholder="(optional)"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    <h4 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <span className="w-1 h-6 bg-slate-200 rounded-full"></span>
+                        Legacy / Technik
+                    </h4>
+
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className={LABEL_CLASS}>Kontogruppe</label>
+                                <input
+                                    value={formData.kontogruppe || ''}
+                                    onChange={e => handleInputChange('kontogruppe', e.target.value)}
+                                    onBlur={handleBlur}
+                                    className={`${INPUT_CLASS} font-mono`}
+                                />
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASS}>Konto SKR03 (legacy)</label>
+                                <input
+                                    value={formData.konto_skr03 || ''}
+                                    onChange={e => handleInputChange('konto_skr03', e.target.value)}
+                                    onBlur={handleBlur}
+                                    className={`${INPUT_CLASS} font-mono`}
+                                />
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASS}>USt Typ (legacy)</label>
+                                <input
+                                    value={formData.ust_typ || ''}
+                                    onChange={e => handleInputChange('ust_typ', e.target.value)}
+                                    onBlur={handleBlur}
+                                    className={INPUT_CLASS}
+                                />
+                            </div>
+                            <div>
+                                <label className={LABEL_CLASS}>SteuerKategorie (legacy)</label>
+                                <input
+                                    value={formData.steuerKategorie || ''}
+                                    onChange={e => handleInputChange('steuerKategorie', e.target.value)}
+                                    onBlur={handleBlur}
+                                    className={INPUT_CLASS}
+                                />
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
             </div>

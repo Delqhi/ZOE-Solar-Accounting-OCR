@@ -1,5 +1,5 @@
 
-import { DocumentRecord, AppSettings, AccountGroupDefinition, VendorRule, TaxCategoryDefinition, AccountDefinition } from '../types';
+import { DocumentRecord, AppSettings, AccountGroupDefinition, VendorRule, TaxCategoryDefinition, AccountDefinition, DatevConfig, ElsterStammdaten, StartupChecklist } from '../types';
 
 const DB_NAME = 'ZoeAccountingDB';
 const STORE_DOCUMENTS = 'documents';
@@ -48,10 +48,57 @@ const DEFAULT_ACCOUNT_GROUPS: AccountGroupDefinition[] = [
   { id: 'mat', name: 'Wareneingang/Material', skr03: '3400', taxType: '19%', keywords: ['baustoff', 'kabel'], isRevenue: false },
 ];
 
+const DEFAULT_DATEV_CONFIG: DatevConfig = {
+  beraterNr: '',
+  mandantNr: '',
+  wirtschaftsjahrBeginn: `${new Date().getFullYear()}0101`,
+  sachkontenlaenge: 4,
+  waehrung: 'EUR',
+  herkunftKz: 'RE',
+  diktatkuerzel: '',
+  stapelBezeichnung: 'Buchungsstapel',
+  taxCategoryToBuKey: {
+    // Defaults sind bewusst konservativ. Für Sonderfälle (z.B. Reverse Charge) bitte in den Settings prüfen.
+    '19_pv': '9',
+    '7_pv': '8',
+    '0_pv': '0',
+    'steuerfrei_kn': '0',
+    'keine_pv': '0',
+    '0_igl_rc': ''
+  },
+};
+
+const DEFAULT_ELSTER_STAMMDATEN: ElsterStammdaten = {
+  unternehmensName: '',
+  land: 'DE',
+  plz: '',
+  ort: '',
+  strasse: '',
+  hausnummer: '',
+  eigeneSteuernummer: '',
+  eigeneUstIdNr: '',
+  finanzamtName: '',
+  finanzamtNr: '',
+  rechtsform: undefined,
+  besteuerungUst: 'unbekannt',
+  kleinunternehmer: false,
+  iban: '',
+  kontaktEmail: '',
+};
+
+const DEFAULT_STARTUP_CHECKLIST: StartupChecklist = {
+  uploadErsterBeleg: false,
+  datevKonfiguriert: false,
+  elsterStammdatenKonfiguriert: false,
+};
+
 const DEFAULT_SETTINGS: AppSettings = {
   id: 'global',
   taxDefinitions: DEFAULT_TAX_DEFINITIONS,
   accountDefinitions: DEFAULT_ACCOUNT_DEFINITIONS,
+  datevConfig: DEFAULT_DATEV_CONFIG,
+  elsterStammdaten: DEFAULT_ELSTER_STAMMDATEN,
+  startupChecklist: DEFAULT_STARTUP_CHECKLIST,
   accountGroups: DEFAULT_ACCOUNT_GROUPS,
   ocrConfig: {
     scores: {
@@ -96,8 +143,48 @@ export const getSettings = async (): Promise<AppSettings> => {
     request.onsuccess = () => {
       const result = request.result as AppSettings;
       if (result) {
+        let needsSave = false;
+
         // Ensure new fields exist if migrating
         if (!result.taxDefinitions) result.taxDefinitions = DEFAULT_TAX_DEFINITIONS;
+
+        if (!result.datevConfig) {
+          result.datevConfig = DEFAULT_DATEV_CONFIG;
+          needsSave = true;
+        } else {
+          // Minimal migration/merge for DATEV config
+          result.datevConfig = {
+            ...DEFAULT_DATEV_CONFIG,
+            ...result.datevConfig,
+            taxCategoryToBuKey: {
+              ...DEFAULT_DATEV_CONFIG.taxCategoryToBuKey,
+              ...(result.datevConfig.taxCategoryToBuKey || {}),
+            },
+          };
+        }
+
+        // ELSTER Stammdaten (Mandant)
+        if (!result.elsterStammdaten) {
+          result.elsterStammdaten = DEFAULT_ELSTER_STAMMDATEN;
+          needsSave = true;
+        } else {
+          // Minimal merge: keep user values, ensure defaults exist
+          result.elsterStammdaten = {
+            ...DEFAULT_ELSTER_STAMMDATEN,
+            ...result.elsterStammdaten,
+          };
+        }
+
+        // Startup checklist
+        if (!result.startupChecklist) {
+          result.startupChecklist = DEFAULT_STARTUP_CHECKLIST;
+          needsSave = true;
+        } else {
+          result.startupChecklist = {
+            ...DEFAULT_STARTUP_CHECKLIST,
+            ...result.startupChecklist,
+          };
+        }
         
         // AUTO-MERGE: Ensure critical default accounts exist even if user has saved settings
         if (!result.accountDefinitions) {
@@ -116,8 +203,12 @@ export const getSettings = async (): Promise<AppSettings> => {
                 });
                 
                 result.accountDefinitions = [...missingDefaults, ...updatedDefs];
-                saveSettings(result); 
+                needsSave = true;
             }
+        }
+
+        if (needsSave) {
+          saveSettings(result);
         }
         resolve(result);
       } else {
@@ -218,10 +309,29 @@ export const saveVendorRule = async (vendorName: string, accountId: string, taxC
 };
 
 // --- SQL Export (Updated for PostgreSQL Extension) ---
-export const exportDatabaseToSQL = async (): Promise<string> => {
-  const docs = await getAllDocuments();
+const generateSQLForDocuments = (docs: DocumentRecord[], settings?: AppSettings): string => {
   const timestamp = new Date().toISOString();
-  
+
+  const safeText = (v: unknown) => {
+    if (v === null || v === undefined) return 'NULL';
+    const s = String(v);
+    if (s.trim().length === 0) return 'NULL';
+    return `'${s.replace(/'/g, "''")}'`;
+  };
+  const safeNum = (v: unknown) => {
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : 'NULL';
+  };
+  const safeBool = (v: unknown) => {
+    if (v === true || v === 'true' || v === 1) return 'TRUE';
+    if (v === false || v === 'false' || v === 0) return 'FALSE';
+    return 'NULL';
+  };
+  const safeDate = (dateStr: unknown) => {
+    const s = dateStr === null || dateStr === undefined ? '' : String(dateStr);
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? `'${s}'` : 'NULL';
+  };
+
   let sql = `-- ZOE Solar Accounting Export\n-- Generated: ${timestamp}\n\n`;
 
   // 1. New Tables Definition
@@ -243,15 +353,56 @@ CREATE TABLE IF NOT EXISTS kontierungskonten (
   allowed_tax_categories TEXT[]
 );\n`;
 
+  // 1b. ELSTER Stammdaten (1 Row)
+  sql += `
+CREATE TABLE IF NOT EXISTS elster_stammdaten (
+  id VARCHAR(20) PRIMARY KEY,
+  unternehmens_name TEXT,
+  land VARCHAR(10),
+  plz VARCHAR(20),
+  ort TEXT,
+  strasse TEXT,
+  hausnummer TEXT,
+  eigene_steuernummer TEXT,
+  eigene_steuernummer_digits TEXT,
+  eigene_ust_idnr TEXT,
+  finanzamt_name TEXT,
+  finanzamt_nr TEXT,
+  rechtsform TEXT,
+  besteuerung_ust TEXT,
+  kleinunternehmer BOOLEAN,
+  iban TEXT,
+  kontakt_email TEXT,
+  updated_at TIMESTAMP DEFAULT NOW()
+);\n`;
+
   // 2. Belege Table Extension
   sql += `
 CREATE TABLE IF NOT EXISTS belege (
     id UUID PRIMARY KEY,
+    document_type VARCHAR(100),
     datum DATE,
+    belegnummer_lieferant VARCHAR(255),
+    eigene_beleg_nummer VARCHAR(255),
     lieferant VARCHAR(255),
+    lieferant_adresse TEXT,
+    steuernummer VARCHAR(100),
+
+    -- Zahlung / Organisation
+    zahlungsmethode VARCHAR(100),
+    zahlungs_datum DATE,
+    zahlungs_status VARCHAR(50),
+    rechnungs_empfaenger VARCHAR(255),
+    aufbewahrungs_ort VARCHAR(255),
+
     betrag DECIMAL(10,2),
-    ust_satz DECIMAL(5,4),
-    vorsteuer_betrag DECIMAL(10,2),
+    netto_betrag DECIMAL(10,2),
+    mwst_satz_0 NUMERIC(5,4),
+    mwst_betrag_0 DECIMAL(10,2),
+    mwst_satz_7 NUMERIC(5,4),
+    mwst_betrag_7 DECIMAL(10,2),
+    mwst_satz_19 NUMERIC(5,4),
+    mwst_betrag_19 DECIMAL(10,2),
     
     -- New Fields
     steuerkategorie VARCHAR(50),
@@ -259,13 +410,72 @@ CREATE TABLE IF NOT EXISTS belege (
     soll_konto VARCHAR(10),
     haben_konto VARCHAR(10),
     konto_ust_satz NUMERIC(5,4),
+
+    -- Legacy / Derived (keep for completeness)
+    kontogruppe VARCHAR(100),
+    konto_skr03 VARCHAR(10),
+    ust_typ VARCHAR(50),
+    steuer_kategorie_legacy VARCHAR(100),
+
+    -- Flags
+    reverse_charge BOOLEAN,
+    vorsteuerabzug BOOLEAN,
+    kleinbetrag BOOLEAN,
+    privatanteil BOOLEAN,
     
     ocr_score INTEGER,
     ocr_rationale TEXT,
-    
     ocr_text TEXT,
+    text_content TEXT,
+    beschreibung TEXT,
+    status VARCHAR(50),
+    
     created_at TIMESTAMP DEFAULT NOW()
 );\n\n`;
+
+  // Positionen (1:n)
+  sql += `
+CREATE TABLE IF NOT EXISTS beleg_positionen (
+    doc_id UUID NOT NULL REFERENCES belege(id) ON DELETE CASCADE,
+    line_index INTEGER NOT NULL,
+    description TEXT,
+    amount DECIMAL(10,2),
+    created_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (doc_id, line_index)
+);\n\n`;
+
+  // Ensure columns exist even if table already exists (idempotent)
+  sql += `
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS document_type VARCHAR(100);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS belegnummer_lieferant VARCHAR(255);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS eigene_beleg_nummer VARCHAR(255);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS lieferant_adresse TEXT;
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS steuernummer VARCHAR(100);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS netto_betrag DECIMAL(10,2);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS mwst_satz_0 NUMERIC(5,4);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS mwst_betrag_0 DECIMAL(10,2);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS mwst_satz_7 NUMERIC(5,4);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS mwst_betrag_7 DECIMAL(10,2);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS mwst_satz_19 NUMERIC(5,4);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS mwst_betrag_19 DECIMAL(10,2);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS zahlungsmethode VARCHAR(100);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS zahlungs_datum DATE;
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS zahlungs_status VARCHAR(50);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS rechnungs_empfaenger VARCHAR(255);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS aufbewahrungs_ort VARCHAR(255);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS reverse_charge BOOLEAN;
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS vorsteuerabzug BOOLEAN;
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS kleinbetrag BOOLEAN;
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS privatanteil BOOLEAN;
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS kontogruppe VARCHAR(100);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS konto_skr03 VARCHAR(10);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS ust_typ VARCHAR(50);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS steuer_kategorie_legacy VARCHAR(100);
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS ocr_text TEXT;
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS text_content TEXT;
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS beschreibung TEXT;
+ALTER TABLE belege ADD COLUMN IF NOT EXISTS status VARCHAR(50);
+\n`;
 
   // 3. Insert Config Data
   DEFAULT_TAX_DEFINITIONS.forEach(t => {
@@ -277,30 +487,175 @@ CREATE TABLE IF NOT EXISTS belege (
 
   sql += "\n-- Data Insertion\n";
 
+  // ELSTER Stammdaten (Settings)
+  const elster = settings?.elsterStammdaten;
+  const elsterDigits = (elster?.eigeneSteuernummer || '').replace(/\D/g, '');
+  sql += `INSERT INTO elster_stammdaten (
+  id,
+  unternehmens_name,
+  land,
+  plz,
+  ort,
+  strasse,
+  hausnummer,
+  eigene_steuernummer,
+  eigene_steuernummer_digits,
+  eigene_ust_idnr,
+  finanzamt_name,
+  finanzamt_nr,
+  rechtsform,
+  besteuerung_ust,
+  kleinunternehmer,
+  iban,
+  kontakt_email,
+  updated_at
+) VALUES (
+  'global',
+  ${safeText(elster?.unternehmensName)},
+  ${safeText(elster?.land)},
+  ${safeText(elster?.plz)},
+  ${safeText(elster?.ort)},
+  ${safeText(elster?.strasse)},
+  ${safeText(elster?.hausnummer)},
+  ${safeText(elster?.eigeneSteuernummer)},
+  ${safeText(elsterDigits)},
+  ${safeText(elster?.eigeneUstIdNr)},
+  ${safeText(elster?.finanzamtName)},
+  ${safeText(elster?.finanzamtNr)},
+  ${safeText(elster?.rechtsform)},
+  ${safeText(elster?.besteuerungUst)},
+  ${safeBool(elster?.kleinunternehmer)},
+  ${safeText(elster?.iban)},
+  ${safeText(elster?.kontaktEmail)},
+  NOW()
+) ON CONFLICT (id) DO UPDATE SET
+  unternehmens_name = EXCLUDED.unternehmens_name,
+  land = EXCLUDED.land,
+  plz = EXCLUDED.plz,
+  ort = EXCLUDED.ort,
+  strasse = EXCLUDED.strasse,
+  hausnummer = EXCLUDED.hausnummer,
+  eigene_steuernummer = EXCLUDED.eigene_steuernummer,
+  eigene_steuernummer_digits = EXCLUDED.eigene_steuernummer_digits,
+  eigene_ust_idnr = EXCLUDED.eigene_ust_idnr,
+  finanzamt_name = EXCLUDED.finanzamt_name,
+  finanzamt_nr = EXCLUDED.finanzamt_nr,
+  rechtsform = EXCLUDED.rechtsform,
+  besteuerung_ust = EXCLUDED.besteuerung_ust,
+  kleinunternehmer = EXCLUDED.kleinunternehmer,
+  iban = EXCLUDED.iban,
+  kontakt_email = EXCLUDED.kontakt_email,
+  updated_at = NOW();\n\n`;
+
   docs.forEach(doc => {
       const d = doc.data || {} as any;
-      const safeText = (s: string) => s ? `'${s.replace(/'/g, "''")}'` : 'NULL';
-      const safeNum = (n: number) => n !== undefined && n !== null ? n : 'NULL';
-      const safeDate = (dateStr: string) => /^\d{4}-\d{2}-\d{2}$/.test(dateStr || '') ? `'${dateStr}'` : 'NULL';
       
       sql += `INSERT INTO belege (
-    id, datum, lieferant, betrag, 
-    steuerkategorie, kontierungskonto, soll_konto, haben_konto, konto_ust_satz, 
-    ocr_score, ocr_rationale
+    id,
+    document_type,
+    datum,
+    belegnummer_lieferant,
+    eigene_beleg_nummer,
+    lieferant,
+    lieferant_adresse,
+    steuernummer,
+    zahlungsmethode,
+    zahlungs_datum,
+    zahlungs_status,
+    rechnungs_empfaenger,
+    aufbewahrungs_ort,
+    betrag,
+    netto_betrag,
+    mwst_satz_0,
+    mwst_betrag_0,
+    mwst_satz_7,
+    mwst_betrag_7,
+    mwst_satz_19,
+    mwst_betrag_19,
+    steuerkategorie,
+    kontierungskonto,
+    soll_konto,
+    haben_konto,
+    konto_ust_satz,
+    kontogruppe,
+    konto_skr03,
+    ust_typ,
+    steuer_kategorie_legacy,
+    reverse_charge,
+    vorsteuerabzug,
+    kleinbetrag,
+    privatanteil,
+    ocr_score,
+    ocr_rationale,
+    ocr_text,
+    text_content,
+    beschreibung,
+    status
 ) VALUES (
     '${doc.id}',
+    ${safeText(d.documentType)},
     ${safeDate(d.belegDatum)},
+    ${safeText(d.belegNummerLieferant)},
+    ${safeText(d.eigeneBelegNummer)},
     ${safeText(d.lieferantName)},
+    ${safeText(d.lieferantAdresse)},
+    ${safeText(d.steuernummer)},
+    ${safeText(d.zahlungsmethode)},
+    ${safeDate(d.zahlungsDatum)},
+    ${safeText(d.zahlungsStatus)},
+    ${safeText(d.rechnungsEmpfaenger)},
+    ${safeText(d.aufbewahrungsOrt)},
     ${safeNum(d.bruttoBetrag)},
+    ${safeNum(d.nettoBetrag)},
+    ${safeNum(d.mwstSatz0)},
+    ${safeNum(d.mwstBetrag0)},
+    ${safeNum(d.mwstSatz7)},
+    ${safeNum(d.mwstBetrag7)},
+    ${safeNum(d.mwstSatz19)},
+    ${safeNum(d.mwstBetrag19)},
     ${safeText(d.steuerkategorie)},
     ${safeText(d.kontierungskonto)},
     ${safeText(d.sollKonto)},
     ${safeText(d.habenKonto)},
-    NULL, 
+    NULL,
+    ${safeText(d.kontogruppe)},
+    ${safeText(d.konto_skr03)},
+    ${safeText(d.ust_typ)},
+    ${safeText(d.steuerKategorie)},
+    ${safeBool(d.reverseCharge)},
+    ${safeBool(d.vorsteuerabzug)},
+    ${safeBool(d.kleinbetrag)},
+    ${safeBool(d.privatanteil)},
     ${safeNum(d.ocr_score)},
-    ${safeText(d.ocr_rationale)}
+    ${safeText(d.ocr_rationale)},
+    ${safeText(d.textContent || '')},
+    ${safeText(d.textContent || '')},
+    ${safeText(d.beschreibung || '')},
+    ${safeText(doc.status)}
 );\n`;
+
+      // Line items -> beleg_positionen
+      const items = (d.lineItems || []) as any[];
+      items.forEach((it, idx) => {
+        sql += `INSERT INTO beleg_positionen (doc_id, line_index, description, amount) VALUES (
+    '${doc.id}',
+    ${idx},
+    ${safeText(it?.description)},
+    ${safeNum(it?.amount)}
+  ) ON CONFLICT (doc_id, line_index) DO UPDATE SET
+    description = EXCLUDED.description,
+    amount = EXCLUDED.amount;\n`;
+      });
   });
   
   return sql;
+};
+
+export const exportDatabaseToSQL = async (): Promise<string> => {
+  const [docs, settings] = await Promise.all([getAllDocuments(), getSettings()]);
+  return generateSQLForDocuments(docs, settings);
+};
+
+export const exportDocumentsToSQL = (docs: DocumentRecord[], settings?: AppSettings): string => {
+  return generateSQLForDocuments(docs, settings);
 };

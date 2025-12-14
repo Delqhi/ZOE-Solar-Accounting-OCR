@@ -79,7 +79,9 @@ const PV_MATERIAL_KEYWORDS = [
     'versand', 'material', 'baustoff', 'unterkonstruktion', 'ziegel', 'lüfter'
 ];
 
-const determineAccount = (data: ExtractedData, accounts: AccountDefinition[]): AccountDefinition | null => {
+type AccountMatch = { account: AccountDefinition | null; reason?: string };
+
+const determineAccount = (data: ExtractedData, accounts: AccountDefinition[]): AccountMatch => {
     // Combine all relevant text sources
     const fullText = (
         (data.lieferantName || '') + ' ' + 
@@ -90,23 +92,36 @@ const determineAccount = (data: ExtractedData, accounts: AccountDefinition[]): A
 
     // 1. Priority Check: Material / Wareneingang via Line Item Keywords
     // If we find specific hardware keywords, we prioritize the Material account
-    const hasMaterialKeyword = PV_MATERIAL_KEYWORDS.some(kw => fullText.includes(kw));
-    if (hasMaterialKeyword) {
+    const matchedMaterialKeyword = PV_MATERIAL_KEYWORDS.find(kw => fullText.includes(kw));
+    if (matchedMaterialKeyword) {
         const materialAccount = accounts.find(a => a.id === 'wareneingang');
-        if (materialAccount) return materialAccount;
+        if (materialAccount) {
+            return { account: materialAccount, reason: `Material-Stichwort erkannt (z.B. "${matchedMaterialKeyword}") -> Wareneingang/Material.` };
+        }
     }
 
     // 2. Standard Name Match
     for (const acc of accounts) {
-        if (fullText.includes(acc.name.toLowerCase())) return acc;
+        if (fullText.includes(acc.name.toLowerCase())) {
+            return { account: acc, reason: `Kontoname im Text gefunden: "${acc.name}".` };
+        }
     }
     
     // 3. Specific Hardcoded Fallbacks
-    if (fullText.includes('tank') || fullText.includes('aral') || fullText.includes('shell') || fullText.includes('jet ')) return accounts.find(a => a.id === 'fuhrpark') || null;
-    if (fullText.includes('adobe') || fullText.includes('software') || fullText.includes('google')) return accounts.find(a => a.id === 'software') || null;
-    if (fullText.includes('telekom') || fullText.includes('o2') || fullText.includes('vodafone')) return accounts.find(a => a.id === 'internet') || null;
+    if (fullText.includes('tank') || fullText.includes('aral') || fullText.includes('shell') || fullText.includes('jet ')) {
+        const acc = accounts.find(a => a.id === 'fuhrpark') || null;
+        return { account: acc, reason: 'Heuristik: Kraftstoff/Auto (z.B. "aral/shell/tank").' };
+    }
+    if (fullText.includes('adobe') || fullText.includes('software') || fullText.includes('google')) {
+        const acc = accounts.find(a => a.id === 'software') || null;
+        return { account: acc, reason: 'Heuristik: Software/Lizenzen (z.B. "adobe/software/google").' };
+    }
+    if (fullText.includes('telekom') || fullText.includes('o2') || fullText.includes('vodafone')) {
+        const acc = accounts.find(a => a.id === 'internet') || null;
+        return { account: acc, reason: 'Heuristik: Internet/Telefon (z.B. "telekom/vodafone").' };
+    }
     
-    return null;
+    return { account: null };
 };
 
 export const applyAccountingRules = (
@@ -121,20 +136,32 @@ export const applyAccountingRules = (
 
   // 1. Determine Account
   let matchedAccount: AccountDefinition | null | undefined = null;
+  let accountReason: string | undefined = undefined;
   
   if (forcedVendorRule?.accountId) {
       matchedAccount = accounts.find(a => a.id === forcedVendorRule.accountId);
-      if (matchedAccount) enriched.ruleApplied = true;
+      if (matchedAccount) {
+          enriched.ruleApplied = true;
+          const vendor = (enriched.lieferantName || '').trim();
+          accountReason = vendor
+              ? `Aus gespeicherter Lieferanten-Regel für "${vendor}".`
+              : 'Aus gespeicherter Lieferanten-Regel.';
+      } else {
+          accountReason = 'Lieferanten-Regel verweist auf unbekanntes Konto; Heuristik/Fallback verwendet.';
+      }
   }
   
   if (!matchedAccount) {
-      matchedAccount = determineAccount(enriched, accounts);
+      const match = determineAccount(enriched, accounts);
+      matchedAccount = match.account;
+      accountReason = match.reason;
   }
 
   // Set Account & SKR03
   if (matchedAccount) {
       enriched.kontierungskonto = matchedAccount.id;
       enriched.kontogruppe = matchedAccount.name; // Legacy compatibility
+      if (accountReason) enriched.kontierungBegruendung = accountReason;
       
       // NEW: Set Soll / Haben
       enriched.sollKonto = matchedAccount.skr03 || '0000';
@@ -151,6 +178,7 @@ export const applyAccountingRules = (
       enriched.kontogruppe = 'Sonstiges';
       enriched.sollKonto = '4900';
       enriched.habenKonto = '1200';
+      enriched.kontierungBegruendung = accountReason || 'Kein Konto-Match; Standardkonto "Sonstiges".';
   }
 
   // 2. Determine Tax Category

@@ -8,6 +8,8 @@ import { analyzeDocumentWithGemini } from './services/geminiService';
 import { applyAccountingRules, generateZoeInvoiceId } from './services/ruleEngine';
 import * as storageService from './services/storageService';
 import { DocumentRecord, DocumentStatus, AppSettings, ExtractedData, Attachment } from './types';
+import { normalizeExtractedData } from './services/extractedDataNormalization';
+import { formatPreflightForDialog, runExportPreflight } from './services/exportPreflight';
 
 const computeFileHash = async (file: File): Promise<string> => {
   const buffer = await file.arrayBuffer();
@@ -27,8 +29,45 @@ const readFileToBase64 = (file: File): Promise<{base64: string, url: string}> =>
     });
 };
 
+type DuplicateMatch = { doc: DocumentRecord; reason: string; confidence: number };
+
+const classifyOcrOutcome = (data: ExtractedData): { status: DocumentStatus; error?: string } => {
+    const score = data.ocr_score ?? 0;
+    const vendor = (data.lieferantName || '').toLowerCase();
+    const rationale = (data.ocr_rationale || '').trim();
+    const description = (data.beschreibung || '').trim();
+
+    const msg = (rationale || description).toLowerCase();
+
+    const isTechnicalFailure =
+        msg.includes('siliconflow_api_key') ||
+        msg.includes('api key') ||
+        msg.includes('pdf ist zu groß') ||
+        msg.includes('vision api error') ||
+        msg.includes('gemini fehlgeschlagen') ||
+        msg.includes('quota') ||
+        msg.includes('http 4') ||
+        msg.includes('http 5');
+
+    const looksLikeManualTemplate =
+        vendor.includes('manuelle eingabe') ||
+        (score <= 0 && (data.bruttoBetrag ?? 0) === 0);
+
+    if (looksLikeManualTemplate) {
+        const msg = rationale || description || 'Analyse fehlgeschlagen. Bitte manuell erfassen.';
+        return { status: isTechnicalFailure ? DocumentStatus.ERROR : DocumentStatus.REVIEW_NEEDED, error: msg };
+    }
+
+    // Non-fatal but needs review
+    if (rationale.includes('Datum unklar') || rationale.includes('Summen widersprüchlich') || score < 6) {
+        return { status: DocumentStatus.REVIEW_NEEDED, error: rationale || 'Bitte Daten prüfen.' };
+    }
+
+    return { status: DocumentStatus.COMPLETED, error: undefined };
+};
+
 // --- AGGRESSIVE SEMANTIC DUPLICATE DETECTION V2 ---
-const findSemanticDuplicate = (data: Partial<ExtractedData>, existingDocs: DocumentRecord[]): DocumentRecord | undefined => {
+const findSemanticDuplicate = (data: Partial<ExtractedData>, existingDocs: DocumentRecord[]): DuplicateMatch | undefined => {
     if (!data.bruttoBetrag && !data.belegNummerLieferant) return undefined;
     
     // Helper to normalize strings (remove spaces, special chars, lowercase)
@@ -40,9 +79,9 @@ const findSemanticDuplicate = (data: Partial<ExtractedData>, existingDocs: Docum
     const newDate = data.belegDatum;
     const newVendor = normalize(data.lieferantName);
 
-    return existingDocs.find(doc => {
+    for (const doc of existingDocs) {
         // Skip invalid docs or the doc itself (if we had IDs here, but this runs before ID assignment in some flows)
-        if (!doc.data || doc.status === DocumentStatus.ERROR || doc.status === DocumentStatus.DUPLICATE) return false;
+        if (!doc.data || doc.status === DocumentStatus.ERROR || doc.status === DocumentStatus.DUPLICATE) continue;
         
         const existingInvNum = normalize(doc.data.belegNummerLieferant);
         const existingAmount = doc.data.bruttoBetrag;
@@ -54,8 +93,7 @@ const findSemanticDuplicate = (data: Partial<ExtractedData>, existingDocs: Docum
         if (newInvoiceNum.length >= 2 && newInvoiceNum === existingInvNum) {
             if (newAmount !== undefined && existingAmount !== undefined) {
                 if (Math.abs(newAmount - existingAmount) < 0.1) {
-                    doc.duplicateReason = `Belegnummer (${doc.data.belegNummerLieferant}) und Betrag identisch.`;
-                    return true;
+                    return { doc, reason: `Belegnummer (${doc.data.belegNummerLieferant}) und Betrag identisch.`, confidence: 0.95 };
                 }
             }
         }
@@ -64,8 +102,7 @@ const findSemanticDuplicate = (data: Partial<ExtractedData>, existingDocs: Docum
         // If Amount is slightly different (OCR error) but Number and Date match exactly.
         if (newInvoiceNum.length >= 3 && newInvoiceNum === existingInvNum) {
             if (newDate && existingDate && newDate === existingDate) {
-                doc.duplicateReason = `Belegnummer (${doc.data.belegNummerLieferant}) und Datum identisch.`;
-                return true;
+                return { doc, reason: `Belegnummer (${doc.data.belegNummerLieferant}) und Datum identisch.`, confidence: 0.9 };
             }
         }
 
@@ -92,12 +129,13 @@ const findSemanticDuplicate = (data: Partial<ExtractedData>, existingDocs: Docum
 
         // If Score is high enough, flag it
         if (score >= 70) {
-            doc.duplicateReason = "Hohe Ähnlichkeit bei Datum, Betrag und Lieferant.";
-            return true;
+            return { doc, reason: "Hohe Ähnlichkeit bei Datum, Betrag und Lieferant.", confidence: Math.min(0.89, score / 100) };
         }
 
-        return false;
-    });
+        continue;
+    }
+
+    return undefined;
 };
 
 export default function App() {
@@ -199,19 +237,29 @@ export default function App() {
     const processingPromises = fileData.map(async (item) => {
         const isExactDuplicate = currentDocsSnapshot.some(d => d.id !== item.id && d.fileHash === item.hash);
         if (isExactDuplicate) {
+                         const original = currentDocsSnapshot.find(d => d.fileHash === item.hash);
              return { 
                  type: 'DOC', 
-                 doc: { id: item.id, status: DocumentStatus.DUPLICATE, error: undefined, data: null, duplicateReason: "Datei identisch (Hash)" } 
+                                 doc: { 
+                                     id: item.id,
+                                     status: DocumentStatus.DUPLICATE,
+                                     error: undefined,
+                                     data: null,
+                                     duplicateReason: "Datei identisch (Hash)",
+                                     duplicateOfId: original?.id,
+                                     duplicateConfidence: 1
+                                 } 
              };
         }
 
         try {
-            const extracted = await analyzeDocumentWithGemini(item.base64, item.file.type);
+            const extractedRaw = await analyzeDocumentWithGemini(item.base64, item.file.type);
+            const extracted = normalizeExtractedData(extractedRaw);
             
             // Check for Semantic Duplicate using Extracted Data
             const semanticDup = findSemanticDuplicate(extracted, currentDocsSnapshot);
             
-            if (semanticDup && semanticDup.id !== item.id) {
+            if (semanticDup && semanticDup.doc.id !== item.id) {
                  // OPTION A: Auto-Merge if it was a file upload that matches an existing one perfectly?
                  // Current logic: Create a NEW doc entry but mark as DUPLICATE so user sees it.
                  // This is safer than silently merging.
@@ -221,12 +269,15 @@ export default function App() {
                          id: item.id, 
                          status: DocumentStatus.DUPLICATE, 
                          data: extracted,
-                         duplicateReason: semanticDup.duplicateReason || "Inhaltliches Duplikat erkannt"
+                         duplicateReason: semanticDup.reason || "Inhaltliches Duplikat erkannt",
+                         duplicateOfId: semanticDup.doc.id,
+                         duplicateConfidence: semanticDup.confidence
                      }
                  };
             }
 
-            return { type: 'DOC', data: extracted, id: item.id };
+            const outcome = classifyOcrOutcome(extracted);
+            return { type: 'DOC', data: extracted, id: item.id, outcome };
         } catch (e) {
             return { 
                 type: 'DOC', 
@@ -272,7 +323,7 @@ export default function App() {
 
             } else if ('data' in res && res.data && res.id) {
                 // Success Case
-                const { id, data } = res;
+                const { id, data } = res as any;
                 const placeholder = newDocs.find(d => d.id === id);
                 if (!placeholder) continue;
 
@@ -284,14 +335,16 @@ export default function App() {
                     if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
                 }
                 
+                const normalized = normalizeExtractedData(data);
+                const outcome = (res as any).outcome || classifyOcrOutcome(normalized);
                 const finalData = applyAccountingRules(
-                    { ...data as ExtractedData, eigeneBelegNummer: zoeId }, 
+                    { ...normalized, eigeneBelegNummer: zoeId }, 
                     currentDocsSnapshot, 
                     currentSettings, 
                     overrideRule
                 );
                 
-                finalDoc = { ...placeholder, status: DocumentStatus.COMPLETED, data: finalData };
+                finalDoc = { ...placeholder, status: outcome.status, data: finalData, error: outcome.error };
                 currentDocsSnapshot.push(finalDoc); 
             }
             
@@ -343,6 +396,22 @@ export default function App() {
     const targetDoc = documents.find(d => d.id === targetId);
     if (!sourceDoc || !targetDoc) return;
 
+    // D2: Safety checks - don't merge duplicates
+    if (sourceDoc.status === DocumentStatus.DUPLICATE || targetDoc.status === DocumentStatus.DUPLICATE) {
+        setNotification('Merge abgebrochen: Duplikate können nicht als Quelle/Ziel genutzt werden.');
+        return;
+    }
+
+    if (sourceDoc.status === DocumentStatus.ERROR || targetDoc.status === DocumentStatus.ERROR) {
+        setNotification('Merge abgebrochen: Belege mit Fehlerstatus können nicht gemerged werden.');
+        return;
+    }
+
+    if (sourceDoc.status === DocumentStatus.REVIEW_NEEDED || targetDoc.status === DocumentStatus.REVIEW_NEEDED) {
+        setNotification('Merge abgebrochen: Belege mit Status "Prüfen" bitte erst korrigieren, dann mergen.');
+        return;
+    }
+
     if (!confirm(`Möchten Sie "${sourceDoc.fileName}" in "${targetDoc.fileName}" integrieren?`)) return;
 
     // Preserve the source document as an attachment
@@ -375,10 +444,11 @@ export default function App() {
 
   const handleRetryOCR = async (doc: DocumentRecord) => {
     if (!doc.previewUrl) return;
-    setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, status: DocumentStatus.PROCESSING } : d));
+        setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, status: DocumentStatus.PROCESSING, error: undefined } : d));
     try {
       const base64 = doc.previewUrl.split(',')[1];
-      const extracted = await analyzeDocumentWithGemini(base64, doc.fileType);
+            const extractedRaw = await analyzeDocumentWithGemini(base64, doc.fileType);
+            const extracted = normalizeExtractedData(extractedRaw);
       const currentSettings = settings || await storageService.getSettings();
       const existingId = doc.data?.eigeneBelegNummer;
       let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
@@ -386,12 +456,14 @@ export default function App() {
            const rule = await storageService.getVendorRule(extracted.lieferantName);
            if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
       }
-      let finalData = applyAccountingRules(extracted as ExtractedData, documents, currentSettings, overrideRule);
+            let finalData = applyAccountingRules(extracted, documents, currentSettings, overrideRule);
       finalData.eigeneBelegNummer = existingId || generateZoeInvoiceId(finalData.belegDatum, documents);
-      const updated = { ...doc, status: DocumentStatus.COMPLETED, data: finalData, error: undefined };
+            const outcome = classifyOcrOutcome(finalData);
+            const updated = { ...doc, status: outcome.status, data: finalData, error: outcome.error };
       await handleSaveDocument(updated);
     } catch (e) {
-      const errDoc = { ...doc, status: DocumentStatus.ERROR, error: "Retry fehlgeschlagen" };
+            const msg = e instanceof Error ? e.message : 'Retry fehlgeschlagen';
+            const errDoc = { ...doc, status: DocumentStatus.ERROR, error: msg };
       await handleSaveDocument(errDoc);
     }
   };
@@ -431,14 +503,41 @@ export default function App() {
           return <SettingsView settings={settings} onSave={(s) => { setSettings(s); storageService.saveSettings(s); }} onClose={() => setViewMode('document')} />;
       }
       if (viewMode === 'database') {
+          const handleExportSQLWithPreflight = async () => {
+              const currentSettings = settings || await storageService.getSettings();
+              const docsToExport = filteredDocuments;
+              const preflight = runExportPreflight(docsToExport, currentSettings);
+              const dialog = formatPreflightForDialog(preflight);
+
+              if (preflight.blockers.length > 0) {
+                  alert(`${dialog.title}\n\n${dialog.body}`);
+                  return;
+              }
+
+              if (preflight.warnings.length > 0) {
+                  const ok = confirm(`${dialog.title}\n\n${dialog.body}\n\nTrotzdem exportieren?`);
+                  if (!ok) return;
+              }
+
+              const sql = storageService.exportDocumentsToSQL(docsToExport, currentSettings);
+              const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+              const y = filterYear === 'all' ? 'all' : filterYear;
+              const q = filterQuarter === 'all' ? 'all' : filterQuarter;
+              const m = filterMonth === 'all' ? 'all' : filterMonth;
+              const fileName = `zoe_belege_${y}_${q}_${m}_${timestamp}.sql`;
+              const url = URL.createObjectURL(new Blob([sql], { type: 'text/sql' }));
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = fileName;
+              a.click();
+          };
+
           return <DatabaseGrid 
               documents={filteredDocuments} 
               onSelectDocument={(d) => { setSelectedDocId(d.id); setViewMode('document'); }} 
-              onExportSQL={() => storageService.exportDatabaseToSQL().then(sql => {
-                  const url = URL.createObjectURL(new Blob([sql], {type: 'text/sql'}));
-                  const a = document.createElement('a'); a.href = url; a.download = 'zoe_export.sql'; a.click();
-              })}
+              onExportSQL={handleExportSQLWithPreflight}
               onMerge={handleMergeDocuments}
+              settings={settings}
               availableYears={availableYears}
               filterYear={filterYear} onFilterYearChange={setFilterYear}
               filterQuarter={filterQuarter} onFilterQuarterChange={setFilterQuarter}
@@ -584,16 +683,19 @@ export default function App() {
                     const isActive = selectedDocId === doc.id;
                     const isDragTarget = sidebarDragTarget === doc.id;
                     const isDup = doc.status === DocumentStatus.DUPLICATE;
+                    const isErr = doc.status === DocumentStatus.ERROR;
+                    const isReview = doc.status === DocumentStatus.REVIEW_NEEDED;
+                    const isBlocked = isDup || isErr || isReview;
                     const displayId = doc.data?.eigeneBelegNummer || doc.id.substring(0, 8);
                     
                     return (
                         <div 
                             key={doc.id}
-                            draggable={!isDup}
-                            title={isDup ? `Duplikat: ${doc.duplicateReason}` : ''}
+                            draggable={!isBlocked}
+                            title={isDup ? `Duplikat: ${doc.duplicateReason}` : (isErr || isReview) ? (doc.error || doc.data?.ocr_rationale || '') : ''}
                             onClick={() => { setSelectedDocId(doc.id); setViewMode('document'); }}
                             onDragStart={(e) => {
-                                if (isDup) {
+                                if (isBlocked) {
                                     e.preventDefault();
                                     return;
                                 }
@@ -601,7 +703,7 @@ export default function App() {
                                 e.dataTransfer.effectAllowed = 'move';
                             }}
                             onDragOver={(e) => {
-                                if (!isDup) {
+                                if (!isBlocked) {
                                     e.preventDefault();
                                     setSidebarDragTarget(doc.id);
                                 }
@@ -610,7 +712,7 @@ export default function App() {
                             onDrop={(e) => {
                                 e.preventDefault();
                                 setSidebarDragTarget(null);
-                                if (isDup) return;
+                                if (isBlocked) return;
                                 
                                 const sourceId = e.dataTransfer.getData('text/plain');
                                 if (sourceId && sourceId !== doc.id) {
@@ -622,10 +724,10 @@ export default function App() {
                                 ${isActive ? 'bg-white shadow-md shadow-blue-500/5 text-blue-700 ring-1 ring-blue-100' : 'text-slate-600 hover:bg-slate-100/80'}
                                 ${isDragTarget ? 'ring-2 ring-blue-500 bg-blue-50' : ''}
                                 ${isDup && !isActive ? 'bg-red-50 text-red-600' : ''}
-                                ${isDup ? 'opacity-80' : ''}
+                                ${(isDup || isErr || isReview) ? 'opacity-80' : ''}
                             `}
                         >
-                            <div className={`w-2 h-2 rounded-full flex-none ${isDup ? 'bg-red-500' : (isActive ? 'bg-blue-500' : 'bg-slate-300')}`}></div>
+                            <div className={`w-2 h-2 rounded-full flex-none ${isDup ? 'bg-red-500' : isErr ? 'bg-rose-500' : isReview ? 'bg-amber-500' : (isActive ? 'bg-blue-500' : 'bg-slate-300')}`}></div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-baseline">
                                     <span className="font-mono font-medium text-xs truncate opacity-90">{displayId}</span>

@@ -1,14 +1,17 @@
 
 import React, { useMemo, useState } from 'react';
-import { DocumentRecord, DocumentStatus } from '../types';
+import { AppSettings, DocumentRecord, DocumentStatus } from '../types';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
+import { formatPreflightForDialog, runExportPreflight } from '../services/exportPreflight';
+import { generateDatevExtfBuchungsstapelCsv, runDatevExportPreflight } from '../services/datevExport';
 
 interface DatabaseGridProps {
   documents: DocumentRecord[];
   onSelectDocument: (doc: DocumentRecord) => void;
-  onExportSQL: () => void;
+    onExportSQL: () => void | Promise<void>;
   onMerge: (sourceId: string, targetId: string) => void;
+    settings?: AppSettings;
   availableYears: string[];
   filterYear: string;
   onFilterYearChange: (val: string) => void;
@@ -23,6 +26,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
   onSelectDocument,
   onExportSQL,
   onMerge,
+    settings,
   availableYears,
   filterYear,
   onFilterYearChange,
@@ -169,29 +173,124 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
   };
 
   const handleExportPDF = () => {
+        const preflight = runExportPreflight(sortedDocs, settings);
+    const dialog = formatPreflightForDialog(preflight);
+
+    if (preflight.blockers.length > 0) {
+        alert(`${dialog.title}\n\n${dialog.body}`);
+        return;
+    }
+
+    if (preflight.warnings.length > 0) {
+        const ok = confirm(`${dialog.title}\n\n${dialog.body}\n\nTrotzdem exportieren?`);
+        if (!ok) return;
+    }
+
     const doc = new jsPDF('l', 'mm', 'a4'); // Landscape for more columns
     const title = viewType === 'euer' ? 'Einnahmenüberschussrechnung (EÜR)' : viewType === 'ustva' ? 'Umsatzsteuervoranmeldung' : 'Belegliste (Detailliert)';
+    const timestamp = new Date().toISOString();
+    const timestampTag = timestamp.replace(/[:.]/g, '-');
+    const y = filterYear === 'all' ? 'all' : filterYear;
+    const q = filterQuarter === 'all' ? 'all' : filterQuarter;
+    const m = filterMonth === 'all' ? 'all' : filterMonth;
+    const filterTag = `${y}_${q}_${m}`;
     
     doc.setFontSize(18);
     doc.text(`ZOE Solar - ${title}`, 14, 20);
     doc.setFontSize(10);
     doc.text(`Filter: ${filterYear}/${filterQuarter}/${filterMonth}`, 14, 28);
+    doc.text(`Export: ${timestamp}`, 14, 34);
+
+        // Optional: ELSTER Stammdaten als Header-Block
+        const elster = settings?.elsterStammdaten;
+        const trim = (v: unknown) => (v === null || v === undefined ? '' : String(v)).trim();
+        const elsterLines: string[] = [];
+        if (elster) {
+            const name = trim(elster.unternehmensName);
+            const addr = [trim(elster.strasse), trim(elster.hausnummer), trim(elster.plz), trim(elster.ort)].filter(Boolean).join(' ');
+            const stnr = trim(elster.eigeneSteuernummer);
+            const ustId = trim(elster.eigeneUstIdNr);
+            const fa = trim(elster.finanzamtName);
+            if (name) elsterLines.push(`Mandant: ${name}`);
+            if (addr) elsterLines.push(`Anschrift: ${addr}${trim(elster.land) ? ` (${trim(elster.land)})` : ''}`);
+            if (stnr) elsterLines.push(`Eigene Steuernummer: ${stnr}`);
+            if (ustId) elsterLines.push(`Eigene USt-IdNr: ${ustId}`);
+            if (fa) elsterLines.push(`Finanzamt: ${fa}`);
+        }
+
+        let tableStartY = 40;
+        if (elsterLines.length > 0) {
+            doc.setFontSize(9);
+            const headerY = 40;
+            elsterLines.forEach((line, idx) => {
+                doc.text(line, 14, headerY + idx * 5);
+            });
+            tableStartY = headerY + elsterLines.length * 5 + 4;
+        }
 
     if (viewType === 'list') {
-        const tableData = sortedDocs.map(d => [
-            d.data?.belegDatum || '',
-            d.data?.lieferantName || '',
-            d.data?.belegNummerLieferant || '',
-            (d.data?.nettoBetrag || 0).toLocaleString('de-DE', {minimumFractionDigits: 2}),
-            (d.data?.bruttoBetrag || 0).toLocaleString('de-DE', {minimumFractionDigits: 2}),
-            d.data?.sollKonto || '',
-            d.data?.habenKonto || ''
-        ]);
+        const tableData = sortedDocs.map(d => {
+            const data: any = d.data || {};
+            const money = (v: unknown) => {
+                const n = typeof v === 'number' ? v : Number(v);
+                return Number.isFinite(n) ? n.toLocaleString('de-DE', { minimumFractionDigits: 2 }) : '';
+            };
+            const flag = (v: unknown) => (v === true ? '✓' : '');
+
+            return [
+                data.belegDatum || '',
+                data.eigeneBelegNummer || '',
+                data.lieferantName || '',
+                data.belegNummerLieferant || '',
+                data.zahlungsStatus || '',
+                data.zahlungsDatum || '',
+                data.zahlungsmethode || '',
+                money(data.nettoBetrag),
+                money(data.mwstBetrag19),
+                money(data.mwstBetrag7),
+                money(data.bruttoBetrag),
+                data.steuerkategorie || '',
+                data.sollKonto || '',
+                data.habenKonto || '',
+                data.kontierungskonto || '',
+                flag(data.reverseCharge),
+                flag(data.vorsteuerabzug),
+                flag(data.kleinbetrag),
+                flag(data.privatanteil),
+                String(data.ocr_score ?? ''),
+                d.status
+            ];
+        });
         autoTable(doc, {
-            startY: 40,
-            head: [['Datum', 'Lieferant', 'Re-Nr.', 'Netto', 'Brutto', 'Soll', 'Haben']],
+            startY: tableStartY,
+            head: [[
+                'Datum',
+                'ZOE-Nr.',
+                'Lieferant',
+                'Re-Nr.',
+                'Zahl-Status',
+                'Zahl-Datum',
+                'Zahlart',
+                'Netto',
+                'MwSt 19',
+                'MwSt 7',
+                'Brutto',
+                'Steuerkat.',
+                'Soll',
+                'Haben',
+                'Konto',
+                'RC',
+                'VSt',
+                'KB',
+                'Priv',
+                'OCR',
+                'Status'
+            ]],
             body: tableData,
-            styles: { fontSize: 8 }
+            styles: { fontSize: 6, cellPadding: 1 },
+            headStyles: { fillColor: [245, 245, 245], textColor: 80 },
+            margin: { left: 10, right: 10 },
+            horizontalPageBreak: true
         });
     } else if (viewType === 'euer') {
         const tableData = euerData.map(d => [
@@ -202,7 +301,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
         ]);
         tableData.push(['', 'SUMME AUSGABEN', '', totals.netto.toLocaleString('de-DE', {minimumFractionDigits: 2}) + ' €']);
         autoTable(doc, {
-            startY: 40,
+            startY: tableStartY,
             head: [['Konto', 'Bezeichnung', 'Anzahl', 'Netto Summe']],
             body: tableData,
         });
@@ -215,17 +314,251 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
             ['SUMME VORSTEUER', '', (ustvaData.tax7 + ustvaData.tax19).toLocaleString('de-DE', {minimumFractionDigits: 2})]
         ];
         autoTable(doc, {
-            startY: 40,
+            startY: tableStartY,
             head: [['Position', 'Bemessungsgrundlage', 'Steuer']],
             body: tableData,
         });
     }
-    doc.save(`zoe_${viewType}_${filterYear}.pdf`);
+    doc.save(`zoe_${viewType}_${filterTag}_${timestampTag}.pdf`);
   };
 
   const handleExportCSV = () => {
-    // ... CSV Export logic remains similar but could be expanded ...
+    const preflight = runExportPreflight(sortedDocs, settings);
+    const dialog = formatPreflightForDialog(preflight);
+    if (preflight.blockers.length > 0) {
+        alert(`${dialog.title}\n\n${dialog.body}`);
+        return;
+    }
+    if (preflight.warnings.length > 0) {
+        const ok = confirm(`${dialog.title}\n\n${dialog.body}\n\nTrotzdem exportieren?`);
+        if (!ok) return;
+    }
+
+    const timestamp = new Date().toISOString();
+    const timestampTag = timestamp.replace(/[:.]/g, '-');
+    const y = filterYear === 'all' ? 'all' : filterYear;
+    const q = filterQuarter === 'all' ? 'all' : filterQuarter;
+    const m = filterMonth === 'all' ? 'all' : filterMonth;
+    const filterTag = `${y}_${q}_${m}`;
+
+    const columns = [
+        'datum',
+        'lieferant',
+        'adresse',
+        'steuernummer',
+        'belegnummer_lieferant',
+        'interne_nummer',
+        'zahlungsmethode',
+        'zahlungsdatum',
+        'zahlungsstatus',
+        'rechnungs_empfaenger',
+        'aufbewahrungsort',
+        'netto',
+        'mwst_satz_0',
+        'mwst_0',
+        'mwst_satz_7',
+        'mwst_7',
+        'mwst_satz_19',
+        'mwst_19',
+        'brutto',
+        'steuerkategorie',
+        'kontierungskonto',
+        'soll_konto',
+        'haben_konto',
+        'reverse_charge',
+        'vorsteuerabzug',
+        'kleinbetrag',
+        'privatanteil',
+        'ocr_score',
+        'ocr_rationale',
+        'beschreibung',
+        'text_content',
+        'status'
+    ];
+
+    const csvEscape = (value: unknown): string => {
+        const s = value === null || value === undefined ? '' : String(value);
+        // Always quote for robustness
+        return `"${s.replace(/"/g, '""')}"`;
+    };
+
+    const num = (value: unknown): string => {
+        const n = typeof value === 'number' ? value : Number(value);
+        if (!Number.isFinite(n)) return '';
+        return n.toFixed(2);
+    };
+
+    const bool = (value: unknown): string => {
+        if (value === true) return 'true';
+        if (value === false) return 'false';
+        if (value === 1) return 'true';
+        if (value === 0) return 'false';
+        return '';
+    };
+
+    const isoDate = (value: unknown): string => {
+        const s = value === null || value === undefined ? '' : String(value);
+        return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
+    };
+
+    const rows = sortedDocs.map(doc => {
+        const d: any = doc.data || {};
+        return [
+            isoDate(d.belegDatum),
+            d.lieferantName || '',
+            d.lieferantAdresse || '',
+            d.steuernummer || '',
+            d.belegNummerLieferant || '',
+            d.eigeneBelegNummer || '',
+            d.zahlungsmethode || '',
+            isoDate(d.zahlungsDatum),
+            d.zahlungsStatus || '',
+            d.rechnungsEmpfaenger || '',
+            d.aufbewahrungsOrt || '',
+            num(d.nettoBetrag),
+            num(d.mwstSatz0),
+            num(d.mwstBetrag0),
+            num(d.mwstSatz7),
+            num(d.mwstBetrag7),
+            num(d.mwstSatz19),
+            num(d.mwstBetrag19),
+            num(d.bruttoBetrag),
+            d.steuerkategorie || '',
+            d.kontierungskonto || '',
+            d.sollKonto || '',
+            d.habenKonto || '',
+            bool(d.reverseCharge),
+            bool(d.vorsteuerabzug),
+            bool(d.kleinbetrag),
+            bool(d.privatanteil),
+            d.ocr_score ?? '',
+            d.ocr_rationale || '',
+            d.beschreibung || '',
+            d.textContent || '',
+            doc.status || ''
+        ];
+    });
+
+    const delimiter = ';';
+    const header = columns.map(csvEscape).join(delimiter);
+    const body = rows.map(r => r.map(csvEscape).join(delimiter)).join('\r\n');
+    const csv = `${header}\r\n${body}\r\n`;
+
+    // 2nd CSV: Positionen (1:n)
+    const positionColumns = ['doc_id', 'line_index', 'description', 'amount'];
+    const positionRows: Array<Array<string>> = [];
+    sortedDocs.forEach(doc => {
+        const items = doc.data?.lineItems || [];
+        items.forEach((item: any, idx: number) => {
+            positionRows.push([
+                doc.id,
+                String(idx),
+                item?.description || '',
+                num(item?.amount)
+            ]);
+        });
+    });
+    const positionHeader = positionColumns.map(csvEscape).join(delimiter);
+    const positionBody = positionRows.map(r => r.map(csvEscape).join(delimiter)).join('\r\n');
+    const positionsCsv = `${positionHeader}\r\n${positionBody}\r\n`;
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `zoe_belege_${filterTag}_${timestampTag}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+        // Download positions CSV (if any rows, still export header-only to keep deterministic)
+        const blob2 = new Blob([positionsCsv], { type: 'text/csv;charset=utf-8' });
+        const url2 = URL.createObjectURL(blob2);
+        const a2 = document.createElement('a');
+        a2.href = url2;
+        a2.download = `zoe_positionen_${filterTag}_${timestampTag}.csv`;
+        a2.click();
+        URL.revokeObjectURL(url2);
+
+        // 3rd CSV: ELSTER Stammdaten (1:1 / 1 row)
+        const stammdatenColumns = [
+            'unternehmens_name',
+            'land',
+            'plz',
+            'ort',
+            'strasse',
+            'hausnummer',
+            'eigene_steuernummer',
+            'eigene_steuernummer_digits',
+            'eigene_ust_idnr',
+            'finanzamt_name',
+            'finanzamt_nr',
+            'rechtsform',
+            'besteuerung_ust',
+            'kleinunternehmer',
+            'iban',
+            'kontakt_email'
+        ];
+        const sd = settings?.elsterStammdaten;
+        const sdDigits = (sd?.eigeneSteuernummer || '').replace(/\D/g, '');
+        const stammdatenRow = [
+            sd?.unternehmensName || '',
+            sd?.land || 'DE',
+            sd?.plz || '',
+            sd?.ort || '',
+            sd?.strasse || '',
+            sd?.hausnummer || '',
+            sd?.eigeneSteuernummer || '',
+            sdDigits,
+            sd?.eigeneUstIdNr || '',
+            sd?.finanzamtName || '',
+            sd?.finanzamtNr || '',
+            sd?.rechtsform || '',
+            sd?.besteuerungUst || '',
+            sd?.kleinunternehmer === true ? 'true' : sd?.kleinunternehmer === false ? 'false' : '',
+            sd?.iban || '',
+            sd?.kontaktEmail || ''
+        ];
+        const stammdatenHeader = stammdatenColumns.map(csvEscape).join(delimiter);
+        const stammdatenBody = stammdatenRow.map(csvEscape).join(delimiter);
+        const stammdatenCsv = `${stammdatenHeader}\r\n${stammdatenBody}\r\n`;
+
+        const blob3 = new Blob([stammdatenCsv], { type: 'text/csv;charset=utf-8' });
+        const url3 = URL.createObjectURL(blob3);
+        const a3 = document.createElement('a');
+        a3.href = url3;
+        a3.download = `zoe_elster_stammdaten_${filterTag}_${timestampTag}.csv`;
+        a3.click();
+        URL.revokeObjectURL(url3);
   };
+
+    const handleExportDATEV = () => {
+        if (!settings) {
+                alert('DATEV Export: Einstellungen fehlen.');
+                return;
+        }
+
+        const preflight = runDatevExportPreflight(sortedDocs, settings);
+        const dialog = formatPreflightForDialog(preflight);
+
+        if (preflight.blockers.length > 0) {
+                alert(`${dialog.title}\n\n${dialog.body}`);
+                return;
+        }
+
+        if (preflight.warnings.length > 0) {
+                const ok = confirm(`${dialog.title}\n\n${dialog.body}\n\nTrotzdem exportieren?`);
+                if (!ok) return;
+        }
+
+        const { csv, filename } = generateDatevExtfBuchungsstapelCsv(sortedDocs, settings);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
 
   const SortIcon = ({ field }: { field: string }) => {
     if (sortField !== field) return <span className="text-gray-300 ml-1 text-[10px]">▼</span>;
@@ -266,29 +599,61 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
             
             <TH label="Konto" field="data.kontierungskonto" />
             <TH label="Kategorie" field="data.steuerkategorie" />
+
+                        <TH label="Zahlart" field="data.zahlungsmethode" />
+                        <TH label="Zahl-Datum" field="data.zahlungsDatum" />
+                        <TH label="Zahl-Status" field="data.zahlungsStatus" />
+
+                        <TH label="Steuernr." field="data.steuernummer" />
+                        <TH label="Adresse" field="data.lieferantAdresse" />
+                        <TH label="Empfänger" field="data.rechnungsEmpfaenger" />
+                        <TH label="Ablage" field="data.aufbewahrungsOrt" />
+
+                        <TH label="RC" field="data.reverseCharge" />
+                        <TH label="VSt" field="data.vorsteuerabzug" />
+                        <TH label="KB" field="data.kleinbetrag" />
+                        <TH label="Priv" field="data.privatanteil" />
+
+                        <TH label="OCR" field="data.ocr_score" />
+                        <TH label="Beschreibung" field="data.beschreibung" />
+                        <TH label="Text" field="data.textContent" />
+
+                        <TH label="Status" field="status" />
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 text-[13px]">
           {sortedDocs.map(doc => {
               const isDuplicate = doc.status === DocumentStatus.DUPLICATE;
+              const isError = doc.status === DocumentStatus.ERROR;
+              const isReview = doc.status === DocumentStatus.REVIEW_NEEDED;
+              const isBlocked = isDuplicate || isError || isReview;
               const isDragTarget = dragTarget === doc.id;
               const isExpanded = expandedRowIds.has(doc.id);
               
               return (
                 <React.Fragment key={doc.id}>
                 <tr 
-                draggable
+                draggable={!isBlocked}
                 onDragStart={(e) => {
+                    if (isBlocked) {
+                        e.preventDefault();
+                        return;
+                    }
                     e.dataTransfer.setData('text/plain', doc.id);
                     e.dataTransfer.effectAllowed = 'move';
                 }}
                 onDragOver={(e) => {
+                    if (isBlocked) return;
                     e.preventDefault();
                     setDragTarget(doc.id);
                 }}
                 onDragLeave={() => setDragTarget(null)}
                 onDrop={(e) => {
                     e.preventDefault();
+                    if (isBlocked) {
+                        setDragTarget(null);
+                        return;
+                    }
                     const sourceId = e.dataTransfer.getData('text/plain');
                     if (sourceId && sourceId !== doc.id) {
                         onMerge(sourceId, doc.id);
@@ -301,7 +666,11 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                         ? 'bg-blue-50 ring-2 ring-inset ring-blue-500 z-20 relative' 
                         : isDuplicate 
                             ? 'bg-red-50/30 hover:bg-red-50 border-red-400' 
-                            : 'hover:bg-gray-50 border-transparent'
+                            : isError
+                                ? 'bg-rose-50/40 hover:bg-rose-50 border-rose-400'
+                                : isReview
+                                    ? 'bg-amber-50/40 hover:bg-amber-50 border-amber-300'
+                                    : 'hover:bg-gray-50 border-transparent'
                 }`}
                 >
                 <td className="px-2 py-2.5 bg-white border-r border-gray-100 sticky left-0 z-20 text-center" onClick={(e) => toggleExpandRow(e, doc.id)}>
@@ -317,6 +686,11 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                      <span className={`font-mono text-xs font-medium text-blue-600`}>
                         {doc.data?.eigeneBelegNummer}
                     </span>
+                    {(isError || isReview) && (
+                        <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isError ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {isError ? 'Fehler' : 'Prüfen'}
+                        </span>
+                    )}
                 </td>
                 <td className="px-4 py-2.5 text-gray-900 font-medium sticky left-[232px] bg-white border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] group-hover:bg-gray-50 max-w-[200px] truncate">
                     {doc.data?.lieferantName || doc.fileName}
@@ -352,13 +726,67 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                 <td className="px-4 py-2.5 text-[10px] text-gray-500 whitespace-nowrap">
                     {doc.data?.steuerkategorie}
                 </td>
+
+                {/* Zahlung */}
+                <td className="px-4 py-2.5 text-xs text-gray-600 whitespace-nowrap">
+                    {doc.data?.zahlungsmethode || ''}
+                </td>
+                <td className="px-4 py-2.5 text-xs text-gray-600 whitespace-nowrap font-mono">
+                    {doc.data?.zahlungsDatum || ''}
+                </td>
+                <td className="px-4 py-2.5 text-xs text-gray-600 whitespace-nowrap">
+                    {doc.data?.zahlungsStatus || ''}
+                </td>
+
+                {/* Orga / Steuern */}
+                <td className="px-4 py-2.5 text-xs text-gray-600 whitespace-nowrap font-mono">
+                    {doc.data?.steuernummer || ''}
+                </td>
+                <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[240px] truncate">
+                    {doc.data?.lieferantAdresse || ''}
+                </td>
+                <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[200px] truncate">
+                    {doc.data?.rechnungsEmpfaenger || ''}
+                </td>
+                <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[200px] truncate">
+                    {doc.data?.aufbewahrungsOrt || ''}
+                </td>
+
+                {/* Flags */}
+                <td className="px-4 py-2.5 text-xs text-gray-600 text-center">
+                    {doc.data?.reverseCharge ? '✓' : ''}
+                </td>
+                <td className="px-4 py-2.5 text-xs text-gray-600 text-center">
+                    {doc.data?.vorsteuerabzug ? '✓' : ''}
+                </td>
+                <td className="px-4 py-2.5 text-xs text-gray-600 text-center">
+                    {doc.data?.kleinbetrag ? '✓' : ''}
+                </td>
+                <td className="px-4 py-2.5 text-xs text-gray-600 text-center">
+                    {doc.data?.privatanteil ? '✓' : ''}
+                </td>
+
+                {/* OCR / Text */}
+                <td className="px-4 py-2.5 text-xs text-gray-600 whitespace-nowrap font-mono">
+                    {doc.data?.ocr_score ?? ''}
+                </td>
+                <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[260px] truncate">
+                    {doc.data?.beschreibung || ''}
+                </td>
+                <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[260px] truncate">
+                    {doc.data?.textContent || ''}
+                </td>
+
+                <td className="px-4 py-2.5 text-xs text-gray-600 whitespace-nowrap">
+                    {doc.status}
+                </td>
                 </tr>
                 
                 {/* Nested Line Items Row */}
                 {isExpanded && (
                     <tr className="bg-gray-50/50 shadow-inner">
                         <td colSpan={2} className="sticky left-0 bg-gray-50 border-r border-gray-200"></td>
-                        <td colSpan={9} className="p-4">
+                        <td colSpan={24} className="p-4">
                              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-w-2xl">
                                  <table className="w-full text-xs">
                                      <thead className="bg-gray-100 text-gray-500 font-semibold border-b border-gray-200">
@@ -389,12 +817,9 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
         </tbody>
         <tfoot className="bg-gray-50 border-t border-gray-200 z-20">
             <tr>
-                <td className="sticky left-0 bg-gray-50"></td>
-                <td colSpan={5} className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500 sticky left-8 bg-gray-50">Gesamt</td>
-                <td className="px-4 py-3 text-right font-mono font-bold text-gray-900">
-                    {totals.brutto.toLocaleString('de-DE', {minimumFractionDigits: 2})} €
+                <td colSpan={26} className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500">
+                    Gesamt Brutto: <span className="font-mono text-gray-900">{totals.brutto.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</span>
                 </td>
-                <td colSpan={4}></td>
             </tr>
         </tfoot>
       </table>
@@ -574,6 +999,12 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                  <button onClick={handleExportPDF} className="p-1.5 text-gray-500 hover:text-gray-900 border border-gray-200 rounded hover:bg-gray-50 transition-all shadow-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                  </button>
+                      <button onClick={handleExportCSV} className="p-1.5 text-gray-500 hover:text-gray-900 border border-gray-200 rounded hover:bg-gray-50 transition-all shadow-sm" title="CSV Export">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M8 13h8"></path><path d="M8 17h8"></path></svg>
+                      </button>
+                      <button onClick={handleExportDATEV} className="px-2 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 border border-gray-200 rounded hover:bg-gray-50 transition-all shadow-sm" title="DATEV Export (EXTF Buchungsstapel)">
+                          DATEV
+                      </button>
                  <button onClick={onExportSQL} className="p-1.5 text-gray-500 hover:text-gray-900 border border-gray-200 rounded hover:bg-gray-50 transition-all shadow-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                  </button>

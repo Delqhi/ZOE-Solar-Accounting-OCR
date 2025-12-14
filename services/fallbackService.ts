@@ -1,6 +1,7 @@
 
-import { ExtractedData } from "../types";
+import { ExtractedData, OcrProvider } from "../types";
 import * as pdfjsLib from 'pdfjs-dist';
+import { normalizeExtractedData } from "./extractedDataNormalization";
 
 // Helper to robustly resolve PDF.js library instance from ESM import
 const getPdfJs = () => {
@@ -22,8 +23,12 @@ if (pdf && pdf.GlobalWorkerOptions) {
 }
 
 // SiliconFlow API Config
-const SF_API_KEY = "sk-iawnupcgvjfhbcgmyjdgarnuznulqtvphzyspsrwsfyspply";
+const SF_API_KEY = process.env.SILICONFLOW_API_KEY;
 const SF_API_URL = "https://api.siliconflow.com/v1/chat/completions";
+
+// PDF Stitching Limits (B3)
+const SF_MAX_PDF_PAGES = 3;
+const SF_MAX_PDF_BYTES = 12 * 1024 * 1024; // ~12MB decoded
 
 // Qwen 2.5 VL 72B is currently the SOTA Open Source Vision Model (Better than DeepSeek-VL)
 const SF_VISION_MODEL = "Qwen/Qwen2.5-VL-72B-Instruct"; 
@@ -80,6 +85,13 @@ async function convertPdfToStitchedImage(base64Pdf: string): Promise<string> {
     try {
         if (!pdf || !pdf.getDocument) throw new Error("PDF.js library not correctly initialized.");
 
+        // Fast size check (base64 length -> bytes approx)
+        // bytes ~= (len * 3/4) - padding
+        const approxBytes = Math.floor((base64Pdf.length * 3) / 4);
+        if (approxBytes > SF_MAX_PDF_BYTES) {
+            throw new Error(`PDF ist zu groß für OCR-Stitching (>${Math.round(SF_MAX_PDF_BYTES / (1024 * 1024))}MB). Bitte PDF verkleinern oder Seiten splitten.`);
+        }
+
         const binaryString = atob(base64Pdf);
         const len = binaryString.length;
         const bytes = new Uint8Array(len);
@@ -89,7 +101,7 @@ async function convertPdfToStitchedImage(base64Pdf: string): Promise<string> {
 
         const loadingTask = pdf.getDocument({ data: bytes });
         const pdfDoc = await loadingTask.promise;
-        const numPages = Math.min(pdfDoc.numPages, 3); // Limit to first 3 pages to avoid massive images
+        const numPages = Math.min(pdfDoc.numPages, SF_MAX_PDF_PAGES); // Limit pages to avoid massive images
 
         const pageImages: { img: ImageBitmap, width: number, height: number }[] = [];
         let totalHeight = 0;
@@ -142,15 +154,56 @@ async function convertPdfToStitchedImage(base64Pdf: string): Promise<string> {
         return stitchedCanvas.toDataURL('image/jpeg', 0.85).split(',')[1];
     } catch (e) {
         console.error("PDF Stitching failed:", e);
-        throw new Error("Could not convert PDF to image.");
+        // Keep specific user-actionable error messages when possible (e.g. size limits)
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(msg || "PDF konnte nicht für OCR konvertiert werden.");
     }
 }
+
+const summarize = (s: string, maxLen = 280) => {
+    const clean = (s || '').replace(/\s+/g, ' ').trim();
+    return clean.length > maxLen ? clean.slice(0, maxLen) + '…' : clean;
+};
+
+const toUserFriendlyFallbackReason = (error: unknown): string => {
+    const raw = error instanceof Error ? error.message : String(error);
+    const msg = summarize(raw);
+
+    if (!msg) return 'Fallback fehlgeschlagen. Bitte manuell erfassen.';
+
+    if (msg.toLowerCase().includes('api key') || msg.includes('SILICONFLOW_API_KEY')) {
+        return 'SiliconFlow nicht konfiguriert: SILICONFLOW_API_KEY in .env setzen und neu laden.';
+    }
+
+    if (msg.includes('PDF ist zu groß')) {
+        return msg;
+    }
+
+    if (msg.toLowerCase().includes('pdf.js') || msg.toLowerCase().includes('pdf')) {
+        // Preserve explicit messages, otherwise provide actionable guidance
+        return msg.includes('Bitte') ? msg : 'PDF konnte nicht für OCR verarbeitet werden. Bitte PDF verkleinern oder in einzelne Seiten splitten.';
+    }
+
+    if (msg.startsWith('Vision API Error')) {
+        return `SiliconFlow Vision API Fehler: ${msg}`;
+    }
+
+    if (msg.toLowerCase().includes('empty response')) {
+        return 'SiliconFlow lieferte keine verwertbare Antwort.';
+    }
+
+    return `Fallback fehlgeschlagen: ${msg}`;
+};
 
 /**
  * Fallback Strategy: SiliconFlow Vision (Qwen 2.5 VL)
  * Direct Image -> JSON
  */
 async function analyzeWithVisionModel(base64Data: string, mimeType: string): Promise<Partial<ExtractedData>> {
+    if (!SF_API_KEY) {
+        throw new Error("SiliconFlow API Key nicht konfiguriert. Bitte SILICONFLOW_API_KEY in .env setzen.");
+    }
+    
     console.log(`Starting Vision AI Analysis (${SF_VISION_MODEL})...`);
     
     let finalBase64 = base64Data;
@@ -215,7 +268,8 @@ async function analyzeWithVisionModel(base64Data: string, mimeType: string): Pro
         content = content.substring(firstBrace, lastBrace + 1);
     }
 
-    return JSON.parse(content);
+    const parsed = JSON.parse(content);
+    return normalizeExtractedData(parsed);
 }
 
 /**
@@ -231,7 +285,7 @@ export const analyzeDocumentWithFallback = async (base64Data: string, mimeType: 
         textContent: "",
         beschreibung: "KI Analyse fehlgeschlagen.",
         ocr_score: 0,
-        ocr_rationale: "Dienste nicht erreichbar."
+        ocr_rationale: "Fallback fehlgeschlagen. Bitte manuell erfassen."
     };
 
     try {
@@ -246,9 +300,16 @@ export const analyzeDocumentWithFallback = async (base64Data: string, mimeType: 
 
     } catch (error) {
         console.error("Vision AI Fallback Failed:", error);
+        const reason = toUserFriendlyFallbackReason(error);
         return {
             ...failSafeObject,
-            beschreibung: "Analyse fehlgeschlagen. Bitte manuell erfassen."
+            beschreibung: "Analyse fehlgeschlagen. Bitte manuell erfassen.",
+            ocr_rationale: reason
         };
     }
+};
+
+// OCR Provider implementation
+export const siliconFlowProvider: OcrProvider = {
+  analyzeDocument: analyzeDocumentWithFallback
 };
