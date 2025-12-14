@@ -1,40 +1,51 @@
+
 # ZOE Solar Accounting OCR ☀️🧾
 
-**Version:** 1.0.0  
-**Status:** Produktion / Stabil  
-**Sprache:** TypeScript / React
+**Version:** 1.2.0  
+**Status:** Produktion  
+**Sprache:** TypeScript / React 19
 
-Eine spezialisierte, KI-gestützte Buchhaltungs-Anwendung für **ZOE Solar**. Diese Web-App automatisiert die Extraktion von Rechnungsdaten, die Klassifizierung nach SKR03 und die Vorbereitung für EÜR/UStVA – alles lokal im Browser mit Cloud-KI-Unterstützung.
+Eine spezialisierte, KI-gestützte Buchhaltungs-Anwendung für **ZOE Solar**. Diese Web-App automatisiert die Extraktion von Rechnungsdaten inklusive Positionen, die Kontierung nach SKR03 (Soll/Haben) und die Vorbereitung für EÜR/UStVA.
 
 ---
 
 ## 🚀 Übersicht & Features
 
-Diese Anwendung ist ein **Single-Page-Application (SPA)**, die vollständig im Browser läuft. Sie nutzt modernste KI-Modelle, um Belege zu analysieren, und speichert alle Daten lokal (IndexedDB) für maximale Privatsphäre und Geschwindigkeit.
+Diese Anwendung ist ein **Single-Page-Application (SPA)**, die vollständig im Browser läuft. Sie nutzt modernste Vision-KI-Modelle, um Belege zu analysieren, und speichert alle Daten lokal (IndexedDB).
 
-### 🧠 KI & OCR Pipeline (3-Stufen-System)
-Das System nutzt eine robuste Kaskade, um Daten zu extrahieren:
-1.  **Primär:** **Google Gemini 2.5 Flash**. Extrahiert komplexe Strukturen, Positionen (Line Items) und Kontext.
-2.  **Fallback 1:** **SiliconFlow (Qwen 2.5 VL)**. Springt ein, wenn Gemini überlastet ist oder Quotas erreicht sind.
-3.  **Fallback 2:** **Tesseract.js / Lokales OCR**. Läuft komplett offline im Browser als letzter Rettungsanker, um zumindest Rohtext zu sichern.
+### 🧠 KI & OCR Pipeline (High-Fidelity 2-Stufen-System)
+Wir setzen ausschließlich auf Large Multimodal Models (LMMs) für höchste Präzision. Tesseract (lokales OCR) wurde zugunsten der Qualität entfernt.
+
+1.  **Primär:** **Google Gemini 2.5 Flash**. Extrahiert komplexe Strukturen, Rechnungspositionen (Line Items) und Kontext in extrem hoher Geschwindigkeit.
+2.  **Fallback:** **SiliconFlow (Qwen 2.5 VL - 72B)**. Ein extrem leistungsstarkes Open-Source Vision Modell, das einspringt, wenn Google Quotas erreicht sind oder Fehler wirft.
 
 ### ✨ Hauptfunktionen
-*   **Multi-Format Upload:** Unterstützt PDF, JPG, PNG, HEIC, WEBP via Drag & Drop oder Kamera-Aufnahme.
-*   **Intelligente Duplikat-Erkennung:**
-    *   *Technisch:* Prüfung per Datei-Hash (SHA-256).
-    *   *Semantisch:* Prüfung auf identischen Lieferanten, Datum und Betrag (verhindert doppelte Buchung bei erneuter Fotografie).
-*   **Split-View Editor:** PDF/Bild-Vorschau links (mit Zoom & Pan), extrahierte Daten rechts.
-*   **Zusammenführen (Merge):** Mehrere hochgeladene Dateien können zu einem Beleg zusammengefügt werden (z.B. Rechnung Seite 1 + Seite 2).
-*   **Memory System:** Die App "lernt", wie bestimmte Lieferanten kontiert werden (z.B. "Shell" -> "Fuhrpark") und schlägt dies beim nächsten Mal automatisch vor.
-*   **Interne Nummerierung:** Generiert automatisch IDs im Format `ZOEYYMM.###` (z.B. `ZOE2305.001`).
 
-### 📊 Buchhaltung & Export
-*   **SKR03 Mapping:** Automatische Zuordnung zu Buchungskonten (z.B. 4930 Bürobedarf).
-*   **Steuer-Logik:** Unterstützung spezieller PV-Steuerregeln (19%, 0% PV, Reverse Charge, Kleinunternehmer).
-*   **Berichte & Export:**
-    *   **PDF:** EÜR (Einnahmenüberschussrechnung), UStVA-Vorbereitung, Belegliste.
-    *   **SQL:** Vollständiger Datenbank-Export (PostgreSQL kompatibel) zur Langzeitarchivierung.
-    *   **CSV:** Export für Excel/Steuerberater.
+#### 1. Buchhaltung & SKR03
+*   **Soll & Haben:** Automatische Ermittlung des Soll-Kontos (z.B. 3400 Wareneingang) und Haben-Kontos (z.B. 70000 Kreditor oder 1200 Bank).
+*   **SKR03 Editor:** Kontenrahmen kann in den Einstellungen bearbeitet werden.
+*   **Steuer-Logik:** Unterstützung spezieller PV-Steuerregeln (19%, 0% PV, Reverse Charge, Kleinunternehmer) und Validierung gegen die extrahierten Steuerbeträge.
+
+#### 2. Positionen (Line Items)
+*   **Detail-Erfassung:** Die KI extrahiert einzelne Rechnungspositionen.
+*   **Grid-View:** In der Übersichtstabelle können Zeilen aufgeklappt werden (Accordion), um die Positionen zu sehen, ohne den Beleg zu öffnen.
+*   **Editierbar:** Positionen können im Detail-Modal bearbeitet, hinzugefügt oder gelöscht werden.
+
+#### 3. Aggressive Duplikat-Erkennung (V2)
+Das System nutzt eine strikte Logik, um Doppelbuchungen zu verhindern:
+*   **Hard Match:** Stimmen **Belegnummer UND Betrag** (oder Datum) überein, wird der Beleg **sofort** als Duplikat markiert und gesperrt.
+*   **Fuzzy Match:** Ein Punktesystem prüft Ähnlichkeiten bei Lieferant, Datum und ungefährem Betrag, falls kein Hard Match vorliegt.
+*   **Hash Check:** Identische Dateien werden sofort abgefangen.
+
+#### 4. Workflow & UI
+*   **Split-View Editor:** PDF/Bild-Vorschau links (mit Zoom & Pan), extrahierte Daten rechts.
+*   **Zusammenführen (Merge):** Per Drag & Drop in der Sidebar oder über die Suche im Modal können Belege zusammengefügt werden (z.B. Seite 1 + Seite 2).
+*   **Interne Nummerierung:** Generiert automatisch IDs im Format `ZOEYYMM.###`.
+
+### 📊 Berichte & Export
+*   **PDF:** EÜR, UStVA-Vorbereitung, Detaillierte Belegliste.
+*   **SQL:** Exportiert ein Schema mit `belege`, `kontierungskonten` und `steuerkategorien` inkl. `soll_konto` und `haben_konto` Feldern.
+*   **CSV:** Standardisierter Export.
 
 ---
 
@@ -43,10 +54,9 @@ Das System nutzt eine robuste Kaskade, um Daten zu extrahieren:
 *   **Frontend Framework:** React 19
 *   **Sprache:** TypeScript
 *   **Styling:** Tailwind CSS
-*   **Build Tool:** Vite (impliziert)
-*   **Datenbank:** IndexedDB (via Wrapper `storageService.ts`)
+*   **Datenbank:** IndexedDB (Wrapper `storageService.ts`)
 *   **PDF Engine:** PDF.js & jsPDF
-*   **KI SDK:** `@google/genai`
+*   **KI SDK:** `@google/genai` (Google) & `fetch` (SiliconFlow)
 
 ---
 
@@ -68,15 +78,11 @@ npm install
 ```
 
 ### 3. Umgebungsvariablen konfigurieren
-Die App benötigt zwingend einen API-Key. Erstellen Sie eine `.env` Datei im Root-Verzeichnis oder konfigurieren Sie Ihren Bundler so, dass `process.env.API_KEY` verfügbar ist.
-
-**.env Beispiel:**
+Erstellen Sie eine `.env` Datei im Root-Verzeichnis:
 ```env
 # Google Gemini API Key (Zwingend erforderlich)
 API_KEY="AIzaSy..."
 ```
-
-*Hinweis: Der `SF_API_KEY` (SiliconFlow) ist aktuell im `fallbackService.ts` hardcodiert und sollte für Produktion ebenfalls in die Env-Variablen ausgelagert werden.*
 
 ### 4. Starten
 ```bash
@@ -89,91 +95,61 @@ npm run dev
 
 ## 📖 Bedienungsanleitung
 
-### 1. Dashboard & Upload
-*   Ziehen Sie Dateien in den markierten Bereich oder nutzen Sie den "Foto aufnehmen" Button auf Mobilgeräten.
-*   Die KI beginnt sofort mit der Analyse (Status: `PROCESSING`).
+### 1. Upload & KI-Analyse
+Ziehen Sie Dateien in den Upload-Bereich. Die KI analysiert sofort. Falls Gemini überlastet ist ("429"), wechselt das System automatisch zu Qwen 2.5 VL.
 
-### 2. Prüfung & Korrektur (Detail-Ansicht)
-*   Klicken Sie auf einen Beleg in der Liste.
-*   **Links:** Belegvorschau. Nutzen Sie das Mausrad zum Zoomen oder ziehen Sie das Bild (Pan). Mit dem `+` Button können weitere Seiten hinzugefügt werden.
-*   **Rechts:** Extrahierte Daten.
-    *   **Interne Nr.:** Wird automatisch vergeben.
-    *   **Original Nr.:** Die Rechnungsnummer des Lieferanten.
-    *   **Konto/Steuer:** Prüfen Sie die automatische Zuordnung. Das System zeigt `Automatisch erkannt & zugewiesen` an, wenn eine gelernte Regel angewendet wurde.
-*   **Zusammenführen:** Nutzen Sie den Button "Zusammenführen" im Header, um einen anderen hochgeladenen Beleg in den aktuellen zu integrieren (Anhänge).
+### 2. Prüfung (Detail-Ansicht)
+*   **Soll/Haben:** Prüfen Sie die automatisch zugewiesenen SKR03 Konten.
+*   **Positionen:** Ergänzen oder korrigieren Sie die einzelnen Rechnungsposten in der Tabelle unten.
+*   **Regel-Lernen:** Wenn Sie ein Konto bei einem Lieferanten ändern, merkt sich das System dies für die Zukunft.
 
 ### 3. Duplikate
-*   Wird ein Beleg rot markiert (`DUPLICATE`), wurde er bereits im System gefunden.
-*   Öffnen Sie den Beleg, um den Grund zu sehen (z.B. "Inhaltliches Duplikat von ZOE2304.005"). Sie können ihn dann löschen.
+Rot markierte Belege sind Duplikate. Der Grund (z.B. "Belegnummer und Betrag identisch") wird im Modal angezeigt. Sie können diese Belege löschen oder (falls es sich um einen Fehler handelt) die Belegnummer ändern, um den Status zurückzusetzen.
 
-### 4. Einstellungen
-*   In der Sidebar unter "Einstellungen" können Sie **Kontierungskonten** bearbeiten, hinzufügen oder löschen.
-*   Die **Steuerkategorien** sind fest definiert (System-Vorgabe), um Konsistenz für den SQL-Export zu gewährleisten.
-
-### 5. Export
-*   Gehen Sie in der Sidebar auf "Berichte & Export".
-*   Nutzen Sie die Filter (Jahr, Quartal, Monat).
-*   Wählen Sie die Ansicht (`LISTE`, `EÜR`, `USTVA`).
-*   Klicken Sie auf das PDF-Icon für einen Druckbericht oder das SQL-Icon für ein Datenbank-Backup.
+### 4. Export
+Nutzen Sie den Button "Berichte", um die Daten für den Steuerberater (PDF/SQL) zu exportieren. Der SQL-Export enthält nun explizite Spalten für `soll_konto` und `haben_konto`.
 
 ---
 
-## 🏛 Architektur & Datenmodell
-
-### Datenbank (IndexedDB)
-Alle Daten liegen im Browser des Nutzers. Es gibt drei Haupt-Stores:
-1.  `documents`: Speichert die Belege, extrahierten JSON-Daten, Base64-Blobs der Bilder und den Status.
-2.  `settings`: Speichert benutzerdefinierte Kontenrahmen.
-3.  `vendor_rules`: Speichert das "Gedächtnis" der KI (Lieferant -> Konto Zuordnung).
-
-### Datenstruktur (`ExtractedData`)
-Das Kernstück ist das JSON-Objekt, das die KI zurückgibt:
+## 🏛 Datenmodell (`ExtractedData`)
 
 ```typescript
 interface ExtractedData {
-  belegDatum: string;          // YYYY-MM-DD
+  // ...Basisdaten
+  belegDatum: string;
   belegNummerLieferant: string;
   lieferantName: string;
+  
+  // Finanzdaten
   nettoBetrag: number;
   bruttoBetrag: number;
+  mwstBetrag19: number; 
+  mwstBetrag7: number;
   
-  // Steuer-Aufschlüsselung
-  mwstSatz19: number; mwstBetrag19: number;
-  mwstSatz7: number;  mwstBetrag7: number;
-  
-  // Klassifizierung
-  kontierungskonto: string;    // z.B. "buero"
+  // Buchhaltung (NEU)
+  kontierungskonto: string;    // Interne ID (z.B. "buero")
+  sollKonto: string;           // SKR03 (z.B. "4930")
+  habenKonto: string;          // SKR03 (z.B. "1200")
   steuerkategorie: string;     // z.B. "19_pv"
   
-  lineItems: LineItem[];       // Array der Rechnungsposten
-  ...
+  // Inhalt
+  lineItems: LineItem[];       // Array [{ description: "...", amount: 10.00 }]
 }
 ```
-
-### SQL Export Schema
-Der SQL-Export generiert ein Schema, das in jede PostgreSQL Datenbank importiert werden kann. Es erstellt Tabellen für:
-*   `belege` (Hauptdaten)
-*   `steuerkategorien` (Lookup)
-*   `kontierungskonten` (Lookup)
 
 ---
 
 ## ⚠️ Troubleshooting
 
-**KI antwortet nicht / Fehler beim Upload:**
-*   Prüfen Sie Ihre Internetverbindung.
+**KI antwortet nicht / Fallback greift nicht:**
 *   Prüfen Sie, ob der `API_KEY` korrekt gesetzt ist.
-*   Sollte Gemini (Google) ausfallen, versucht das System automatisch SiliconFlow.
+*   SiliconFlow Key ist aktuell hardcodiert in `fallbackService.ts` – für Produktion sollte dieser in `.env` ausgelagert werden.
 
-**Duplikat-Warnung trotz neuem Beleg:**
-*   Das System prüft sehr genau. Haben Sie exakt denselben Betrag beim selben Lieferanten am selben Tag? Falls ja (legitim), können Sie den Status manuell ignorieren, indem Sie die Daten leicht ändern oder den Beleg einfach im System belassen (er wird in Berichten inkludiert, wenn der Status nicht auf ERROR steht).
-
-**PDF Vorschau lädt nicht:**
-*   Sehr große PDFs können die Base64-Grenzen des Browsers sprengen. Das System komprimiert Bilder vor dem Senden an die KI, aber die Vorschau nutzt das Original.
+**PDF Vorschau unscharf:**
+*   Die Vorschau nutzt `pdf.js` mit Scale 2.0. Bei sehr kleinen Displays kann es zu Skalierungseffekten kommen. Nutzen Sie Zoom (Mausrad + Ctrl).
 
 ---
 
 ## 📄 Lizenz
 
 Proprietäre Software für ZOE Solar.
-Nutzung und Weitergabe nur mit Genehmigung.
