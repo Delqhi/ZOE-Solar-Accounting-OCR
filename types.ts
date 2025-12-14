@@ -12,8 +12,24 @@ export interface LineItem {
   amount?: number;
 }
 
+export interface TaxCategoryDefinition {
+  value: string;
+  label: string;
+  ust_satz: number;
+  vorsteuer: boolean;
+  reverse_charge?: boolean;
+}
+
+export interface AccountDefinition {
+  id: string;
+  name: string;
+  skr03: string; // New: Explicit SKR03 number
+  steuerkategorien: string[]; // List of allowed tax category values
+}
+
 export interface ExtractedData {
   // Grunddaten
+  documentType?: string; 
   belegDatum: string;
   belegNummerLieferant: string;
   lieferantName: string;
@@ -22,41 +38,63 @@ export interface ExtractedData {
 
   // Finanzielle Daten
   nettoBetrag: number;
-  mwstSatz7: number; // e.g. 0.07
+  mwstSatz0: number;
+  mwstBetrag0: number;
+  mwstSatz7: number;
   mwstBetrag7: number;
-  mwstSatz19: number; // e.g. 0.19
+  mwstSatz19: number;
   mwstBetrag19: number;
   bruttoBetrag: number;
-  zahlungsmethode: string; // Bar, EC, Überweisung, Kreditkarte
+  zahlungsmethode: string;
 
   // Positionen
   lineItems: LineItem[];
 
-  // Kategorisierung & Buchhaltung
-  kostenstelle: string;
-  projekt: string; // Projekt- oder Auftragszuordnung
-  sollKonto: string; // z.B. 4220, 3100
-  habenKonto: string; // z.B. 1200, 1800, 1000
-  steuerKategorie: string; // z.B. "19% Vorsteuer", "0% PV"
-
-  // Organisatorisch / Generierte Felder
-  eigeneBelegNummer: string; // ZOE2512.1
-  zahlungsDatum: string;
-  zahlungsStatus: string; // bezahlt/offen
-  aufbewahrungsOrt: string; // Betriebseigene Cloud-Storage
-  rechnungsEmpfaenger: string; // ZOE Solar, Inh. Jeremy Schulze...
+  // Neu: KI Klassifizierung / Kontierung
+  kontierungskonto?: string; // ID from AccountDefinition
+  steuerkategorie?: string;  // Value from TaxCategoryDefinition
   
-  // Besonderheiten / Flags
+  // Legacy / Fallbacks
+  kontogruppe: string; 
+  konto_skr03: string; 
+  ust_typ: string;     
+
+  // Derived for internal consistency
+  sollKonto: string; // Explicit Field for UI/DB
+  habenKonto: string; // Explicit Field for UI/DB
+  steuerKategorie: string; // Legacy string description
+
+  // Organisatorisch
+  eigeneBelegNummer: string; 
+  zahlungsDatum: string;
+  zahlungsStatus: string; 
+  aufbewahrungsOrt: string; 
+  rechnungsEmpfaenger: string;
+  
+  // Flags
   kleinbetrag: boolean;
   vorsteuerabzug: boolean;
   reverseCharge: boolean;
   privatanteil: boolean;
   
-  // Optional
+  // Content
   beschreibung: string;
-  
-  // Raw text for rules engine
   textContent?: string;
+
+  // AI Quality & OCR Score
+  qualityScore?: number; // Legacy
+  ocr_score?: number;    // New System 0-10
+  ocr_rationale?: string; // New System explanation
+  
+  // Memory System
+  ruleApplied?: boolean; 
+}
+
+export interface Attachment {
+    id: string;
+    url: string;
+    type: string;
+    name: string;
 }
 
 export interface DocumentRecord {
@@ -67,14 +105,64 @@ export interface DocumentRecord {
   status: DocumentStatus;
   data: ExtractedData | null;
   error?: string;
-  previewUrl?: string; // For displaying the image/pdf preview
+  previewUrl?: string;
   
-  // Duplicate Detection
+  // New: Multiple pages/attachments
+  attachments?: Attachment[];
+  
   fileHash?: string;
   duplicateOfId?: string;
+  duplicateConfidence?: number;
+  duplicateReason?: string;
+}
+
+// --- Configuration Types ---
+
+export interface AccountGroupDefinition {
+  id: string;
+  name: string;      
+  skr03: string;     
+  taxType: string;   
+  keywords: string[]; 
+  isRevenue: boolean; 
+}
+
+export interface ScoreDefinition {
+  min_fields: number;
+  desc: string;
+}
+
+export interface ValidationRules {
+  sum_check: boolean;
+  date_check: boolean;
+  min_confidence: number;
+}
+
+export interface OCRConfig {
+  scores: Record<string, ScoreDefinition>;
+  required_fields: string[];
+  field_weights: Record<string, number>;
+  regex_patterns: Record<string, string>;
+  validation_rules: ValidationRules;
 }
 
 export interface AppSettings {
-  id: string; // usually 'global'
-  taxCategories: string[];
+  id: string;
+  // New Configs
+  taxDefinitions: TaxCategoryDefinition[];
+  accountDefinitions: AccountDefinition[];
+  
+  // Legacy
+  accountGroups: AccountGroupDefinition[]; 
+  ocrConfig: OCRConfig;
+  taxCategories?: string[]; 
+}
+
+export interface VendorRule {
+  vendorName: string;      
+  accountGroupName: string; // Legacy
+  accountId?: string;       // New
+  taxCategoryValue?: string; // New
+  lastUpdated: string;
+  useCount: number;
 }

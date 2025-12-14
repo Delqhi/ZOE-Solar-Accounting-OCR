@@ -1,5 +1,7 @@
 {
   "name": "ZOE Solar Accounting OCR",
   "description": "Automated accounting OCR system for ZOE Solar. Upload invoices (PNG, JPG, PDF) to extract data, assign SKR03 accounts, and apply specific tax rules using Gemini AI.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "camera"
+  ]
 }
