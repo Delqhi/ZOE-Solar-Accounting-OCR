@@ -1,5 +1,5 @@
 
-<div align="center">
+<div align="left">
 
 # 🌟 ZOE Solar Accounting OCR
 
@@ -21,29 +21,29 @@
 
 <table>
   <tr>
-    <td align="center">
+    <td>
       <h3>🤖 KI-gestützt</h3>
       <p>Modernste Vision-KI für 99% Genauigkeit bei der Datenerfassung</p>
     </td>
-    <td align="center">
+    <td>
       <h3>⚡ Blitzschnell</h3>
       <p>Rechnungen in Sekunden analysiert, nicht Stunden</p>
     </td>
-    <td align="center">
+    <td>
       <h3>🔒 Datenschutz</h3>
       <p>100% lokal - keine Daten verlassen Ihren Browser</p>
     </td>
   </tr>
   <tr>
-    <td align="center">
+    <td>
       <h3>🎯 SKR03</h3>
       <p>Automatische Soll/Haben-Kontierung nach deutschem Standard</p>
     </td>
-    <td align="center">
+    <td>
       <h3>📊 ELSTER Ready</h3>
       <p>Direkter XML-Export für ELSTER Umsatzsteuervoranmeldung</p>
     </td>
-    <td align="center">
+    <td>
       <h3>🛡️ Qualitätssicherung</h3>
       <p>Intelligente Duplikat-Erkennung und Validierung</p>
     </td>
@@ -68,16 +68,12 @@ npm run dev
 
 ## 🧠 Revolutionäre KI-Technologie
 
-<div align="center">
-
 ### 🔥 High-Fidelity 2-Stufen KI-Pipeline
 
 | Stufe | Modell | Geschwindigkeit | Genauigkeit | Zweck |
 |-------|--------|----------------|-------------|-------|
 | **1️⃣ Primär** | Google Gemini 2.5 Flash ⚡ | < 3 Sekunden | 99% | Komplexe Strukturen & Positionen |
 | **2️⃣ Fallback** | SiliconFlow Qwen 2.5 VL (72B) 🧠 | < 5 Sekunden | 98% | Maximale Zuverlässigkeit |
-
-</div>
 
 **🚫 Kein Tesseract!** Wir verwenden ausschließlich Large Multimodal Models (LMMs) für höchste Präzision.
 
@@ -164,8 +160,6 @@ const kontierung = {
 
 ## 📊 Export & Integrationen
 
-<div align="center">
-
 ### 🚀 Export-Formate
 
 | Format | Zweck | Besonderheiten |
@@ -175,8 +169,6 @@ const kontierung = {
 | **📊 CSV** | Tabellenkalkulation | UTF-8, semikolon-getrennt |
 | **📋 ELSTER XML** | Steuerbehörde | Direkter Upload ins ELSTER Portal |
 | **🏦 DATEV** | Steuerberater | EXTF Buchungsstapel |
-
-</div>
 
 ### 🎯 ELSTER Integration (NEU!)
 
@@ -201,8 +193,6 @@ const kontierung = {
 
 ## 🛠 Tech Stack
 
-<div align="center">
-
 ### Frontend Architecture
 ![React](https://img.shields.io/badge/React-19-61dafb?style=for-the-badge&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178c6?style=for-the-badge&logo=typescript)
@@ -219,8 +209,6 @@ const kontierung = {
 ![jsPDF](https://img.shields.io/badge/jsPDF-2.5-EA4335?style=for-the-badge)
 ![ELSTER](https://img.shields.io/badge/ELSTER-XML-000000?style=for-the-badge)
 ![DATEV](https://img.shields.io/badge/DATEV-EXTF-005CA9?style=for-the-badge)
-
-</div>
 
 ---
 
@@ -355,7 +343,7 @@ Dieses Projekt ist unter der MIT Lizenz lizenziert - siehe die [LICENSE](LICENSE
 
 ---
 
-<div align="center">
+<div align="left">
 
 **Made with ❤️ for the Solar Industry**
 
