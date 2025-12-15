@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { AppSettings, AccountDefinition, DatevConfig, ElsterStammdaten, StartupChecklist, ElsterBesteuerungUst, ElsterRechtsform } from '../types';
+import { AppSettings, AccountDefinition, DatevConfig, ElsterStammdaten, StartupChecklist, ElsterBesteuerungUst, ElsterRechtsform, SubmissionConfig } from '../types';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -81,6 +81,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, on
         };
     });
 
+    const [submissionConfig, setSubmissionConfig] = useState<SubmissionConfig>(() => ({
+        mode: 'local',
+        localUrl: 'http://localhost:8080',
+        ociUrl: '',
+        apiKey: '',
+        ...(settings.submissionConfig || {}),
+    }));
+
     const buildSettingsSnapshot = (overrides?: Partial<AppSettings>): AppSettings => {
         return {
             ...settings,
@@ -88,6 +96,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, on
             datevConfig,
             elsterStammdaten,
             startupChecklist,
+            submissionConfig,
             ...(overrides || {}),
         };
     };
@@ -609,10 +618,83 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, on
                                 <>
                                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                                         <div className="p-4 bg-slate-50 border-b border-slate-200">
-                                            <h3 className="font-bold text-slate-800">☁️ Oracle Cloud (OCI) – Backend/VM Setup</h3>
+                                            <h3 className="font-bold text-slate-800">🔧 Submission Backend – ELSTER UStVA-Übermittlung</h3>
                                             <div className="text-xs text-slate-500 mt-1">
-                                                Kurzanleitung, um eine Oracle Cloud VM als "Submission Backend" (z.B. für ERiC) zu betreiben.
-                                                <span className="block mt-1">Hinweis: Oracle/OCI Begriffe &amp; Free‑Tier‑Details können sich ändern.</span>
+                                                Wählen Sie, ob das Backend lokal (Docker) oder auf einer OCI VM läuft.
+                                            </div>
+                                        </div>
+
+                                        <div className="p-4 space-y-5">
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-2">Modus</label>
+                                                <select
+                                                    value={submissionConfig.mode}
+                                                    onChange={(e) => setSubmissionConfig(prev => ({ ...prev, mode: e.target.value as 'local' | 'oci' }))}
+                                                    className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                                                >
+                                                    <option value="local">Lokal (Docker Container)</option>
+                                                    <option value="oci">OCI VM</option>
+                                                </select>
+                                            </div>
+
+                                            {submissionConfig.mode === 'local' && (
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-2">Lokale Backend-URL</label>
+                                                    <input
+                                                        type="text"
+                                                        value={submissionConfig.localUrl || ''}
+                                                        onChange={(e) => setSubmissionConfig(prev => ({ ...prev, localUrl: e.target.value }))}
+                                                        placeholder="http://localhost:8080"
+                                                        className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                                                    />
+                                                    <div className="text-xs text-slate-500 mt-1">
+                                                        URL Ihres lokalen Docker-Containers.
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {submissionConfig.mode === 'oci' && (
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-700 mb-2">OCI VM Backend-URL</label>
+                                                    <input
+                                                        type="text"
+                                                        value={submissionConfig.ociUrl || ''}
+                                                        onChange={(e) => setSubmissionConfig(prev => ({ ...prev, ociUrl: e.target.value }))}
+                                                        placeholder="http://92.5.30.252:8080"
+                                                        className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                                                    />
+                                                    <div className="text-xs text-slate-500 mt-1">
+                                                        URL Ihrer OCI VM (z.B. http://&lt;VM-IP&gt;:8080).
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-2">API-Key (optional)</label>
+                                                <input
+                                                    type="password"
+                                                    value={submissionConfig.apiKey || ''}
+                                                    onChange={(e) => setSubmissionConfig(prev => ({ ...prev, apiKey: e.target.value }))}
+                                                    placeholder="API-Key für Backend-Authentifizierung"
+                                                    className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                                                />
+                                                <div className="text-xs text-slate-500 mt-1">
+                                                    Optionaler API-Key für zusätzliche Sicherheit.
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600">
+                                                <div className="font-semibold text-slate-700 mb-1">Hinweis:</div>
+                                                Das Backend führt die ELSTER-Übermittlung mit ERiC aus. Zertifikatsdateien und PIN werden nicht im Browser gespeichert.
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                        <div className="p-4 bg-slate-50 border-b border-slate-200">
+                                            <h3 className="font-bold text-slate-800">☁️ Oracle Cloud (OCI) – VM Setup Anleitung</h3>
+                                            <div className="text-xs text-slate-500 mt-1">
+                                                Kurzanleitung, um eine Oracle Cloud VM als "Submission Backend" zu betreiben.
                                             </div>
                                         </div>
 
