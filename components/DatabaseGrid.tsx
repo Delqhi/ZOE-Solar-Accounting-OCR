@@ -5,6 +5,8 @@ import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
 import { formatPreflightForDialog, runExportPreflight } from '../services/exportPreflight';
 import { generateDatevExtfBuchungsstapelCsv, runDatevExportPreflight } from '../services/datevExport';
+import { validateUstva, submitUstva, UstvaValidationRequest, UstvaSubmissionRequest } from '../services/submissionService';
+import { generateElsterXml, downloadElsterXml, ElsterExportRequest } from '../services/elsterExport';
 
 interface DatabaseGridProps {
   documents: DocumentRecord[];
@@ -48,6 +50,12 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
   // Sort State
   const [sortField, setSortField] = useState<string>('uploadDate');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  // Submission State
+  const [pfxFile, setPfxFile] = useState<File | null>(null);
+  const [pfxPassword, setPfxPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionResult, setSubmissionResult] = useState<string>('');
 
   // Sorting Logic
   const sortedDocs = useMemo(() => {
@@ -170,6 +178,159 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
           else next.add(id);
           return next;
       });
+  };
+
+  // Submission Functions
+  const getSubmissionUrl = () => {
+    const config = settings?.submissionConfig;
+    if (!config) return null;
+
+    if (config.mode === 'local') {
+      return config.localUrl || 'http://localhost:8080';
+    } else if (config.mode === 'oci') {
+      return config.ociUrl;
+    }
+    return null;
+  };
+
+  const getSubmissionApiKey = () => {
+    return settings?.submissionConfig?.apiKey;
+  };
+
+  const handleValidateUstva = async () => {
+    const url = getSubmissionUrl();
+    if (!url) {
+      setSubmissionResult('Fehler: Keine Backend-URL konfiguriert. Prüfen Sie die Einstellungen.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmissionResult('Validierung läuft...');
+
+    const period = filterYear === 'all' ? 'all' : `${filterYear}${filterQuarter !== 'all' ? filterQuarter : filterMonth !== 'all' ? filterMonth : ''}`;
+
+    const request: UstvaValidationRequest = {
+      period,
+      data: ustvaData,
+    };
+
+    const result = await validateUstva(url, request, getSubmissionApiKey());
+
+    if (result.success) {
+      setSubmissionResult('Validierung erfolgreich!');
+    } else {
+      setSubmissionResult(`Validierungsfehler: ${result.error}`);
+    }
+
+    setIsSubmitting(false);
+  };
+
+  const handleSubmitUstva = async () => {
+    if (!pfxFile) {
+      setSubmissionResult('Fehler: Keine Zertifikatsdatei ausgewählt.');
+      return;
+    }
+
+    if (!pfxPassword) {
+      setSubmissionResult('Fehler: Kein PIN/Passwort eingegeben.');
+      return;
+    }
+
+    const url = getSubmissionUrl();
+    if (!url) {
+      setSubmissionResult('Fehler: Keine Backend-URL konfiguriert. Prüfen Sie die Einstellungen.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmissionResult('Übermittlung läuft...');
+
+    const period = filterYear === 'all' ? 'all' : `${filterYear}${filterQuarter !== 'all' ? filterQuarter : filterMonth !== 'all' ? filterMonth : ''}`;
+
+    const request: UstvaSubmissionRequest = {
+      period,
+      data: ustvaData,
+      pfxFile,
+      pfxPassword,
+    };
+
+    const result = await submitUstva(url, request, getSubmissionApiKey());
+
+    if (result.success) {
+      setSubmissionResult(`Übermittlung erfolgreich! Ticket: ${result.ticket || 'N/A'}`);
+    } else {
+      setSubmissionResult(`Übermittlungsfehler: ${result.error}`);
+    }
+
+    setIsSubmitting(false);
+  };
+
+  const calculateUstvaData = () => {
+    let base19 = 0;
+    let tax19 = 0;
+    let base7 = 0;
+    let tax7 = 0;
+    let base0 = 0;
+    let reverseChargeBase = 0;
+
+    sortedDocs.forEach(doc => {
+      if (doc.status === DocumentStatus.DUPLICATE) return;
+      const d = doc.data;
+      if (!d) return;
+
+      tax19 += d.mwstBetrag19 || 0;
+      tax7 += d.mwstBetrag7 || 0;
+
+      if ((d.mwstBetrag19 || 0) > 0) base19 += (d.mwstBetrag19 || 0) / 0.19;
+      if ((d.mwstBetrag7 || 0) > 0) base7 += (d.mwstBetrag7 || 0) / 0.07;
+
+      const taxedNet19 = (d.mwstBetrag19 || 0) / 0.19;
+      const taxedNet7 = (d.mwstBetrag7 || 0) / 0.07;
+      const totalTaxedNet = taxedNet19 + taxedNet7;
+
+      let remainderNet = (d.nettoBetrag || 0) - totalTaxedNet;
+      if (remainderNet < 0.05 && remainderNet > -0.05) remainderNet = 0;
+
+      if (remainderNet > 0) {
+        if (d.reverseCharge) {
+          reverseChargeBase += remainderNet;
+        } else {
+          base0 += remainderNet;
+        }
+      }
+    });
+
+    return { base0, reverseChargeBase, base7, tax7, base19, tax19 };
+  };
+
+  const handleExportUstvaXml = () => {
+    if (!settings?.elsterStammdaten) {
+      alert('ELSTER XML Export: Stammdaten fehlen. Bitte konfigurieren Sie Ihre ELSTER-Stammdaten in den Einstellungen.');
+      return;
+    }
+
+    // Calculate UStVA data for current filter period
+    const period = filterQuarter !== 'all' ? `${filterYear}Q${filterQuarter}` : `${filterYear}${filterMonth.padStart(2, '0')}`;
+    const ustvaData = calculateUstvaData();
+
+    const exportRequest: ElsterExportRequest = {
+      stammdaten: settings.elsterStammdaten,
+      ustvaData: {
+        period,
+        base0: ustvaData.base0,
+        reverseChargeBase: ustvaData.reverseChargeBase,
+        base7: ustvaData.base7,
+        tax7: ustvaData.tax7,
+        base19: ustvaData.base19,
+        tax19: ustvaData.tax19
+      }
+    };
+
+    const xml = generateElsterXml(exportRequest);
+    const filename = `elster_ustva_${period}.xml`;
+    downloadElsterXml(xml, filename);
+
+    alert(`ELSTER XML-Datei "${filename}" wurde heruntergeladen.\n\nBitte laden Sie diese Datei manuell im ELSTER Online Portal hoch:\nhttps://www.elster.de/eportal/`);
   };
 
   const handleExportPDF = () => {
@@ -895,7 +1056,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
   );
 
   const renderUstvaView = () => (
-      <div className="max-w-4xl mx-auto p-8">
+      <div className="max-w-4xl mx-auto p-8 space-y-8">
         <div className="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
              <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
                 <h3 className="font-semibold text-gray-900">Umsatzsteuervoranmeldung (Vorbereitung)</h3>
@@ -940,6 +1101,39 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                     </tr>
                 </tfoot>
             </table>
+        </div>
+
+        {/* Übermittlung Section */}
+        <div className="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
+            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                <h3 className="font-semibold text-gray-900">ELSTER XML Export für manuelle Übermittlung</h3>
+                <div className="text-xs text-gray-500 mt-1">
+                    Export der UStVA-Daten als XML-Datei für Upload im ELSTER Online Portal.
+                </div>
+            </div>
+            <div className="p-6 space-y-4">
+                <div className="flex gap-3">
+                    <button
+                        onClick={handleExportUstvaXml}
+                        className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700"
+                    >
+                        XML Export
+                    </button>
+                </div>
+                <div className="text-xs text-gray-500 space-y-1">
+                    <p><strong>Anleitung:</strong></p>
+                    <ol className="list-decimal list-inside space-y-1 ml-2">
+                        <li>Klicken Sie auf "XML Export" um die XML-Datei herunterzuladen</li>
+                        <li>Öffnen Sie das <a href="https://www.elster.de/portal" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">ELSTER Online Portal</a></li>
+                        <li>Melden Sie sich mit Ihren ELSTER-Zugangsdaten an</li>
+                        <li>Wählen Sie "Umsatzsteuer" → "Umsatzsteuervoranmeldung"</li>
+                        <li>Laden Sie die XML-Datei hoch und übermitteln Sie die Voranmeldung</li>
+                    </ol>
+                </div>
+                <div className="text-xs text-amber-600 bg-amber-50 p-3 rounded">
+                    <strong>Hinweis:</strong> Die XML-Datei enthält keine Signatur. ELSTER Online Portal signiert die Daten automatisch bei der Übermittlung.
+                </div>
+            </div>
         </div>
       </div>
   );
@@ -1005,6 +1199,11 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                       <button onClick={handleExportDATEV} className="px-2 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 border border-gray-200 rounded hover:bg-gray-50 transition-all shadow-sm" title="DATEV Export (EXTF Buchungsstapel)">
                           DATEV
                       </button>
+                      {viewType === 'ustva' && (
+                          <button onClick={handleExportUstvaXml} className="px-2 py-1.5 text-xs font-semibold text-blue-600 hover:text-blue-900 border border-blue-200 rounded hover:bg-blue-50 transition-all shadow-sm" title="ELSTER XML Export">
+                              XML
+                          </button>
+                      )}
                  <button onClick={onExportSQL} className="p-1.5 text-gray-500 hover:text-gray-900 border border-gray-200 rounded hover:bg-gray-50 transition-all shadow-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                  </button>
