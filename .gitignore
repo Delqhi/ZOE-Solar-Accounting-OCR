@@ -19,7 +19,29 @@ dist-ssr
 .env.test.local
 .env.production.local
 
-# Editor directories and files
+# SSH Keys and Certificates
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+ssh-keys/
+oci-ssh-keys/
+*ssh*
+*key*
+
+# API Keys and Secrets
+*secret*
+*token*
+*password*
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# OS generated files
 .vscode/*
 !.vscode/extensions.json
 .idea
