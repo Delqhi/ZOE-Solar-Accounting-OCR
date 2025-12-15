@@ -1,11 +1,11 @@
 
 # ZOE Solar Accounting OCR ☀️🧾
 
-**Version:** 1.2.0  
+**Version:** 1.3.0  
 **Status:** Produktion  
 **Sprache:** TypeScript / React 19
 
-Eine spezialisierte, KI-gestützte Buchhaltungs-Anwendung für **ZOE Solar**. Diese Web-App automatisiert die Extraktion von Rechnungsdaten inklusive Positionen, die Kontierung nach SKR03 (Soll/Haben) und die Vorbereitung für EÜR/UStVA.
+Eine spezialisierte, KI-gestützte Buchhaltungs-Anwendung für **ZOE Solar**. Diese Web-App automatisiert die Extraktion von Rechnungsdaten inklusive Positionen, die Kontierung nach SKR03 (Soll/Haben) und die Vorbereitung für EÜR/UStVA sowie ELSTER-kompatible XML-Exporte.
 
 ---
 
@@ -46,6 +46,18 @@ Das System nutzt eine strikte Logik, um Doppelbuchungen zu verhindern:
 *   **PDF:** EÜR, UStVA-Vorbereitung, Detaillierte Belegliste.
 *   **SQL:** Exportiert ein Schema mit `belege`, `kontierungskonten` und `steuerkategorien` inkl. `soll_konto` und `haben_konto` Feldern.
 *   **CSV:** Standardisierter Export.
+*   **ELSTER XML:** Umsatzsteuervoranmeldung (UStVA) für manuelles Hochladen im ELSTER Online Portal.
+*   **DATEV:** EXTF Buchungsstapel für DATEV-Kompatibilität.
+
+#### ELSTER XML-Export (Neu in v1.2.0)
+*   **Zweck:** Generiert ELSTER-kompatible XML-Dateien für die elektronische Umsatzsteuervoranmeldung.
+*   **Format:** ElsterAnmeldung v8 (Coala-XML) mit Umsatzsteuervoranmeldung-Daten.
+*   **Kennzahlen:** Kz21 (steuerfreie Umsätze), Kz35 (Reverse Charge), Kz81/Kz83 (7% Steuer), Kz86/Kz89 (19% Steuer), Kz93 (Gesamtsteuer).
+*   **Zeitraum:** Automatische Erkennung von Quartal (Q1-Q4) oder Monat (01-12).
+*   **Verwendung:** XML-Datei manuell im [ELSTER Online Portal](https://www.elster.de/portal/) hochladen.
+*   **Voraussetzung:** ELSTER-Stammdaten müssen in den Einstellungen konfiguriert sein.
+
+**Export-Datei:** `elster_ustva_{period}.xml` (z.B. `elster_ustva_2024Q1.xml`)
 
 #### CSV-Export (Format)
 
@@ -165,6 +177,57 @@ Oder als Einzeiler (Typecheck + Build):
 ```bash
 npm run check
 ```
+
+---
+
+## ☁️ OCI VM Deployment (für ELSTER UStVA-Übermittlung)
+
+Für die elektronische Übermittlung von UStVA-Daten an ELSTER benötigen Sie eine OCI VM mit dem Submission-Backend und ERiC.
+
+### Voraussetzungen
+*   OCI Account mit Always-Free VM (z.B. Ubuntu 24.04 ARM64)
+*   ERiC Software (von Ihrem Steuerberater oder Finanzamt)
+*   SSH-Zugang zur VM
+
+### 1. VM vorbereiten
+Stellen Sie sicher, dass Ihre OCI VM läuft (z.B. IP: 92.5.30.252).
+
+Verbinden Sie sich via SSH:
+```bash
+ssh -i /path/to/your/private-key ubuntu@92.5.30.252
+```
+
+### 2. ERiC installieren
+Laden Sie das `install_eric.sh` Script auf Ihre VM und führen Sie es aus:
+```bash
+# Auf Ihrer lokalen Maschine
+scp -i /path/to/your/private-key install_eric.sh ubuntu@92.5.30.252:/home/ubuntu/
+
+# Auf der VM
+bash install_eric.sh
+```
+
+**Wichtig:** Ersetzen Sie die ERiC-Download-URL im Script mit der echten URL von Ihrem Steuerberater.
+
+### 3. Submission-Backend deployen
+Laden Sie das Backend auf die VM:
+```bash
+# Lokale Maschine
+scp -i /path/to/your/private-key -r submission-backend ubuntu@92.5.30.252:/home/ubuntu/
+
+# Auf der VM
+bash deploy_backend.sh
+```
+
+### 4. Frontend konfigurieren
+In der Webapp (Einstellungen > OCI):
+- Wählen Sie "OCI" als Übermittlungsmodus
+- Tragen Sie die VM-IP ein: `http://92.5.30.252:8080`
+- Optional: API-Key setzen
+
+### 5. Testen
+- Health-Check: `curl http://localhost:8080/health`
+- UStVA-Validierung in der Webapp testen
 
 ---
 
