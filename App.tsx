@@ -6,7 +6,8 @@ import { DocumentDetail } from './components/DetailModal';
 import { SettingsView } from './components/SettingsView';
 import { analyzeDocumentWithGemini } from './services/geminiService';
 import { applyAccountingRules, generateZoeInvoiceId } from './services/ruleEngine';
-import * as storageService from './services/storageService';
+import * as supabaseService from './services/supabaseService';
+import { detectPrivateDocument } from './services/privateDocumentDetection';
 import { DocumentRecord, DocumentStatus, AppSettings, ExtractedData, Attachment } from './types';
 import { normalizeExtractedData } from './services/extractedDataNormalization';
 import { formatPreflightForDialog, runExportPreflight } from './services/exportPreflight';
@@ -146,7 +147,12 @@ export default function App() {
   const [viewMode, setViewMode] = useState<'document' | 'settings' | 'database'>('document');
   const [searchQuery, setSearchQuery] = useState('');
   const [notification, setNotification] = useState<string | null>(null);
-  
+  const [privateDocNotification, setPrivateDocNotification] = useState<{
+    vendor: string;
+    amount: number;
+    reason: string;
+  } | null>(null);
+
   const [filterYear, setFilterYear] = useState<string>('all');
   const [filterQuarter, setFilterQuarter] = useState<string>('all');
   const [filterMonth, setFilterMonth] = useState<string>('all');
@@ -162,14 +168,20 @@ export default function App() {
   useEffect(() => {
     const initData = async () => {
       try {
+        // Check if Supabase is configured
+        if (!supabaseService.isSupabaseConfigured()) {
+          setNotification('Supabase ist nicht konfiguriert. Bitte .env Datei prüfen.');
+          return;
+        }
         const [savedDocs, savedSettings] = await Promise.all([
-           storageService.getAllDocuments(),
-           storageService.getSettings()
+           supabaseService.getAllDocuments(),
+           supabaseService.getSettings()
         ]);
         setDocuments(savedDocs.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()));
         setSettings(savedSettings);
       } catch (e) {
         console.error("Init Error:", e);
+        setNotification('Fehler beim Laden der Daten. Bitte Supabase-Verbindung prüfen.');
       }
     };
     initData();
@@ -181,6 +193,13 @@ export default function App() {
           return () => clearTimeout(timer);
       }
   }, [notification]);
+
+  useEffect(() => {
+      if (privateDocNotification) {
+          const timer = setTimeout(() => setPrivateDocNotification(null), 8000);
+          return () => clearTimeout(timer);
+      }
+  }, [privateDocNotification]);
 
   const startResizing = (mouseDownEvent: React.MouseEvent) => {
     mouseDownEvent.preventDefault();
@@ -229,7 +248,7 @@ export default function App() {
 
     setDocuments(prev => [...newDocs, ...prev]);
 
-    const currentSettings = settings || await storageService.getSettings();
+    const currentSettings = settings || await supabaseService.getSettings();
     const processedBatch: DocumentRecord[] = [];
     let currentDocsSnapshot = [...documents]; 
     let autoMergedCount = 0;
@@ -265,15 +284,30 @@ export default function App() {
                  // This is safer than silently merging.
                  return {
                      type: 'DOC',
-                     doc: { 
-                         id: item.id, 
-                         status: DocumentStatus.DUPLICATE, 
+                     doc: {
+                         id: item.id,
+                         status: DocumentStatus.DUPLICATE,
                          data: extracted,
                          duplicateReason: semanticDup.reason || "Inhaltliches Duplikat erkannt",
                          duplicateOfId: semanticDup.doc.id,
                          duplicateConfidence: semanticDup.confidence
                      }
                  };
+            }
+
+            // --- Private Document Detection ---
+            const privateCheck = detectPrivateDocument(extracted);
+            if (privateCheck.isPrivate && privateCheck.detectedVendor) {
+                return {
+                    type: 'PRIVATE_DOC',
+                    id: item.id,
+                    base64: item.base64,
+                    fileName: item.file.name,
+                    fileType: item.file.type,
+                    data: extracted,
+                    vendor: privateCheck.detectedVendor,
+                    reason: privateCheck.reason || 'Private Positionen erkannt'
+                };
             }
 
             const outcome = classifyOcrOutcome(extracted);
@@ -289,6 +323,45 @@ export default function App() {
     const results = await Promise.all(processingPromises);
 
     for (const res of results) {
+        // --- Handle Private Documents ---
+        if (res.type === 'PRIVATE_DOC') {
+            const privateRes = res as any;
+            try {
+                // Upload to belege_privat table
+                await supabaseService.savePrivateDocument(
+                    privateRes.id,
+                    privateRes.fileName,
+                    privateRes.fileType,
+                    privateRes.base64,
+                    privateRes.data,
+                    privateRes.reason
+                );
+
+                // Show notification to user
+                setPrivateDocNotification({
+                    vendor: privateRes.vendor,
+                    amount: privateRes.data?.bruttoBetrag || 0,
+                    reason: privateRes.reason
+                });
+
+                // Don't add to processedBatch (won't show in UI)
+            } catch (e) {
+                console.error('Failed to save private document:', e);
+                // Fallback: save as normal document with PRIVATE status
+                const fallbackDoc: DocumentRecord = {
+                    id: privateRes.id,
+                    fileName: privateRes.fileName,
+                    fileType: privateRes.fileType,
+                    uploadDate: new Date().toISOString(),
+                    status: DocumentStatus.PRIVATE,
+                    data: { ...privateRes.data, privatanteil: true }
+                };
+                processedBatch.push(fallbackDoc);
+                await supabaseService.saveDocument(fallbackDoc);
+            }
+            continue;
+        }
+
         if (res.type === 'MERGE') {
              // Logic kept for potential future use, currently findSemanticDuplicate mainly flags as DUPLICATE
              // Use type assertion because currently no path returns MERGE, so TS infers only DOC types
@@ -299,7 +372,7 @@ export default function App() {
                      ...targetDoc,
                      attachments: [...(targetDoc.attachments || []), mergeRes.attachment]
                  };
-                 await storageService.saveDocument(updatedDoc);
+                 await supabaseService.saveDocument(updatedDoc);
                  currentDocsSnapshot = currentDocsSnapshot.map(d => d.id === targetDoc.id ? updatedDoc : d);
                  autoMergedCount++;
              }
@@ -331,7 +404,7 @@ export default function App() {
                 let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
                 
                 if (data.lieferantName) {
-                    const rule = await storageService.getVendorRule(data.lieferantName);
+                    const rule = await supabaseService.getVendorRule(data.lieferantName);
                     if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
                 }
                 
@@ -350,7 +423,7 @@ export default function App() {
             
             if (finalDoc) {
                 processedBatch.push(finalDoc);
-                await storageService.saveDocument(finalDoc);
+                await supabaseService.saveDocument(finalDoc);
             }
         }
     }
@@ -378,16 +451,16 @@ export default function App() {
 
   const handleSaveDocument = async (updatedDoc: DocumentRecord) => {
     setDocuments(prev => prev.map(doc => doc.id === updatedDoc.id ? updatedDoc : doc));
-    await storageService.saveDocument(updatedDoc);
+    await supabaseService.saveDocument(updatedDoc);
     if (updatedDoc.data?.lieferantName && updatedDoc.data?.kontierungskonto && updatedDoc.data?.steuerkategorie) {
-         await storageService.saveVendorRule(updatedDoc.data.lieferantName, updatedDoc.data.kontierungskonto, updatedDoc.data.steuerkategorie);
+         await supabaseService.saveVendorRule(updatedDoc.data.lieferantName, updatedDoc.data.kontierungskonto, updatedDoc.data.steuerkategorie);
     }
   };
 
   const handleDeleteDocument = async (id: string) => {
     setDocuments(prev => prev.filter(d => d.id !== id));
     if (selectedDocId === id) setSelectedDocId(null);
-    await storageService.deleteDocument(id);
+    await supabaseService.deleteDocument(id);
   };
 
   const handleMergeDocuments = async (sourceId: string, targetId: string) => {
@@ -432,8 +505,8 @@ export default function App() {
         ]
     };
 
-    await storageService.saveDocument(updatedTarget);
-    await storageService.deleteDocument(sourceId);
+    await supabaseService.saveDocument(updatedTarget);
+    await supabaseService.deleteDocument(sourceId);
     
     setDocuments(prev => prev.filter(d => d.id !== sourceId).map(d => d.id === targetId ? updatedTarget : d));
     
@@ -449,11 +522,11 @@ export default function App() {
       const base64 = doc.previewUrl.split(',')[1];
             const extractedRaw = await analyzeDocumentWithGemini(base64, doc.fileType);
             const extracted = normalizeExtractedData(extractedRaw);
-      const currentSettings = settings || await storageService.getSettings();
+      const currentSettings = settings || await supabaseService.getSettings();
       const existingId = doc.data?.eigeneBelegNummer;
       let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
       if (extracted.lieferantName) {
-           const rule = await storageService.getVendorRule(extracted.lieferantName);
+           const rule = await supabaseService.getVendorRule(extracted.lieferantName);
            if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
       }
             let finalData = applyAccountingRules(extracted, documents, currentSettings, overrideRule);
@@ -500,11 +573,11 @@ export default function App() {
 
   const renderContent = () => {
       if (viewMode === 'settings' && settings) {
-          return <SettingsView settings={settings} onSave={(s) => { setSettings(s); storageService.saveSettings(s); }} onClose={() => setViewMode('document')} />;
+          return <SettingsView settings={settings} onSave={(s) => { setSettings(s); supabaseService.saveSettings(s); }} onClose={() => setViewMode('document')} />;
       }
       if (viewMode === 'database') {
           const handleExportSQLWithPreflight = async () => {
-              const currentSettings = settings || await storageService.getSettings();
+              const currentSettings = settings || await supabaseService.getSettings();
               const docsToExport = filteredDocuments;
               const preflight = runExportPreflight(docsToExport, currentSettings);
               const dialog = formatPreflightForDialog(preflight);
@@ -519,7 +592,7 @@ export default function App() {
                   if (!ok) return;
               }
 
-              const sql = storageService.exportDocumentsToSQL(docsToExport, currentSettings);
+              const sql = supabaseService.exportDocumentsToSQL(docsToExport, currentSettings);
               const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
               const y = filterYear === 'all' ? 'all' : filterYear;
               const q = filterQuarter === 'all' ? 'all' : filterQuarter;
@@ -603,6 +676,32 @@ export default function App() {
           <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-900/90 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
               <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
               <span className="font-medium">{notification}</span>
+          </div>
+      )}
+
+      {/* Private Document Toast */}
+      {privateDocNotification && (
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[60] bg-amber-50/90 backdrop-blur-md border border-amber-200 text-amber-900 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300 max-w-md">
+              <svg className="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+              </svg>
+              <div className="flex flex-col min-w-0">
+                  <span className="font-medium">Privatbeleg erkannt</span>
+                  <span className="text-xs opacity-75 truncate">
+                    {privateDocNotification.vendor} - {privateDocNotification.amount.toFixed(2)} EUR
+                  </span>
+                  <span className="text-[10px] opacity-60 truncate">
+                    {privateDocNotification.reason}
+                  </span>
+              </div>
+              <button
+                onClick={() => setPrivateDocNotification(null)}
+                className="ml-2 text-amber-600 hover:text-amber-800 flex-shrink-0"
+              >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+              </button>
           </div>
       )}
 
