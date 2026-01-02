@@ -10,7 +10,7 @@ export const generateZoeInvoiceId = (dateStr: string, existingDocs: DocumentReco
         const yy = d.getFullYear().toString().slice(-2);
         const mm = (d.getMonth() + 1).toString().padStart(2, '0');
         const prefix = `ZOE${yy}${mm}`;
-        
+
         let max = 0;
         existingDocs.forEach(doc => {
             const nr = doc.data?.eigeneBelegNummer || '';
@@ -25,6 +25,7 @@ export const generateZoeInvoiceId = (dateStr: string, existingDocs: DocumentReco
 
         return `${prefix}.${(max + 1).toString().padStart(3, '0')}`;
     } catch (e) {
+        console.warn('generateZoeInvoiceId: Fehler bei der Belegnummer-Generierung', e);
         return '';
     }
 };
@@ -84,17 +85,20 @@ type AccountMatch = { account: AccountDefinition | null; reason?: string };
 const determineAccount = (data: ExtractedData, accounts: AccountDefinition[]): AccountMatch => {
     // Combine all relevant text sources
     const fullText = (
-        (data.lieferantName || '') + ' ' + 
-        (data.textContent || '') + ' ' + 
+        (data.lieferantName || '') + ' ' +
+        (data.textContent || '') + ' ' +
         (data.beschreibung || '') + ' ' +
         (data.lineItems?.map(i => i.description).join(' ') || '')
     ).toLowerCase();
+
+    // Create account lookup map for O(1) access instead of multiple find() calls
+    const accountMap = new Map(accounts.map(a => [a.id, a]));
 
     // 1. Priority Check: Material / Wareneingang via Line Item Keywords
     // If we find specific hardware keywords, we prioritize the Material account
     const matchedMaterialKeyword = PV_MATERIAL_KEYWORDS.find(kw => fullText.includes(kw));
     if (matchedMaterialKeyword) {
-        const materialAccount = accounts.find(a => a.id === 'wareneingang');
+        const materialAccount = accountMap.get('wareneingang');
         if (materialAccount) {
             return { account: materialAccount, reason: `Material-Stichwort erkannt (z.B. "${matchedMaterialKeyword}") -> Wareneingang/Material.` };
         }
@@ -106,21 +110,18 @@ const determineAccount = (data: ExtractedData, accounts: AccountDefinition[]): A
             return { account: acc, reason: `Kontoname im Text gefunden: "${acc.name}".` };
         }
     }
-    
-    // 3. Specific Hardcoded Fallbacks
+
+    // 3. Specific Hardcoded Fallbacks - optimized with Map lookup
     if (fullText.includes('tank') || fullText.includes('aral') || fullText.includes('shell') || fullText.includes('jet ')) {
-        const acc = accounts.find(a => a.id === 'fuhrpark') || null;
-        return { account: acc, reason: 'Heuristik: Kraftstoff/Auto (z.B. "aral/shell/tank").' };
+        return { account: accountMap.get('fuhrpark') || null, reason: 'Heuristik: Kraftstoff/Auto (z.B. "aral/shell/tank").' };
     }
     if (fullText.includes('adobe') || fullText.includes('software') || fullText.includes('google')) {
-        const acc = accounts.find(a => a.id === 'software') || null;
-        return { account: acc, reason: 'Heuristik: Software/Lizenzen (z.B. "adobe/software/google").' };
+        return { account: accountMap.get('software') || null, reason: 'Heuristik: Software/Lizenzen (z.B. "adobe/software/google").' };
     }
     if (fullText.includes('telekom') || fullText.includes('o2') || fullText.includes('vodafone')) {
-        const acc = accounts.find(a => a.id === 'internet') || null;
-        return { account: acc, reason: 'Heuristik: Internet/Telefon (z.B. "telekom/vodafone").' };
+        return { account: accountMap.get('internet') || null, reason: 'Heuristik: Internet/Telefon (z.B. "telekom/vodafone").' };
     }
-    
+
     return { account: null };
 };
 
@@ -188,10 +189,14 @@ export const applyAccountingRules = (
       enriched.steuerkategorie = matchedAccount.steuerkategorien[0];
   } else {
       // Logic based on amounts
-      if ((data.mwstBetrag19 || 0) > 0) enriched.steuerkategorie = '19_pv';
-      else if ((data.mwstBetrag7 || 0) > 0) enriched.steuerkategorie = '7_pv';
-      else if (data.mwstBetrag19 === 0 && data.bruttoBetrag > 0) enriched.steuerkategorie = '0_pv'; 
-      else enriched.steuerkategorie = '19_pv'; 
+      const has19 = (data.mwstBetrag19 || 0) > 0;
+      const has7 = (data.mwstBetrag7 || 0) > 0;
+      const has0 = (data.mwstBetrag0 || 0) > 0 || (data.mwstBetrag19 === 0 && data.mwstBetrag7 === 0 && data.bruttoBetrag > 0);
+
+      if (has19) enriched.steuerkategorie = '19_pv';
+      else if (has7) enriched.steuerkategorie = '7_pv';
+      else if (has0) enriched.steuerkategorie = '0_pv';
+      else enriched.steuerkategorie = '19_pv'; // Default fallback
   }
 
   // 3. Calculate Score

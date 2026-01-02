@@ -250,13 +250,18 @@ export default function App() {
 
     const currentSettings = settings || await supabaseService.getSettings();
     const processedBatch: DocumentRecord[] = [];
-    let currentDocsSnapshot = [...documents]; 
+    // Use functional state access to get the current documents
+    const currentDocsSnapshotRef: { current: DocumentRecord[] } = { current: [] };
+    setDocuments(prev => {
+        currentDocsSnapshotRef.current = [...prev];
+        return prev;
+    });
     let autoMergedCount = 0;
 
     const processingPromises = fileData.map(async (item) => {
-        const isExactDuplicate = currentDocsSnapshot.some(d => d.id !== item.id && d.fileHash === item.hash);
+        const isExactDuplicate = currentDocsSnapshotRef.current.some(d => d.id !== item.id && d.fileHash === item.hash);
         if (isExactDuplicate) {
-                         const original = currentDocsSnapshot.find(d => d.fileHash === item.hash);
+                         const original = currentDocsSnapshotRef.current.find(d => d.fileHash === item.hash);
              return { 
                  type: 'DOC', 
                                  doc: { 
@@ -276,7 +281,7 @@ export default function App() {
             const extracted = normalizeExtractedData(extractedRaw);
             
             // Check for Semantic Duplicate using Extracted Data
-            const semanticDup = findSemanticDuplicate(extracted, currentDocsSnapshot);
+            const semanticDup = findSemanticDuplicate(extracted, currentDocsSnapshotRef.current);
             
             if (semanticDup && semanticDup.doc.id !== item.id) {
                  // OPTION A: Auto-Merge if it was a file upload that matches an existing one perfectly?
@@ -366,14 +371,14 @@ export default function App() {
              // Logic kept for potential future use, currently findSemanticDuplicate mainly flags as DUPLICATE
              // Use type assertion because currently no path returns MERGE, so TS infers only DOC types
              const mergeRes = res as any;
-             const targetDoc = currentDocsSnapshot.find(d => d.id === mergeRes.targetId);
+             const targetDoc = currentDocsSnapshotRef.current.find(d => d.id === mergeRes.targetId);
              if (targetDoc) {
                  const updatedDoc = {
                      ...targetDoc,
                      attachments: [...(targetDoc.attachments || []), mergeRes.attachment]
                  };
                  await supabaseService.saveDocument(updatedDoc);
-                 currentDocsSnapshot = currentDocsSnapshot.map(d => d.id === targetDoc.id ? updatedDoc : d);
+                 currentDocsSnapshotRef.current = currentDocsSnapshotRef.current.map(d => d.id === targetDoc.id ? updatedDoc : d);
                  autoMergedCount++;
              }
         } else if (res.type === 'DOC') {
@@ -390,7 +395,7 @@ export default function App() {
 
                 if (finalDoc.status === DocumentStatus.DUPLICATE && finalDoc.data) {
                      // Apply rules even for duplicates so they look nice in the UI
-                     const zoeId = generateZoeInvoiceId(finalDoc.data.belegDatum || '', currentDocsSnapshot);
+                     const zoeId = generateZoeInvoiceId(finalDoc.data.belegDatum || '', currentDocsSnapshotRef.current);
                      finalDoc.data.eigeneBelegNummer = zoeId;
                 }
 
@@ -400,7 +405,7 @@ export default function App() {
                 const placeholder = newDocs.find(d => d.id === id);
                 if (!placeholder) continue;
 
-                const zoeId = generateZoeInvoiceId(data.belegDatum || '', currentDocsSnapshot);
+                const zoeId = generateZoeInvoiceId(data.belegDatum || '', currentDocsSnapshotRef.current);
                 let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
                 
                 if (data.lieferantName) {
@@ -411,14 +416,14 @@ export default function App() {
                 const normalized = normalizeExtractedData(data);
                 const outcome = (res as any).outcome || classifyOcrOutcome(normalized);
                 const finalData = applyAccountingRules(
-                    { ...normalized, eigeneBelegNummer: zoeId }, 
-                    currentDocsSnapshot, 
-                    currentSettings, 
+                    { ...normalized, eigeneBelegNummer: zoeId },
+                    currentDocsSnapshotRef.current,
+                    currentSettings,
                     overrideRule
                 );
-                
+
                 finalDoc = { ...placeholder, status: outcome.status, data: finalData, error: outcome.error };
-                currentDocsSnapshot.push(finalDoc); 
+                currentDocsSnapshotRef.current.push(finalDoc); 
             }
             
             if (finalDoc) {
@@ -433,7 +438,7 @@ export default function App() {
         const mergedTargetIds = results.filter(r => r.type === 'MERGE').map((r:any) => r.targetId);
         const updatedOldDocs = cleanPrev.map(d => {
             if (mergedTargetIds.includes(d.id)) {
-                return currentDocsSnapshot.find(snap => snap.id === d.id) || d;
+                return currentDocsSnapshotRef.current.find(snap => snap.id === d.id) || d;
             }
             return d;
         });
