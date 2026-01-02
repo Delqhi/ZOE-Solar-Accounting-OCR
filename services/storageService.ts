@@ -656,6 +656,126 @@ export const exportDatabaseToSQL = async (): Promise<string> => {
   return generateSQLForDocuments(docs, settings);
 };
 
+
 export const exportDocumentsToSQL = (docs: DocumentRecord[], settings?: AppSettings): string => {
   return generateSQLForDocuments(docs, settings);
+};
+
+// ============================================
+// Supabase Integration (Dual-Write Mode)
+// ============================================
+
+import { supabaseService, SupabaseDocument } from './supabaseService';
+
+/**
+ * Initialize Supabase connection
+ */
+export const initializeSupabase = (): void => {
+  supabaseService.initialize();
+};
+
+/**
+ * Check if Supabase is available
+ */
+export const isSupabaseAvailable = (): boolean => {
+  return supabaseService.isAvailable();
+};
+
+/**
+ * Get documents from Supabase
+ */
+export const getDocumentsFromSupabase = async (filters?: {
+  year?: string;
+  status?: string;
+  source_type?: string;
+}): Promise<DocumentRecord[]> => {
+  return supabaseService.getDocuments(filters);
+};
+
+/**
+ * Get a single document from Supabase
+ */
+export const getDocumentFromSupabase = async (id: string): Promise<DocumentRecord | null> => {
+  return supabaseService.getDocument(id);
+};
+
+/**
+ * Save document to Supabase (for n8n workflow)
+ */
+export const saveDocumentToSupabase = async (doc: SupabaseDocument): Promise<string | null> => {
+  return supabaseService.insertDocument(doc);
+};
+
+/**
+ * Get pending queue items from Supabase
+ */
+export const getPendingQueueFromSupabase = async () => {
+  return supabaseService.getPendingQueue();
+};
+
+/**
+ * Confirm a pending queue item
+ */
+export const confirmPendingQueueItem = async (id: string): Promise<boolean> => {
+  return supabaseService.confirmPendingQueueItem(id);
+};
+
+/**
+ * Reject a pending queue item
+ */
+export const rejectPendingQueueItem = async (id: string, notes?: string): Promise<boolean> => {
+  return supabaseService.rejectPendingQueueItem(id, notes);
+};
+
+/**
+ * Get unread notifications from Supabase
+ */
+export const getNotificationsFromSupabase = async () => {
+  return supabaseService.getUnreadNotifications();
+};
+
+/**
+ * Mark notification as read
+ */
+export const markNotificationRead = async (id: string): Promise<boolean> => {
+  return supabaseService.markNotificationRead(id);
+};
+
+/**
+ * Subscribe to real-time notifications
+ */
+export const subscribeToSupabaseNotifications = (callback: (notification: any) => void) => {
+  supabaseService.subscribeToNotifications(callback);
+};
+
+/**
+ * Subscribe to pending queue changes
+ */
+export const subscribeToSupabasePendingQueue = (callback: (item: any) => void) => {
+  supabaseService.subscribeToPendingQueue(callback);
+};
+
+/**
+ * Unsubscribe from all Supabase real-time channels
+ */
+export const unsubscribeSupabase = () => {
+  supabaseService.unsubscribe();
+};
+
+/**
+ * Check if message was already processed (for idempotency)
+ */
+export const isMessageProcessed = async (messageId: string): Promise<boolean> => {
+  return supabaseService.isMessageProcessed(messageId);
+};
+
+/**
+ * Mark message as processed
+ */
+export const markMessageProcessed = async (
+  messageId: string,
+  messageType: string,
+  documentId?: string
+): Promise<boolean> => {
+  return supabaseService.markMessageProcessed(messageId, messageType, documentId);
 };

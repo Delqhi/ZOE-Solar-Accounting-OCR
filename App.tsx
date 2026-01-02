@@ -11,6 +11,31 @@ import { DocumentRecord, DocumentStatus, AppSettings, ExtractedData, Attachment 
 import { normalizeExtractedData } from './services/extractedDataNormalization';
 import { formatPreflightForDialog, runExportPreflight } from './services/exportPreflight';
 
+// Type for pending queue item from Supabase
+type PendingQueueItem = {
+  id: string;
+  source_type: string;
+  source_message_id: string;
+  sender_email: string;
+  sender_phone: string | null;
+  preliminary_data: Record<string, unknown>;
+  extracted_amount: number | null;
+  extracted_vendor: string | null;
+  extracted_date: string | null;
+  status: string;
+  created_at: string;
+};
+
+type NotificationItem = {
+  id: string;
+  notification_type: string;
+  title: string;
+  message: string;
+  data: Record<string, unknown>;
+  is_read: boolean;
+  created_at: string;
+};
+
 const computeFileHash = async (file: File): Promise<string> => {
   const buffer = await file.arrayBuffer();
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
@@ -146,7 +171,14 @@ export default function App() {
   const [viewMode, setViewMode] = useState<'document' | 'settings' | 'database'>('document');
   const [searchQuery, setSearchQuery] = useState('');
   const [notification, setNotification] = useState<string | null>(null);
-  
+
+  // Pending Queue State (from n8n/Gmail workflow)
+  const [pendingQueue, setPendingQueue] = useState<PendingQueueItem[]>([]);
+  const [showPendingQueue, setShowPendingQueue] = useState(false);
+
+  // Notifications State (from n8n)
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+
   const [filterYear, setFilterYear] = useState<string>('all');
   const [filterQuarter, setFilterQuarter] = useState<string>('all');
   const [filterMonth, setFilterMonth] = useState<string>('all');
@@ -168,11 +200,57 @@ export default function App() {
         ]);
         setDocuments(savedDocs.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()));
         setSettings(savedSettings);
+
+        // Initialize Supabase and fetch initial data
+        storageService.initializeSupabase();
+        if (storageService.isSupabaseAvailable()) {
+          // Fetch initial pending queue
+          const queue = await storageService.getPendingQueueFromSupabase() as PendingQueueItem[];
+          setPendingQueue(queue || []);
+
+          // Fetch initial notifications
+          const notifs = await storageService.getNotificationsFromSupabase() as NotificationItem[];
+          setNotifications(notifs || []);
+        }
       } catch (e) {
         console.error("Init Error:", e);
       }
     };
     initData();
+  }, []);
+
+  // Polling for notifications and pending queue (every 30 seconds)
+  useEffect(() => {
+    if (!storageService.isSupabaseAvailable()) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const [queue, notifs] = await Promise.all([
+          storageService.getPendingQueueFromSupabase(),
+          storageService.getNotificationsFromSupabase()
+        ]);
+        setPendingQueue(queue as PendingQueueItem[]);
+        setNotifications(notifs as NotificationItem[]);
+      } catch (e) {
+        console.error("Polling error:", e);
+      }
+    }, 30000);
+
+    // Real-time subscriptions
+    storageService.subscribeToSupabaseNotifications((notif) => {
+      setNotifications(prev => [notif as NotificationItem, ...prev]);
+      setNotification(notif.title);
+    });
+
+    storageService.subscribeToSupabasePendingQueue((item) => {
+      setPendingQueue(prev => [item as PendingQueueItem, ...prev]);
+      setNotification(`Neuer Eintrag in der Queue: ${(item as PendingQueueItem).extracted_vendor || 'Unbekannt'}`);
+    });
+
+    return () => {
+      clearInterval(pollInterval);
+      storageService.unsubscribeSupabase();
+    };
   }, []);
 
   useEffect(() => {
@@ -468,6 +546,54 @@ export default function App() {
     }
   };
 
+  // ============================================
+  // Pending Queue Actions (from n8n/Gmail workflow)
+  // ============================================
+
+  const handleConfirmPendingItem = async (id: string) => {
+    if (!storageService.isSupabaseAvailable()) {
+      setNotification('Supabase nicht konfiguriert');
+      return;
+    }
+
+    const success = await storageService.confirmPendingQueueItem(id);
+    if (success) {
+      setPendingQueue(prev => prev.filter(item => item.id !== id));
+      setNotification('Rechnung bestätigt und verarbeitet.');
+    } else {
+      setNotification('Fehler beim Bestätigen.');
+    }
+  };
+
+  const handleRejectPendingItem = async (id: string) => {
+    if (!storageService.isSupabaseAvailable()) {
+      setNotification('Supabase nicht konfiguriert');
+      return;
+    }
+
+    const notes = prompt('Grund für Ablehnung (optional):');
+    const success = await storageService.rejectPendingQueueItem(id, notes || undefined);
+    if (success) {
+      setPendingQueue(prev => prev.filter(item => item.id !== id));
+      setNotification('Rechnung abgelehnt und aus Queue entfernt.');
+    } else {
+      setNotification('Fehler beim Ablehnen.');
+    }
+  };
+
+  const handleMarkNotificationRead = async (id: string) => {
+    if (!storageService.isSupabaseAvailable()) return;
+    await storageService.markNotificationRead(id);
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+  };
+
+  const handleClearAllNotifications = async () => {
+    if (!storageService.isSupabaseAvailable()) return;
+    // Mark all as read in UI immediately
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    // Note: Would need a batch API call in production
+  };
+
   const filteredDocuments = useMemo(() => {
     return documents.filter(doc => {
       if (searchQuery) {
@@ -628,19 +754,109 @@ export default function App() {
 
           <div className="p-4 space-y-4 border-b border-slate-200/60">
              <div className="flex flex-col gap-1">
-                 <SidebarItem 
-                    active={viewMode === 'document'} 
-                    label="Belege" 
+                 <SidebarItem
+                    active={viewMode === 'document'}
+                    label="Belege"
                     icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>}
-                    onClick={() => { setSelectedDocId(null); setViewMode('document'); }} 
+                    onClick={() => { setSelectedDocId(null); setViewMode('document'); }}
                 />
-                 <SidebarItem 
-                    active={viewMode === 'database'} 
-                    label="Berichte" 
+                 <SidebarItem
+                    active={viewMode === 'database'}
+                    label="Berichte"
                     icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>}
-                    onClick={() => { setSelectedDocId(null); setViewMode('database'); }} 
+                    onClick={() => { setSelectedDocId(null); setViewMode('database'); }}
                  />
              </div>
+
+             {/* Pending Queue Section */}
+             <div className="mt-2 pt-2 border-t border-slate-200/60">
+               <button
+                 onClick={() => setShowPendingQueue(!showPendingQueue)}
+                 className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-3 transition-all ${
+                   showPendingQueue
+                     ? 'bg-amber-50 text-amber-700 shadow-sm ring-1 ring-amber-100'
+                     : 'text-slate-600 hover:bg-slate-100'
+                 }`}
+               >
+                 <span className={`${showPendingQueue ? 'text-amber-600' : 'text-slate-400'}`}>
+                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                     <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                   </svg>
+                 </span>
+                 <span className="flex-1">Queue</span>
+                 {pendingQueue.length > 0 && (
+                   <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                     {pendingQueue.length}
+                   </span>
+                 )}
+               </button>
+
+               {/* Pending Queue Items Dropdown */}
+               {showPendingQueue && (
+                 <div className="mt-1 ml-4 space-y-1 border-l-2 border-amber-200 pl-3">
+                   {pendingQueue.length === 0 ? (
+                     <div className="py-2 text-xs text-slate-400 italic">
+                       Keine ausstehenden Belege
+                     </div>
+                   ) : (
+                     pendingQueue.map(item => (
+                       <div key={item.id} className="bg-amber-50/50 rounded-lg p-2 text-xs">
+                         <div className="flex justify-between items-start mb-1">
+                           <span className="font-medium text-slate-700 truncate">
+                             {item.extracted_vendor || 'Unbekannt'}
+                           </span>
+                           <span className="text-[10px] text-slate-400">
+                             {item.source_type === 'gmail' ? '📧' : '📱'}
+                           </span>
+                         </div>
+                         <div className="text-slate-600 mb-2">
+                           {item.extracted_amount ? `${item.extracted_amount.toFixed(2)} EUR` : 'Betrag unbekannt'}
+                         </div>
+                         <div className="flex gap-1">
+                           <button
+                             onClick={() => handleConfirmPendingItem(item.id)}
+                             className="flex-1 bg-green-500 text-white py-1 px-2 rounded text-[10px] hover:bg-green-600 transition-colors"
+                           >
+                             Bestätigen
+                           </button>
+                           <button
+                             onClick={() => handleRejectPendingItem(item.id)}
+                             className="flex-1 bg-red-500 text-white py-1 px-2 rounded text-[10px] hover:bg-red-600 transition-colors"
+                           >
+                             Löschen
+                           </button>
+                         </div>
+                       </div>
+                     ))
+                   )}
+                 </div>
+               )}
+             </div>
+
+             {/* Notifications Section */}
+             {notifications.length > 0 && (
+               <div className="mt-2 pt-2 border-t border-slate-200/60">
+                 <div className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex justify-between items-center">
+                   <span>Benachrichtigungen</span>
+                   <button
+                     onClick={handleClearAllNotifications}
+                     className="text-blue-500 hover:text-blue-700"
+                   >
+                     Alle gelesen
+                   </button>
+                 </div>
+                 {notifications.filter(n => !n.is_read).slice(0, 3).map(notif => (
+                   <div
+                     key={notif.id}
+                     onClick={() => handleMarkNotificationRead(notif.id)}
+                     className="ml-4 mr-3 mb-1 p-2 bg-blue-50 rounded-lg text-xs cursor-pointer hover:bg-blue-100 transition-colors"
+                   >
+                     <div className="font-medium text-blue-700">{notif.title}</div>
+                     <div className="text-slate-600 truncate">{notif.message}</div>
+                   </div>
+                 ))}
+               </div>
+             )}
 
              <div className="relative group">
                  <svg className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>

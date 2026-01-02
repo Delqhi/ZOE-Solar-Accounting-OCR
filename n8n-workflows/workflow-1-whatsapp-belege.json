@@ -1,0 +1,254 @@
+{
+  "name": "ZOE WhatsApp Document Processing",
+  "nodes": [
+    {
+      "name": "WAHA Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "zoe-whatsapp",
+        "options": {}
+      },
+      "typeVersion": 1,
+      "position": [100, 200],
+      "name": "WAHA Webhook"
+    },
+    {
+      "name": "Filter Belege Group",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "const items = $input.all();\nconst belegItems = items.filter(item => {\n  const chat = item.json.chat || {};\n  return chat.group && chat.group.name && \n         chat.group.name.toLowerCase().includes('belege');\n});\nreturn belegItems;"
+      },
+      "typeVersion": 1,
+      "position": [300, 200],
+      "name": "Filter Belege Group"
+    },
+    {
+      "name": "Check Processed",
+      "type": "n8n-nodes-base.supabase",
+      "parameters": {
+        "operation": "getFirst",
+        "tableId": "processed_messages",
+        "returnAll": false,
+        "filters": {
+          "id": "={{ $json.id }}"
+        }
+      },
+      "typeVersion": 1,
+      "position": [500, 200],
+      "name": "Check Processed"
+    },
+    {
+      "name": "Skip If Processed",
+      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.id }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1,
+      "position": [700, 200],
+      "name": "Skip If Processed"
+    },
+    {
+      "name": "Download Media",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "GET",
+        "url": "=https://waha.aura-call.de/api/{{ $json.chat.id }}/{{ $json.id }}/media",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $node['WAHA Webhook'].parameter['authenticate']['credentialType'] }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1,
+      "position": [900, 100],
+      "name": "Download Media"
+    },
+    {
+      "name": "Extract File Info",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "const response = $input.first().json;\nconst contentType = (response.headers && response.headers['content-type']) || '';\nconst isPdf = contentType.includes('application/pdf');\nconst isImage = contentType.includes('image/');\n\nif (!isPdf && !isImage) {\n  throw new Error('Unsupported file type: ' + contentType);\n}\n\nconst bodyBuffer = response.body;\nlet base64Data = '';\nif (typeof bodyBuffer === 'string') {\n  base64Data = bodyBuffer;\n} else if (Buffer && Buffer.isBuffer(bodyBuffer)) {\n  base64Data = bodyBuffer.toString('base64');\n} else if (bodyBuffer instanceof ArrayBuffer) {\n  base64Data = Buffer.from(bodyBuffer).toString('base64');\n}\n\nconst mimeType = isPdf ? 'application/pdf' : contentType;\nconst originalName = $input.first().json.filename || 'document.pdf';\n\nreturn [{\n  json: {\n    base64: base64Data,\n    mimeType: mimeType,\n    originalName: originalName,\n    messageId: $input.first().json.id,\n    chatId: $input.first().json.chat.id\n  }\n}];"
+      },
+      "typeVersion": 1,
+      "position": [1100, 100],
+      "name": "Extract File Info"
+    },
+    {
+      "name": "OCR with Gemini",
+      "type": "n8n-nodes-base.googleGemini",
+      "parameters": {
+        "operation": "generateContent",
+        "model": "gemini-2.5-flash",
+        "prompt": "Extract accounting data from this document. Return JSON only with:\n- documentType (invoice, receipt, etc.)\n- belegDatum (YYYY-MM-DD)\n- lieferantName\n- lieferantAdresse\n- steuernummer\n- bruttoBetrag\n- nettoBetrag\n- mwstBetrag19 (19% VAT amount)\n- mwstBetrag7 (7% VAT amount)\n- belegNummerLieferant\n\nDouble check all calculations, especially the total amount.",
+        "options": {}
+      },
+      "typeVersion": 1,
+      "position": [1300, 100],
+      "name": "OCR with Gemini"
+    },
+    {
+      "name": "Parse OCR Response",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "const ocrResult = $input.first().json;\nlet extractedData = {};\n\n// Try to parse JSON from response\nif (typeof ocrResult === 'string') {\n  try {\n    extractedData = JSON.parse(ocrResult);\n  } catch (e) {\n    // Try to extract JSON from markdown code blocks\n    const jsonMatch = ocrResult.match(/```json\\s*([\\s\\S]*?)\\s*```/) || \n                      ocrResult.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      try {\n        extractedData = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n      } catch (e2) {\n        extractedData = { rawText: ocrResult };\n      }\n    } else {\n      extractedData = { rawText: ocrResult };\n    }\n  }\n} else {\n  extractedData = ocrResult;\n}\n\n// Generate ZOE reference number\nconst date = new Date(extractedData.belegDatum || Date.now());\nconst year = date.getFullYear();\nconst month = String(date.getMonth() + 1).padStart(2, '0');\nconst timestamp = Date.now().toString(36).toUpperCase();\nconst zoeRef = `ZOE-${year}${month}-${timestamp}`;\n\n// Calculate OCR score (simplified)\nconst requiredFields = ['belegDatum', 'bruttoBetrag', 'lieferantName'];\nconst foundFields = requiredFields.filter(f => extractedData[f]);\nconst ocrScore = Math.round((foundFields.length / requiredFields.length) * 10);\n\nreturn [{\n  json: {\n    ...extractedData,\n    zoe_reference: zoeRef,\n    ocr_score: ocrScore,\n    ocr_model: 'gemini-2.5-flash',\n    status: ocrScore >= 7 ? 'completed' : 'review_needed'\n  }\n}];"
+      },
+      "typeVersion": 1,
+      "position": [1500, 100],
+      "name": "Parse OCR Response"
+    },
+    {
+      "name": "Generate UUID",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "function generateUUID() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {\n    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);\n    return v.toString(16);\n  });\n}\n\nconst extracted = $input.first().json;\nconst fileInfo = $('Extract File Info').first().json;\n\nreturn [{\n  json: {\n    id: generateUUID(),\n    zoe_reference: extracted.zoe_reference,\n    file_name: fileInfo.originalName,\n    file_type: fileInfo.mimeType,\n    source_type: 'whatsapp',\n    source_id: fileInfo.messageId,\n    document_type: extracted.documentType,\n    beleg_datum: extracted.belegDatum,\n    lieferant_name: extracted.lieferantName,\n    lieferant_adresse: extracted.lieferantAdresse,\n    steuernummer: extracted.steuernummer,\n    brutto_betrag: extracted.bruttoBetrag,\n    netto_betrag: extracted.nettoBetrag,\n    mwst_betrag_19: extracted.mwstBetrag19,\n    mwst_betrag_7: extracted.mwstBetrag7,\n    ocr_score: extracted.ocr_score,\n    status: extracted.status,\n    raw_data: extracted,\n    created_at: new Date().toISOString(),\n    updated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "typeVersion": 1,
+      "position": [1700, 100],
+      "name": "Generate UUID"
+    },
+    {
+      "name": "Insert to Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "parameters": {
+        "operation": "insert",
+        "tableId": "documents",
+        "fieldsValues": "={{ JSON.stringify([$json]) }}"
+      },
+      "typeVersion": 1,
+      "position": [1900, 100],
+      "name": "Insert to Supabase"
+    },
+    {
+      "name": "Upload to GitLab",
+      "type": "n8n-nodes-base.gitlab",
+      "parameters": {
+        "operation": "commit",
+        "projectId": "zoe-solar-documents",
+        "filePath": "={{ $('Generate UUID').first().json.zoe_reference + '.pdf' }}",
+        "fileContent": "={{ $('Extract File Info').first().json.base64 }}",
+        "branch": "main",
+        "commitMessage": "={{ 'Add document: ' + $('Generate UUID').first().json.zoe_reference + ' - ' + $('Generate UUID').first().json.lieferant_name }}"
+      },
+      "typeVersion": 1,
+      "position": [2100, 100],
+      "name": "Upload to GitLab"
+    },
+    {
+      "name": "Create JSON Metadata",
+      "type": "n8n-nodes-base.gitlab",
+      "parameters": {
+        "operation": "commit",
+        "projectId": "zoe-solar-documents",
+        "filePath": "={{ $('Generate UUID').first().json.zoe_reference + '.json' }}",
+        "fileContent": "={{ JSON.stringify({\n  id: $('Generate UUID').first().json.id,\n  zoe_reference: $('Generate UUID').first().json.zoe_reference,\n  source: {\n    type: 'whatsapp',\n    message_id: $('Extract File Info').first().json.messageId,\n    timestamp: new Date().toISOString()\n  },\n  document: {\n    type: $('Generate UUID').first().json.document_type,\n    date: $('Generate UUID').first().json.beleg_datum,\n    vendor: {\n      name: $('Generate UUID').first().json.lieferant_name,\n      address: $('Generate UUID').first().json.lieferant_adresse\n    },\n    invoice_number: $('Generate UUID').first().json.beleg_nummer_lieferant\n  },\n  financial: {\n    net: $('Generate UUID').first().json.netto_betrag,\n    gross: $('Generate UUID').first().json.brutto_betrag,\n    vat_19: $('Generate UUID').first().json.mwst_betrag_19,\n    vat_7: $('Generate UUID').first().json.mwst_betrag_7\n  },\n  accounting: {\n    ocr_score: $('Generate UUID').first().json.ocr_score,\n    status: $('Generate UUID').first().json.status\n  }\n}, null, 2) }}",
+        "branch": "main",
+        "commitMessage": "={{ 'Add metadata: ' + $('Generate UUID').first().json.zoe_reference }}"
+      },
+      "typeVersion": 1,
+      "position": [2300, 100],
+      "name": "Create JSON Metadata"
+    },
+    {
+      "name": "Mark as Processed",
+      "type": "n8n-nodes-base.supabase",
+      "parameters": {
+        "operation": "insert",
+        "tableId": "processed_messages",
+        "fieldsValues": "={{ JSON.stringify([{\n  id: $('Extract File Info').first().json.messageId,\n  message_type: 'whatsapp',\n  processing_status: 'completed',\n  document_id: $('Generate UUID').first().json.id,\n  created_at: new Date().toISOString()\n}]) }}"
+      },
+      "typeVersion": 1,
+      "position": [2500, 100],
+      "name": "Mark as Processed"
+    },
+    {
+      "name": "Create App Notification",
+      "type": "n8n-nodes-base.supabase",
+      "parameters": {
+        "operation": "insert",
+        "tableId": "notifications",
+        "fieldsValues": "={{ JSON.stringify([{\n  notification_type: 'document_processed',\n  title: 'Neuer Beleg verarbeitet',\n  message: $('Generate UUID').first().json.lieferant_name + ' - ' + $('Generate UUID').first().json.brutto_betrag + ' EUR',\n  data: {\n    document_id: $('Generate UUID').first().json.id,\n    zoe_reference: $('Generate UUID').first().json.zoe_reference,\n    vendor: $('Generate UUID').first().json.lieferant_name,\n    amount: $('Generate UUID').first().json.brutto_betrag\n  },\n  is_read: false,\n  created_at: new Date().toISOString()\n}]) }}"
+      },
+      "typeVersion": 1,
+      "position": [2700, 100],
+      "name": "Create App Notification"
+    },
+    {
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "const error = $input.first().json;\nreturn [{\n  json: {\n    error: error.message || 'Unknown error',\n    timestamp: new Date().toISOString(),\n    messageId: $('Extract File Info').first().json?.messageId\n  }\n}];"
+      },
+      "typeVersion": 1,
+      "position": [900, 400],
+      "name": "Error Handler"
+    }
+  ],
+  "connections": {
+    "WAHA Webhook": {
+      "main": [["Filter Belege Group"]]
+    },
+    "Filter Belege Group": {
+      "main": [["Check Processed"]]
+    },
+    "Check Processed": {
+      "main": [
+        ["Skip If Processed"],
+        ["Download Media"]
+      ]
+    },
+    "Skip If Processed": {
+      "main": [[]]
+    },
+    "Download Media": {
+      "main": [["Extract File Info"]]
+    },
+    "Extract File Info": {
+      "main": [["OCR with Gemini"]]
+    },
+    "OCR with Gemini": {
+      "main": [["Parse OCR Response"]]
+    },
+    "Parse OCR Response": {
+      "main": [["Generate UUID"]]
+    },
+    "Generate UUID": {
+      "main": [["Insert to Supabase"]]
+    },
+    "Insert to Supabase": {
+      "main": [["Upload to GitLab"]]
+    },
+    "Upload to GitLab": {
+      "main": [["Create JSON Metadata"]]
+    },
+    "Create JSON Metadata": {
+      "main": [["Mark as Processed"]]
+    },
+    "Mark as Processed": {
+      "main": [["Create App Notification"]]
+    },
+    "Create App Notification": {
+      "main": [[]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

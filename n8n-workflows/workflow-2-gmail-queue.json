@@ -1,0 +1,163 @@
+{
+  "name": "ZOE Gmail Invoice Processing",
+  "nodes": [
+    {
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "parameters": {
+        "triggerOn": "new_email",
+        "filters": {
+          "from": [],
+          "subject": ["rechnung", "invoice", "beleg", "facture", "RE:", "RG:"],
+          "hasAttachment": true
+        }
+      },
+      "typeVersion": 1,
+      "position": [100, 200],
+      "name": "Gmail Trigger"
+    },
+    {
+      "name": "Check Processed",
+      "type": "n8n-nodes-base.supabase",
+      "parameters": {
+        "operation": "getFirst",
+        "tableId": "processed_messages",
+        "returnAll": false,
+        "filters": {
+          "id": "={{ $json.id }}"
+        }
+      },
+      "typeVersion": 1,
+      "position": [300, 200],
+      "name": "Check Processed"
+    },
+    {
+      "name": "Skip If Processed",
+      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.id }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1,
+      "position": [500, 200],
+      "name": "Skip If Processed"
+    },
+    {
+      "name": "Extract Metadata",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "const email = $input.first().json;\nconst subject = email.subject || '';\nconst from = email.from || '';\nconst bodyText = email.textPlain || email.textHtml || '';\nconst date = email.date || new Date().toISOString();\n\n// Extract sender email\nconst senderMatch = from.match(/<([^>]+)>/);\nconst senderEmail = senderMatch ? senderMatch[1] : from;\n\n// Extract vendor name from sender\nconst vendorMatch = from.match(/^([^<\\n]+)/);\nconst vendorName = vendorMatch ? vendorMatch[1].trim() : 'Unknown';\n\n// Simple extraction patterns\nconst amountPatterns = [\n  /\\b(\\d+[.,]\\d{2})\\s*(?:eur|€|euro)\\b/gi,\n  /\\b(?:total|sum|amount|betrag|rechnungsbetrag)[:\\s]*(\\d+[.,]\\d{2})/gi\n];\n\nlet extractedAmount = 0;\nfor (const pattern of amountPatterns) {\n  const matches = bodyText.match(pattern);\n  if (matches) {\n    const lastMatch = matches[matches.length - 1];\n    const amountMatch = lastMatch.match(/(\\d+[.,]\\d{2})/);\n    if (amountMatch) {\n      extractedAmount = parseFloat(amountMatch[1].replace(/,/g, '.'));\n      break;\n    }\n  }\n}\n\n// Extract date from email or body\nconst datePatterns = [\n  /(\\d{2}[./-]\\d{2}[./-]\\d{4})/,\n  /(\\d{4}[./-]\\d{2}[./-]\\d{2})/\n];\nlet extractedDate = date.split('T')[0];\nfor (const pattern of datePatterns) {\n  const match = bodyText.match(pattern) || subject.match(pattern);\n  if (match) {\n    extractedDate = match[1];\n    break;\n  }\n}\n\nreturn [{\n  json: {\n    email_id: email.id,\n    subject,\n    from,\n    sender_email: senderEmail,\n    sender_vendor: vendorName,\n    body_preview: bodyText.substring(0, 500),\n    date,\n    extracted_amount: extractedAmount,\n    extracted_vendor: vendorName,\n    extracted_date: extractedDate\n  }\n}];"
+      },
+      "typeVersion": 1,
+      "position": [700, 100],
+      "name": "Extract Metadata"
+    },
+    {
+      "name": "Generate Queue Entry",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "function generateUUID() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {\n    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);\n    return v.toString(16);\n  });\n}\n\nconst data = $input.first().json;\n\nreturn [{\n  json: {\n    id: generateUUID(),\n    document_id: null,\n    source_type: 'gmail',\n    source_message_id: data.email_id,\n    sender_email: data.sender_email,\n    sender_phone: null,\n    preliminary_data: {\n      subject: data.subject,\n      vendor: data.sender_vendor,\n      extracted_amount: data.extracted_amount,\n      extracted_date: data.extracted_date,\n      body_preview: data.body_preview\n    },\n    extracted_amount: data.extracted_amount,\n    extracted_vendor: data.sender_vendor,\n    extracted_date: data.extracted_date,\n    status: 'pending',\n    created_at: new Date().toISOString(),\n    updated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "typeVersion": 1,
+      "position": [900, 100],
+      "name": "Generate Queue Entry"
+    },
+    {
+      "name": "Insert to Pending Queue",
+      "type": "n8n-nodes-base.supabase",
+      "parameters": {
+        "operation": "insert",
+        "tableId": "pending_queue",
+        "fieldsValues": "={{ JSON.stringify([$json]) }}"
+      },
+      "typeVersion": 1,
+      "position": [1100, 100],
+      "name": "Insert to Pending Queue"
+    },
+    {
+      "name": "Create Notification",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "const queue = $input.first().json;\nreturn [{\n  json: {\n    notification_type: 'invoice_pending',\n    title: 'Neue Rechnung zur Bestätigung',\n    message: `Rechnung von ${queue.extracted_vendor || 'Unbekannt'} (${queue.extracted_amount ? queue.extracted_amount.toFixed(2) + ' EUR' : 'Betrag nicht erkannt'}) wartet auf Bestätigung.`,\n    data: {\n      queue_id: queue.id,\n      vendor: queue.extracted_vendor,\n      amount: queue.extracted_amount,\n      source: 'gmail',\n      email_subject: queue.preliminary_data?.subject\n    },\n    is_read: false,\n    created_at: new Date().toISOString()\n  }\n}];"
+      },
+      "typeVersion": 1,
+      "position": [1300, 100],
+      "name": "Create Notification"
+    },
+    {
+      "name": "Insert Notification",
+      "type": "n8n-nodes-base.supabase",
+      "parameters": {
+        "operation": "insert",
+        "tableId": "notifications",
+        "fieldsValues": "={{ JSON.stringify([$json]) }}"
+      },
+      "typeVersion": 1,
+      "position": [1500, 100],
+      "name": "Insert Notification"
+    },
+    {
+      "name": "Mark as Processed",
+      "type": "n8n-nodes-base.supabase",
+      "parameters": {
+        "operation": "insert",
+        "tableId": "processed_messages",
+        "fieldsValues": "={{ JSON.stringify([{\n  id: $('Extract Metadata').first().json.email_id,\n  message_type: 'gmail',\n  processing_status: 'queued',\n  created_at: new Date().toISOString()\n}]) }}"
+      },
+      "typeVersion": 1,
+      "position": [1700, 100],
+      "name": "Mark as Processed"
+    },
+    {
+      "name": "Return Success",
+      "type": "n8n-nodes-base.noOp",
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1,
+      "position": [1900, 100],
+      "name": "Return Success"
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [["Check Processed"]]
+    },
+    "Check Processed": {
+      "main": [
+        ["Skip If Processed"],
+        ["Extract Metadata"]
+      ]
+    },
+    "Skip If Processed": {
+      "main": [[]]
+    },
+    "Extract Metadata": {
+      "main": [["Generate Queue Entry"]]
+    },
+    "Generate Queue Entry": {
+      "main": [["Insert to Pending Queue"]]
+    },
+    "Insert to Pending Queue": {
+      "main": [["Create Notification"]]
+    },
+    "Create Notification": {
+      "main": [["Insert Notification"]]
+    },
+    "Insert Notification": {
+      "main": [["Mark as Processed"]]
+    },
+    "Mark as Processed": {
+      "main": [["Return Success"]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
