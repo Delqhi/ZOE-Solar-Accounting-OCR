@@ -203,14 +203,11 @@ async function analyzeWithVisionModel(base64Data: string, mimeType: string): Pro
     if (!SF_API_KEY) {
         throw new Error("SiliconFlow API Key nicht konfiguriert. Bitte SILICONFLOW_API_KEY in .env setzen.");
     }
-    
-    console.log(`Starting Vision AI Analysis (${SF_VISION_MODEL})...`);
-    
+
     let finalBase64 = base64Data;
-    
+
     // 1. Pre-process Input
     if (mimeType === 'application/pdf') {
-        console.log("Converting PDF to Stitched Image...");
         finalBase64 = await convertPdfToStitchedImage(base64Data);
     } else {
         // Ensure image isn't massive, but keep quality high
@@ -276,8 +273,7 @@ async function analyzeWithVisionModel(base64Data: string, mimeType: string): Pro
  * Main Fallback Function
  */
 export const analyzeDocumentWithFallback = async (base64Data: string, mimeType: string): Promise<Partial<ExtractedData>> => {
-    console.log("Running High-Quality Fallback (No Tesseract)...");
-    
+
     const failSafeObject: Partial<ExtractedData> = {
         belegDatum: new Date().toISOString().split('T')[0],
         lieferantName: "Manuelle Eingabe erforderlich",

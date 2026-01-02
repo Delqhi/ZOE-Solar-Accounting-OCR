@@ -87,7 +87,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ url, type, onAddPage }) =>
 
               // Render at high resolution (scale 2) for sharp zoom
               const viewport = page.getViewport({ scale: 2.0 });
-              
+
               canvas.width = viewport.width;
               canvas.height = viewport.height;
 
@@ -98,7 +98,12 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ url, type, onAddPage }) =>
                   canvasContext: context,
                   viewport: viewport
               };
-              page.render(renderContext);
+              page.render(renderContext).catch((err: any) => {
+                console.error('PDF render error:', err);
+              });
+          }).catch((err: any) => {
+            console.error('Failed to load PDF page:', err);
+            setError('Seite konnte nicht geladen werden.');
           });
       }
   }, [pdfDoc, isImage, currentPage]); // Re-render when currentPage changes

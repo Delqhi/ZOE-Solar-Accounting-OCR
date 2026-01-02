@@ -79,7 +79,9 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
     }, [formData]);
 
   useEffect(() => {
-    getSettings().then(setSettings);
+    getSettings().then(setSettings).catch(err => {
+      console.error('Failed to load settings:', err);
+    });
   }, []);
 
   useEffect(() => {
@@ -109,6 +111,13 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
                      setViewUrl(objectUrl);
                      setViewType(currentType);
                  }
+             })
+             .catch(err => {
+               console.error('Failed to load file:', err);
+               if (active) {
+                 setViewUrl(currentUrl);
+                 setViewType(currentType);
+               }
              });
       } else {
           setViewUrl(currentUrl);
