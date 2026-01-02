@@ -88,8 +88,7 @@ async function generateWithRetry(model: string, params: any, config: any, retrie
 export const analyzeDocumentWithGemini = async (base64Data: string, mimeType: string): Promise<Partial<ExtractedData>> => {
   try {
     // Attempt Primary: Gemini 2.5 Flash
-    console.log("Attempting Gemini OCR...");
-    
+
     const response = await generateWithRetry(
       "gemini-2.5-flash",
       {

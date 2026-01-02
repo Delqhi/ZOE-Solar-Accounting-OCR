@@ -11,6 +11,35 @@ import { DocumentRecord, DocumentStatus, AppSettings, ExtractedData, Attachment 
 import { normalizeExtractedData } from './services/extractedDataNormalization';
 import { formatPreflightForDialog, runExportPreflight } from './services/exportPreflight';
 
+// --- Type-safe discriminated union for processing results ---
+type ProcessingResultMerge = {
+  type: 'MERGE';
+  targetId: string;
+  attachment: Attachment;
+};
+
+type ProcessingResultDocWithDoc = {
+  type: 'DOC';
+  doc: {
+    id: string;
+    status: DocumentStatus;
+    data: ExtractedData | null;
+    error?: string;
+    duplicateReason?: string;
+    duplicateOfId?: string;
+    duplicateConfidence?: number;
+  };
+};
+
+type ProcessingResultDocSuccess = {
+  type: 'DOC';
+  id: string;
+  data: ExtractedData;
+  outcome: { status: DocumentStatus; error?: string };
+};
+
+type ProcessingResult = ProcessingResultMerge | ProcessingResultDocWithDoc | ProcessingResultDocSuccess;
+
 const computeFileHash = async (file: File): Promise<string> => {
   const buffer = await file.arrayBuffer();
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
@@ -279,10 +308,13 @@ export default function App() {
             const outcome = classifyOcrOutcome(extracted);
             return { type: 'DOC', data: extracted, id: item.id, outcome };
         } catch (e) {
-            return { 
-                type: 'DOC', 
-                doc: { id: item.id, status: DocumentStatus.ERROR, error: "KI Analyse fehlgeschlagen", data: null, duplicateReason: undefined } 
-            };
+            const errorMessage = e instanceof Error
+              ? `KI Analyse fehlgeschlagen: ${e.message}`
+              : 'KI Analyse fehlgeschlagen: Unbekannter Fehler';
+            return {
+                type: 'DOC',
+                doc: { id: item.id, status: DocumentStatus.ERROR, error: errorMessage, data: null, duplicateReason: undefined }
+            } as ProcessingResultDocWithDoc;
         }
     });
 
@@ -291,13 +323,11 @@ export default function App() {
     for (const res of results) {
         if (res.type === 'MERGE') {
              // Logic kept for potential future use, currently findSemanticDuplicate mainly flags as DUPLICATE
-             // Use type assertion because currently no path returns MERGE, so TS infers only DOC types
-             const mergeRes = res as any;
-             const targetDoc = currentDocsSnapshot.find(d => d.id === mergeRes.targetId);
+             const targetDoc = currentDocsSnapshot.find(d => d.id === res.targetId);
              if (targetDoc) {
                  const updatedDoc = {
                      ...targetDoc,
-                     attachments: [...(targetDoc.attachments || []), mergeRes.attachment]
+                     attachments: [...(targetDoc.attachments || []), res.attachment]
                  };
                  await storageService.saveDocument(updatedDoc);
                  currentDocsSnapshot = currentDocsSnapshot.map(d => d.id === targetDoc.id ? updatedDoc : d);
@@ -306,12 +336,12 @@ export default function App() {
         } else if (res.type === 'DOC') {
             let finalDoc: DocumentRecord | undefined;
 
-            if ('doc' in res && res.doc) {
-                // It's either an Error or a Duplicate
+            if ('doc' in res) {
+                // It's either an Error or a Duplicate (ProcessingResultDocWithDoc)
                 const resultDoc = res.doc;
                 const placeholder = newDocs.find(d => d.id === resultDoc.id);
                 if (!placeholder) continue;
-                
+
                 // If it's a duplicate, we still save the extracted data so the user can verify WHY it's a duplicate
                 finalDoc = { ...placeholder, ...resultDoc } as DocumentRecord;
 
@@ -321,33 +351,33 @@ export default function App() {
                      finalDoc.data.eigeneBelegNummer = zoeId;
                 }
 
-            } else if ('data' in res && res.data && res.id) {
-                // Success Case
-                const { id, data } = res as any;
+            } else if ('data' in res && 'id' in res && 'outcome' in res) {
+                // Success Case (ProcessingResultDocSuccess)
+                const { id, data, outcome } = res;
                 const placeholder = newDocs.find(d => d.id === id);
                 if (!placeholder) continue;
 
                 const zoeId = generateZoeInvoiceId(data.belegDatum || '', currentDocsSnapshot);
                 let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
-                
+
                 if (data.lieferantName) {
                     const rule = await storageService.getVendorRule(data.lieferantName);
                     if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
                 }
-                
+
                 const normalized = normalizeExtractedData(data);
-                const outcome = (res as any).outcome || classifyOcrOutcome(normalized);
+                const finalOutcome = outcome || classifyOcrOutcome(normalized);
                 const finalData = applyAccountingRules(
-                    { ...normalized, eigeneBelegNummer: zoeId }, 
-                    currentDocsSnapshot, 
-                    currentSettings, 
+                    { ...normalized, eigeneBelegNummer: zoeId },
+                    currentDocsSnapshot,
+                    currentSettings,
                     overrideRule
                 );
-                
-                finalDoc = { ...placeholder, status: outcome.status, data: finalData, error: outcome.error };
-                currentDocsSnapshot.push(finalDoc); 
+
+                finalDoc = { ...placeholder, status: finalOutcome.status, data: finalData, error: finalOutcome.error };
+                currentDocsSnapshot.push(finalDoc);
             }
-            
+
             if (finalDoc) {
                 processedBatch.push(finalDoc);
                 await storageService.saveDocument(finalDoc);
@@ -357,7 +387,9 @@ export default function App() {
 
     setDocuments(prev => {
         const cleanPrev = prev.filter(d => !newDocs.some(n => n.id === d.id));
-        const mergedTargetIds = results.filter(r => r.type === 'MERGE').map((r:any) => r.targetId);
+        const mergedTargetIds = results
+            .filter((r): r is ProcessingResultMerge => r.type === 'MERGE')
+            .map(r => r.targetId);
         const updatedOldDocs = cleanPrev.map(d => {
             if (mergedTargetIds.includes(d.id)) {
                 return currentDocsSnapshot.find(snap => snap.id === d.id) || d;

@@ -1,12 +1,35 @@
 
 import React, { useMemo, useState } from 'react';
-import { AppSettings, DocumentRecord, DocumentStatus } from '../types';
+import { AppSettings, DocumentRecord, DocumentStatus, ExtractedData } from '../types';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
 import { formatPreflightForDialog, runExportPreflight } from '../services/exportPreflight';
 import { generateDatevExtfBuchungsstapelCsv, runDatevExportPreflight } from '../services/datevExport';
 import { validateUstva, submitUstva, UstvaValidationRequest, UstvaSubmissionRequest } from '../services/submissionService';
 import { generateElsterXml, downloadElsterXml, ElsterExportRequest } from '../services/elsterExport';
+
+// Type-safe value accessor for sorting
+type SortableValue = string | number | boolean | null | undefined;
+
+const getSortValue = (doc: DocumentRecord, sortField: string): SortableValue => {
+  if (sortField.startsWith('data.')) {
+    const field = sortField.split('.')[1] as keyof ExtractedData;
+    if (!doc.data) return '';
+    const value = doc.data[field];
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      return value;
+    }
+    return '';
+  }
+  // Direct fields on DocumentRecord
+  switch (sortField) {
+    case 'uploadDate': return doc.uploadDate;
+    case 'fileName': return doc.fileName;
+    case 'status': return doc.status;
+    case 'id': return doc.id;
+    default: return '';
+  }
+};
 
 interface DatabaseGridProps {
   documents: DocumentRecord[];
@@ -57,23 +80,11 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionResult, setSubmissionResult] = useState<string>('');
 
-  // Sorting Logic
+  // Sorting Logic (type-safe)
   const sortedDocs = useMemo(() => {
     return [...documents].sort((a, b) => {
-      let valA: any = a;
-      let valB: any = b;
-      
-      if (sortField.startsWith('data.')) {
-        const field = sortField.split('.')[1];
-        valA = a.data ? (a.data as any)[field] : '';
-        valB = b.data ? (b.data as any)[field] : '';
-      } else {
-        valA = (a as any)[sortField];
-        valB = (b as any)[sortField];
-      }
-
-      if (!valA) valA = '';
-      if (!valB) valB = '';
+      const valA = getSortValue(a, sortField) ?? '';
+      const valB = getSortValue(b, sortField) ?? '';
 
       if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
       if (valA > valB) return sortDirection === 'asc' ? 1 : -1;

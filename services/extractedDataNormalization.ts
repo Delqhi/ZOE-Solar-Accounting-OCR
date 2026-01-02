@@ -144,28 +144,38 @@ const toBooleanSafe = (value: unknown, fallback = false): boolean => {
   return fallback;
 };
 
+// Type-safe interface for raw line items from OCR
+interface RawLineItem {
+  description?: unknown;
+  amount?: unknown;
+}
+
 const normalizeLineItems = (value: unknown): LineItem[] => {
   const arr = Array.isArray(value)
     ? value
     : (value && typeof value === "object" ? [value] : []);
 
   return arr
-    .map((item) => {
+    .map((item): LineItem | null => {
       if (!item || typeof item !== "object") return null;
-      const anyItem = item as any;
-      const description = toStringSafe(anyItem.description, "").trim();
-      const amount = anyItem.amount === undefined || anyItem.amount === null
+      const rawItem = item as RawLineItem;
+      const description = toStringSafe(rawItem.description, "").trim();
+      const amount = rawItem.amount === undefined || rawItem.amount === null
         ? undefined
-        : toNumberMaybe(anyItem.amount);
+        : toNumberMaybe(rawItem.amount);
       if (!description) return null;
-      const li: LineItem = amount === undefined ? { description } : { description, amount };
-      return li;
+      return amount === undefined ? { description } : { description, amount };
     })
     .filter((x): x is LineItem => Boolean(x));
 };
 
+// Type-safe raw OCR data interface
+interface RawOcrData {
+  [key: string]: unknown;
+}
+
 export const normalizeExtractedData = (input: Partial<ExtractedData> | unknown): ExtractedData => {
-  const obj: any = (input && typeof input === "object") ? input : {};
+  const obj: RawOcrData = (input && typeof input === "object") ? input as RawOcrData : {};
 
   const warnings: string[] = [];
 

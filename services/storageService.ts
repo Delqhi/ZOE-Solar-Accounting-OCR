@@ -1,5 +1,5 @@
 
-import { DocumentRecord, AppSettings, AccountGroupDefinition, VendorRule, TaxCategoryDefinition, AccountDefinition, DatevConfig, ElsterStammdaten, StartupChecklist } from '../types';
+import { DocumentRecord, AppSettings, AccountGroupDefinition, VendorRule, TaxCategoryDefinition, AccountDefinition, DatevConfig, ElsterStammdaten, StartupChecklist, ExtractedData } from '../types';
 
 const DB_NAME = 'ZoeAccountingDB';
 const STORE_DOCUMENTS = 'documents';
@@ -548,7 +548,7 @@ ALTER TABLE belege ADD COLUMN IF NOT EXISTS status VARCHAR(50);
   updated_at = NOW();\n\n`;
 
   docs.forEach(doc => {
-      const d = doc.data || {} as any;
+      const d: Partial<ExtractedData> = doc.data || {};
       
       sql += `INSERT INTO belege (
     id,
@@ -635,7 +635,7 @@ ALTER TABLE belege ADD COLUMN IF NOT EXISTS status VARCHAR(50);
 );\n`;
 
       // Line items -> beleg_positionen
-      const items = (d.lineItems || []) as any[];
+      const items = d.lineItems || [];
       items.forEach((it, idx) => {
         sql += `INSERT INTO beleg_positionen (doc_id, line_index, description, amount) VALUES (
     '${doc.id}',
