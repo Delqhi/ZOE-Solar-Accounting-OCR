@@ -57,16 +57,16 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionResult, setSubmissionResult] = useState<string>('');
 
-  // Sorting Logic
+  // Sorting Logic - optimized to avoid repeated split()
+  const sortFieldKey = sortField.startsWith('data.') ? sortField.split('.')[1] : null;
   const sortedDocs = useMemo(() => {
     return [...documents].sort((a, b) => {
-      let valA: any = a;
-      let valB: any = b;
-      
-      if (sortField.startsWith('data.')) {
-        const field = sortField.split('.')[1];
-        valA = a.data ? (a.data as any)[field] : '';
-        valB = b.data ? (b.data as any)[field] : '';
+      let valA: any;
+      let valB: any;
+
+      if (sortFieldKey) {
+        valA = a.data ? (a.data as any)[sortFieldKey] : '';
+        valB = b.data ? (b.data as any)[sortFieldKey] : '';
       } else {
         valA = (a as any)[sortField];
         valB = (b as any)[sortField];
@@ -79,7 +79,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
       if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [documents, sortField, sortDirection]);
+  }, [documents, sortField, sortDirection, sortFieldKey]);
 
   // Totals for Footer (Global)
   const totals = useMemo(() => {
@@ -310,7 +310,11 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
     }
 
     // Calculate UStVA data for current filter period
-    const period = filterQuarter !== 'all' ? `${filterYear}Q${filterQuarter}` : `${filterYear}${filterMonth.padStart(2, '0')}`;
+    const period = filterQuarter !== 'all'
+      ? `${filterYear}Q${filterQuarter}`
+      : filterMonth !== 'all'
+        ? `${filterYear}${filterMonth.padStart(2, '0')}`
+        : `${filterYear}`;
     const ustvaData = calculateUstvaData();
 
     const exportRequest: ElsterExportRequest = {
