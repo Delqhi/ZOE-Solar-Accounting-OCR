@@ -107,14 +107,17 @@ export interface DocumentRecord {
   data: ExtractedData | null;
   error?: string;
   previewUrl?: string;
-  
+
   // New: Multiple pages/attachments
   attachments?: Attachment[];
-  
+
   fileHash?: string;
   duplicateOfId?: string;
   duplicateConfidence?: number;
   duplicateReason?: string;
+
+  // GitLab Storage (Supabase Integration)
+  gitlabStorageUrl?: string;
 }
 
 // --- Configuration Types ---

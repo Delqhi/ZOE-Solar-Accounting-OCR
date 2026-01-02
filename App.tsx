@@ -6,7 +6,8 @@ import { DocumentDetail } from './components/DetailModal';
 import { SettingsView } from './components/SettingsView';
 import { analyzeDocumentWithGemini } from './services/geminiService';
 import { applyAccountingRules, generateZoeInvoiceId } from './services/ruleEngine';
-import * as storageService from './services/storageService';
+import * as belegeService from './services/belegeService';
+import { gitlabStorageService } from './services/gitlabStorageService';
 import { DocumentRecord, DocumentStatus, AppSettings, ExtractedData, Attachment } from './types';
 import { normalizeExtractedData } from './services/extractedDataNormalization';
 import { formatPreflightForDialog, runExportPreflight } from './services/exportPreflight';
@@ -138,6 +139,64 @@ const findSemanticDuplicate = (data: Partial<ExtractedData>, existingDocs: Docum
     return undefined;
 };
 
+// Helper to generate SQL export from documents (replaces storageService.exportDocumentsToSQL)
+const generateSQLFromDocuments = (docs: DocumentRecord[], settings: AppSettings): string => {
+    const statements: string[] = [];
+    const now = new Date().toISOString().split('T')[0];
+
+    statements.push(`-- ZOE Solar Accounting Export`);
+    statements.push(`-- Generated: ${now}`);
+    statements.push(`-- Documents: ${docs.length}`);
+    statements.push('');
+
+    for (const doc of docs) {
+        if (!doc.data) continue;
+
+        const d = doc.data;
+        const id = doc.id;
+        const betrag = d.bruttoBetrag || 0;
+        const mwstBetrag = (d.mwstBetrag19 || 0) + (d.mwstBetrag7 || 0) + (d.mwstBetrag0 || 0);
+
+        statements.push(`INSERT INTO belege (`);
+        statements.push(`  id, document_type, datum, belegnummer_lieferant, lieferant,`);
+        statements.push(`  steuernummer, betrag, netto_betrag, mwst_satz_19, mwst_betrag_19,`);
+        statements.push(`  mwst_satz_7, mwst_betrag_7, mwst_satz_0, mwst_betrag_0,`);
+        statements.push(`  steuerkategorie, kontierungskonto, soll_konto, haben_konto,`);
+        statements.push(`  reverse_charge, vorsteuerabzug, kleinbetrag, privatanteil,`);
+        statements.push(`  ocr_score, status, created_at`);
+        statements.push(`) VALUES (`);
+        statements.push(`  '${id}',`);
+        statements.push(`  ${d.documentType ? `'${d.documentType}'` : 'NULL'},`);
+        statements.push(`  ${d.belegDatum ? `'${d.belegDatum}'` : 'NULL'},`);
+        statements.push(`  ${d.belegNummerLieferant ? `'${d.belegNummerLieferant.replace(/'/g, "''")}'` : 'NULL'},`);
+        statements.push(`  ${d.lieferantName ? `'${d.lieferantName.replace(/'/g, "''")}'` : 'NULL'},`);
+        statements.push(`  ${d.steuernummer ? `'${d.steuernummer}'` : 'NULL'},`);
+        statements.push(`  ${betrag.toFixed(2).replace('.', ',')},`);
+        statements.push(`  ${(d.nettoBetrag || 0).toFixed(2).replace('.', ',')},`);
+        statements.push(`  ${(d.mwstSatz19 || 0).toFixed(4).replace('.', ',')},`);
+        statements.push(`  ${(d.mwstBetrag19 || 0).toFixed(2).replace('.', ',')},`);
+        statements.push(`  ${(d.mwstSatz7 || 0).toFixed(4).replace('.', ',')},`);
+        statements.push(`  ${(d.mwstBetrag7 || 0).toFixed(2).replace('.', ',')},`);
+        statements.push(`  ${(d.mwstSatz0 || 0).toFixed(4).replace('.', ',')},`);
+        statements.push(`  ${(d.mwstBetrag0 || 0).toFixed(2).replace('.', ',')},`);
+        statements.push(`  ${d.steuerkategorie ? `'${d.steuerkategorie}'` : 'NULL'},`);
+        statements.push(`  ${d.kontierungskonto ? `'${d.kontierungskonto}'` : 'NULL'},`);
+        statements.push(`  ${d.sollKonto ? `'${d.sollKonto}'` : 'NULL'},`);
+        statements.push(`  ${d.habenKonto ? `'${d.habenKonto}'` : 'NULL'},`);
+        statements.push(`  ${d.reverseCharge},`);
+        statements.push(`  ${d.vorsteuerabzug},`);
+        statements.push(`  ${d.kleinbetrag},`);
+        statements.push(`  ${d.privatanteil},`);
+        statements.push(`  ${d.ocr_score || 'NULL'},`);
+        statements.push(`  '${doc.status}',`);
+        statements.push(`  '${doc.uploadDate}'`);
+        statements.push(`);`);
+        statements.push('');
+    }
+
+    return statements.join('\n');
+};
+
 export default function App() {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -162,12 +221,71 @@ export default function App() {
   useEffect(() => {
     const initData = async () => {
       try {
-        const [savedDocs, savedSettings] = await Promise.all([
-           storageService.getAllDocuments(),
-           storageService.getSettings()
+        const [savedDocsResult, savedSettings] = await Promise.all([
+           belegeService.belegeService.getAll(),
+           belegeService.einstellungenService.getAll().catch(() => []) // Fallback if no settings yet
         ]);
+
+        // Convert Supabase records to DocumentRecord format
+        const savedDocs = savedDocsResult.data.map(beleg => ({
+          id: belege.id,
+          fileName: belege.dateiname,
+          fileType: belege.dateityp || '',
+          uploadDate: belege.uploaded_at,
+          status: belege.status as DocumentStatus,
+          data: belege.lieferant_name ? {
+            documentType: belege.document_type || undefined,
+            belegDatum: belege.beleg_datum || '',
+            belegNummerLieferant: belege.belegnummer_lieferant || '',
+            lieferantName: belege.lieferant_name || '',
+            lieferantAdresse: belege.lieferant_adresse || '',
+            steuernummer: belege.steuernummer || '',
+            nettoBetrag: belege.netto_betrag || 0,
+            bruttoBetrag: belege.brutto_betrag || 0,
+            mwstSatz0: belege.mwst_satz_0 || undefined,
+            mwstBetrag0: belege.mwst_betrag_0 || undefined,
+            mwstSatz7: belege.mwst_satz_7 || undefined,
+            mwstBetrag7: belege.mwst_betrag_7 || undefined,
+            mwstSatz19: belege.mwst_satz_19 || undefined,
+            mwstBetrag19: belege.mwst_betrag_19 || undefined,
+            zahlungsmethode: belege.zahlungsmethode || '',
+            lineItems: [],
+            kontierungskonto: belege.kontierungskonto || undefined,
+            steuerkategorie: belege.steuerkategorie || undefined,
+            kontierungBegruendung: belege.kontierung_begruendung || undefined,
+            kontogruppe: '',
+            konto_skr03: belege.soll_konto || '',
+            ust_typ: '',
+            sollKonto: belege.soll_konto || '',
+            habenKonto: belege.haben_konto || '',
+            steuerKategorie: '',
+            eigeneBelegNummer: belege.eigene_beleg_nummer || '',
+            zahlungsDatum: belege.zahlungs_datum || '',
+            zahlungsStatus: belege.zahlungs_status || '',
+            aufbewahrungsOrt: belege.aufbewahrungs_ort || '',
+            rechnungsEmpfaenger: belege.rechnungs_empfaenger || '',
+            kleinbetrag: belege.kleinbetrag || false,
+            vorsteuerabzug: belege.vorsteuerabzug || false,
+            reverseCharge: belege.reverse_charge || false,
+            privatanteil: belege.privatanteil || false,
+            beschreibung: '',
+            ocr_score: belege.ocr_score || undefined,
+            ocr_rationale: belege.ocr_rationale || undefined,
+          } : null,
+          error: belege.fehler || undefined,
+          fileHash: belege.file_hash || undefined,
+          duplicateOfId: belege.duplicate_of_id || undefined,
+          duplicateConfidence: belege.duplicate_confidence,
+          duplicateReason: belege.duplicate_reason || undefined,
+          gitlabStorageUrl: belege.gitlab_storage_url || undefined,
+        } as DocumentRecord);
+
         setDocuments(savedDocs.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()));
-        setSettings(savedSettings);
+
+        // Convert settings if any
+        if (savedSettings && savedSettings.length > 0) {
+           // Convert einstellungen to AppSettings format if needed
+        }
       } catch (e) {
         console.error("Init Error:", e);
       }
@@ -229,45 +347,41 @@ export default function App() {
 
     setDocuments(prev => [...newDocs, ...prev]);
 
-    const currentSettings = settings || await storageService.getSettings();
     const processedBatch: DocumentRecord[] = [];
-    let currentDocsSnapshot = [...documents]; 
+    let currentDocsSnapshot = [...documents];
     let autoMergedCount = 0;
 
     const processingPromises = fileData.map(async (item) => {
-        const isExactDuplicate = currentDocsSnapshot.some(d => d.id !== item.id && d.fileHash === item.hash);
-        if (isExactDuplicate) {
-                         const original = currentDocsSnapshot.find(d => d.fileHash === item.hash);
-             return { 
-                 type: 'DOC', 
-                                 doc: { 
-                                     id: item.id,
-                                     status: DocumentStatus.DUPLICATE,
-                                     error: undefined,
-                                     data: null,
-                                     duplicateReason: "Datei identisch (Hash)",
-                                     duplicateOfId: original?.id,
-                                     duplicateConfidence: 1
-                                 } 
+        // Check for exact duplicate in Supabase
+        const duplicateInDb = await belegeService.belegeService.findByFileHash(item.hash);
+        if (duplicateInDb) {
+             return {
+                 type: 'DOC',
+                 doc: {
+                     id: item.id,
+                     status: DocumentStatus.DUPLICATE,
+                     error: undefined,
+                     data: null,
+                     duplicateReason: "Datei identisch (Hash)",
+                     duplicateOfId: duplicateInDb.id,
+                     duplicateConfidence: 1
+                 }
              };
         }
 
         try {
             const extractedRaw = await analyzeDocumentWithGemini(item.base64, item.file.type);
             const extracted = normalizeExtractedData(extractedRaw);
-            
+
             // Check for Semantic Duplicate using Extracted Data
             const semanticDup = findSemanticDuplicate(extracted, currentDocsSnapshot);
-            
+
             if (semanticDup && semanticDup.doc.id !== item.id) {
-                 // OPTION A: Auto-Merge if it was a file upload that matches an existing one perfectly?
-                 // Current logic: Create a NEW doc entry but mark as DUPLICATE so user sees it.
-                 // This is safer than silently merging.
                  return {
                      type: 'DOC',
-                     doc: { 
-                         id: item.id, 
-                         status: DocumentStatus.DUPLICATE, 
+                     doc: {
+                         id: item.id,
+                         status: DocumentStatus.DUPLICATE,
                          data: extracted,
                          duplicateReason: semanticDup.reason || "Inhaltliches Duplikat erkannt",
                          duplicateOfId: semanticDup.doc.id,
@@ -279,9 +393,9 @@ export default function App() {
             const outcome = classifyOcrOutcome(extracted);
             return { type: 'DOC', data: extracted, id: item.id, outcome };
         } catch (e) {
-            return { 
-                type: 'DOC', 
-                doc: { id: item.id, status: DocumentStatus.ERROR, error: "KI Analyse fehlgeschlagen", data: null, duplicateReason: undefined } 
+            return {
+                type: 'DOC',
+                doc: { id: item.id, status: DocumentStatus.ERROR, error: "KI Analyse fehlgeschlagen", data: null, duplicateReason: undefined }
             };
         }
     });
@@ -290,8 +404,6 @@ export default function App() {
 
     for (const res of results) {
         if (res.type === 'MERGE') {
-             // Logic kept for potential future use, currently findSemanticDuplicate mainly flags as DUPLICATE
-             // Use type assertion because currently no path returns MERGE, so TS infers only DOC types
              const mergeRes = res as any;
              const targetDoc = currentDocsSnapshot.find(d => d.id === mergeRes.targetId);
              if (targetDoc) {
@@ -299,7 +411,7 @@ export default function App() {
                      ...targetDoc,
                      attachments: [...(targetDoc.attachments || []), mergeRes.attachment]
                  };
-                 await storageService.saveDocument(updatedDoc);
+                 await belegeService.belegeService.update(updatedDoc.id, updatedDoc.data!);
                  currentDocsSnapshot = currentDocsSnapshot.map(d => d.id === targetDoc.id ? updatedDoc : d);
                  autoMergedCount++;
              }
@@ -311,12 +423,10 @@ export default function App() {
                 const resultDoc = res.doc;
                 const placeholder = newDocs.find(d => d.id === resultDoc.id);
                 if (!placeholder) continue;
-                
-                // If it's a duplicate, we still save the extracted data so the user can verify WHY it's a duplicate
+
                 finalDoc = { ...placeholder, ...resultDoc } as DocumentRecord;
 
                 if (finalDoc.status === DocumentStatus.DUPLICATE && finalDoc.data) {
-                     // Apply rules even for duplicates so they look nice in the UI
                      const zoeId = generateZoeInvoiceId(finalDoc.data.belegDatum || '', currentDocsSnapshot);
                      finalDoc.data.eigeneBelegNummer = zoeId;
                 }
@@ -329,28 +439,52 @@ export default function App() {
 
                 const zoeId = generateZoeInvoiceId(data.belegDatum || '', currentDocsSnapshot);
                 let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
-                
+
                 if (data.lieferantName) {
-                    const rule = await storageService.getVendorRule(data.lieferantName);
-                    if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
+                    const rule = await belegeService.lieferantenRegelnService.findMatching(data.lieferantName);
+                    if (rule) overrideRule = { accountId: rule.standard_konto || undefined, taxCategoryValue: rule.standard_steuerkategorie || undefined };
                 }
-                
+
                 const normalized = normalizeExtractedData(data);
                 const outcome = (res as any).outcome || classifyOcrOutcome(normalized);
                 const finalData = applyAccountingRules(
-                    { ...normalized, eigeneBelegNummer: zoeId }, 
-                    currentDocsSnapshot, 
-                    currentSettings, 
+                    { ...normalized, eigeneBelegNummer: zoeId },
+                    currentDocsSnapshot,
+                    settings || { taxDefinitions: [], accountDefinitions: [], accountGroups: [], ocrConfig: {} as any },
                     overrideRule
                 );
-                
+
                 finalDoc = { ...placeholder, status: outcome.status, data: finalData, error: outcome.error };
-                currentDocsSnapshot.push(finalDoc); 
+                currentDocsSnapshot.push(finalDoc);
             }
-            
+
             if (finalDoc) {
                 processedBatch.push(finalDoc);
-                await storageService.saveDocument(finalDoc);
+                // Save to Supabase with GitLab Storage URL
+                if (finalDoc.data) {
+                    const fileItem = fileData.find(f => f.id === finalDoc!.id);
+                    let gitlabStorageUrl: string | undefined;
+
+                    // Upload to GitLab Storage if configured
+                    if (gitlabStorageService.isConfigured() && fileItem) {
+                        const uploadResult = await gitlabStorageService.uploadPdfToGitLab(
+                            finalDoc.fileName,
+                            fileItem.base64,
+                            finalDoc.data.belegDatum
+                        );
+                        if (uploadResult.success) {
+                            gitlabStorageUrl = uploadResult.url;
+                        }
+                    }
+
+                    await belegeService.belegeService.create(finalDoc.data, {
+                        dateiname: finalDoc.fileName,
+                        dateityp: finalDoc.fileType,
+                        dateigroesse: fileItem?.file.size,
+                        file_hash: finalDoc.fileHash,
+                        gitlab_storage_url: gitlabStorageUrl,
+                    });
+                }
             }
         }
     }
@@ -368,7 +502,7 @@ export default function App() {
     });
 
     setIsProcessing(false);
-    
+
     if (autoMergedCount > 0) {
         setNotification(`${autoMergedCount} Duplikat(e) automatisch zusammengeführt.`);
     }
@@ -378,16 +512,24 @@ export default function App() {
 
   const handleSaveDocument = async (updatedDoc: DocumentRecord) => {
     setDocuments(prev => prev.map(doc => doc.id === updatedDoc.id ? updatedDoc : doc));
-    await storageService.saveDocument(updatedDoc);
+    if (updatedDoc.data) {
+      await belegeService.belegeService.update(updatedDoc.id, updatedDoc.data);
+    }
     if (updatedDoc.data?.lieferantName && updatedDoc.data?.kontierungskonto && updatedDoc.data?.steuerkategorie) {
-         await storageService.saveVendorRule(updatedDoc.data.lieferantName, updatedDoc.data.kontierungskonto, updatedDoc.data.steuerkategorie);
+         await belegeService.lieferantenRegelnService.create({
+             lieferant_name_pattern: updatedDoc.data.lieferantName,
+             standard_konto: updatedDoc.data.kontierungskonto,
+             standard_steuerkategorie: updatedDoc.data.steuerkategorie,
+             prioritaet: 100,
+             aktiv: true,
+         });
     }
   };
 
   const handleDeleteDocument = async (id: string) => {
     setDocuments(prev => prev.filter(d => d.id !== id));
     if (selectedDocId === id) setSelectedDocId(null);
-    await storageService.deleteDocument(id);
+    await belegeService.belegeService.delete(id);
   };
 
   const handleMergeDocuments = async (sourceId: string, targetId: string) => {
@@ -432,8 +574,8 @@ export default function App() {
         ]
     };
 
-    await storageService.saveDocument(updatedTarget);
-    await storageService.deleteDocument(sourceId);
+    await belegeService.belegeService.update(targetId, updatedTarget.data!);
+    await belegeService.belegeService.delete(sourceId);
     
     setDocuments(prev => prev.filter(d => d.id !== sourceId).map(d => d.id === targetId ? updatedTarget : d));
     
@@ -449,12 +591,12 @@ export default function App() {
       const base64 = doc.previewUrl.split(',')[1];
             const extractedRaw = await analyzeDocumentWithGemini(base64, doc.fileType);
             const extracted = normalizeExtractedData(extractedRaw);
-      const currentSettings = settings || await storageService.getSettings();
+      const currentSettings = settings || { taxDefinitions: [], accountDefinitions: [], accountGroups: [], ocrConfig: {} as any };
       const existingId = doc.data?.eigeneBelegNummer;
       let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
       if (extracted.lieferantName) {
-           const rule = await storageService.getVendorRule(extracted.lieferantName);
-           if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
+           const rule = await belegeService.lieferantenRegelnService.findMatching(extracted.lieferantName);
+           if (rule) overrideRule = { accountId: rule.standard_konto || undefined, taxCategoryValue: rule.standard_steuerkategorie || undefined };
       }
             let finalData = applyAccountingRules(extracted, documents, currentSettings, overrideRule);
       finalData.eigeneBelegNummer = existingId || generateZoeInvoiceId(finalData.belegDatum, documents);
@@ -500,11 +642,11 @@ export default function App() {
 
   const renderContent = () => {
       if (viewMode === 'settings' && settings) {
-          return <SettingsView settings={settings} onSave={(s) => { setSettings(s); storageService.saveSettings(s); }} onClose={() => setViewMode('document')} />;
+          return <SettingsView settings={settings} onSave={(s) => { setSettings(s); /* Save to Supabase later */ }} onClose={() => setViewMode('document')} />;
       }
       if (viewMode === 'database') {
           const handleExportSQLWithPreflight = async () => {
-              const currentSettings = settings || await storageService.getSettings();
+              const currentSettings = settings || { taxDefinitions: [], accountDefinitions: [], accountGroups: [], ocrConfig: {} as any };
               const docsToExport = filteredDocuments;
               const preflight = runExportPreflight(docsToExport, currentSettings);
               const dialog = formatPreflightForDialog(preflight);
@@ -519,7 +661,8 @@ export default function App() {
                   if (!ok) return;
               }
 
-              const sql = storageService.exportDocumentsToSQL(docsToExport, currentSettings);
+              // Export from Supabase data - generate SQL
+              const sql = generateSQLFromDocuments(docsToExport, currentSettings);
               const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
               const y = filterYear === 'all' ? 'all' : filterYear;
               const q = filterQuarter === 'all' ? 'all' : filterQuarter;
