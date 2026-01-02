@@ -482,57 +482,6 @@ npm run check
 
 ---
 
-## ☁️ OCI VM Deployment (für ELSTER UStVA-Übermittlung)
-
-Für die elektronische Übermittlung von UStVA-Daten an ELSTER benötigen Sie eine OCI VM mit dem Submission-Backend und ERiC.
-
-### Voraussetzungen
-*   OCI Account mit Always-Free VM (z.B. Ubuntu 24.04 ARM64)
-*   ERiC Software (von Ihrem Steuerberater oder Finanzamt)
-*   SSH-Zugang zur VM
-
-### 1. VM vorbereiten
-Stellen Sie sicher, dass Ihre OCI VM läuft (z.B. IP: 92.5.30.252).
-
-Verbinden Sie sich via SSH:
-```bash
-ssh -i /path/to/your/private-key ubuntu@92.5.30.252
-```
-
-### 2. ERiC installieren
-Laden Sie das `install_eric.sh` Script auf Ihre VM und führen Sie es aus:
-```bash
-# Auf Ihrer lokalen Maschine
-scp -i /path/to/your/private-key install_eric.sh ubuntu@92.5.30.252:/home/ubuntu/
-
-# Auf der VM
-bash install_eric.sh
-```
-
-**Wichtig:** Ersetzen Sie die ERiC-Download-URL im Script mit der echten URL von Ihrem Steuerberater.
-
-### 3. Submission-Backend deployen
-Laden Sie das Backend auf die VM:
-```bash
-# Lokale Maschine
-scp -i /path/to/your/private-key -r submission-backend ubuntu@92.5.30.252:/home/ubuntu/
-
-# Auf der VM
-bash deploy_backend.sh
-```
-
-### 4. Frontend konfigurieren
-In der Webapp (Einstellungen > OCI):
-- Wählen Sie "OCI" als Übermittlungsmodus
-- Tragen Sie die VM-IP ein: `http://92.5.30.252:8080`
-- Optional: API-Key setzen
-
-### 5. Testen
-- Health-Check: `curl http://localhost:8080/health`
-- UStVA-Validierung in der Webapp testen
-
----
-
 ## 📖 Bedienungsanleitung
 
 ### 1. Upload & KI-Analyse
