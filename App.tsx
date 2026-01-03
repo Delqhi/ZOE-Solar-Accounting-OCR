@@ -3,6 +3,7 @@ import { UploadArea } from './components/UploadArea';
 import { DatabaseView } from './components/DatabaseView';
 import { DatabaseGrid } from './components/DatabaseGrid';
 import { DocumentDetail } from './components/DetailModal';
+import { DuplicateCompareModal } from './components/DuplicateCompareModal';
 import { SettingsView } from './components/SettingsView';
 import { analyzeDocumentWithGemini } from './services/geminiService';
 import { applyAccountingRules, generateZoeInvoiceId } from './services/ruleEngine';
@@ -158,6 +159,10 @@ export default function App() {
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isResizing = useRef(false);
+
+  // Duplicate Compare Modal State
+  const [compareDoc, setCompareDoc] = useState<DocumentRecord | null>(null);
+  const [originalDoc, setOriginalDoc] = useState<DocumentRecord | null>(null);
 
   useEffect(() => {
     const initData = async () => {
@@ -468,6 +473,31 @@ export default function App() {
     }
   };
 
+  const handleCompareDuplicates = (original: DocumentRecord, duplicate: DocumentRecord) => {
+    setOriginalDoc(original);
+    setCompareDoc(duplicate);
+  };
+
+  const handleCloseCompare = () => {
+    setCompareDoc(null);
+    setOriginalDoc(null);
+  };
+
+  const handleIgnoreDuplicate = async (id: string) => {
+    const doc = documents.find(d => d.id === id);
+    if (doc) {
+      const updated = {
+        ...doc,
+        status: DocumentStatus.REVIEW_NEEDED as DocumentStatus,
+        duplicateOfId: undefined,
+        duplicateConfidence: undefined,
+        duplicateReason: undefined
+      };
+      await handleSaveDocument(updated);
+    }
+    handleCloseCompare();
+  };
+
   const filteredDocuments = useMemo(() => {
     return documents.filter(doc => {
       if (searchQuery) {
@@ -735,10 +765,31 @@ export default function App() {
                                         <span className="text-[10px] opacity-70 font-mono ml-1">{Math.round(doc.data.bruttoBetrag)}€</span>
                                     )}
                                 </div>
-                                <div className="truncate text-xs opacity-70">
+                                <div className="truncate text-xs opacity-70 flex items-center gap-1">
                                     {doc.data?.lieferantName || doc.fileName}
                                 </div>
                             </div>
+                            {/* Compare button for duplicates */}
+                            {isDup && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        const original = documents.find(d => d.id === doc.duplicateOfId);
+                                        if (original) {
+                                            handleCompareDuplicates(original, doc);
+                                        }
+                                    }}
+                                    className="p-1 text-red-500 hover:bg-red-100 rounded transition-colors"
+                                    title="Mit Original vergleichen"
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <rect x="3" y="3" width="7" height="7"/>
+                                        <rect x="14" y="3" width="7" height="7"/>
+                                        <rect x="14" y="14" width="7" height="7"/>
+                                        <rect x="3" y="14" width="7" height="7"/>
+                                    </svg>
+                                </button>
+                            )}
                         </div>
                     );
                 })}
@@ -790,6 +841,21 @@ export default function App() {
       <main className="flex-1 flex flex-col relative overflow-hidden bg-white/50 min-w-0 md:mb-0 mb-20">
           {renderContent()}
       </main>
+
+      {/* Duplicate Compare Modal */}
+      {compareDoc && originalDoc && (
+        <DuplicateCompareModal
+          original={originalDoc}
+          duplicate={compareDoc}
+          allDocuments={documents}
+          onClose={handleCloseCompare}
+          onDelete={handleDeleteDocument}
+          onSave={handleSaveDocument}
+          onMerge={handleMergeDocuments}
+          onSelectDocument={(doc) => { setSelectedDocId(doc.id); setViewMode('document'); handleCloseCompare(); }}
+          onIgnoreDuplicate={handleIgnoreDuplicate}
+        />
+      )}
     </div>
   );
 }
