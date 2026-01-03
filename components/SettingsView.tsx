@@ -126,7 +126,43 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, on
       }));
   };
   
+  const validateDatevConfig = (): { valid: boolean; errors: string[] } => {
+      const errors: string[] = [];
+
+      // Check required fields
+      if (!datevConfig.beraterNr.trim()) {
+          errors.push('Berater-Nr. ist erforderlich');
+      } else if (!/^\d+$/.test(datevConfig.beraterNr)) {
+          errors.push('Berater-Nr. muss numerisch sein');
+      }
+
+      if (!datevConfig.mandantNr.trim()) {
+          errors.push('Mandant-Nr. ist erforderlich');
+      } else if (!/^\d+$/.test(datevConfig.mandantNr)) {
+          errors.push('Mandant-Nr. muss numerisch sein');
+      }
+
+      // Check BU-Schlüssel for tax categories that are in use
+      const usedTaxCategories = taxes.filter(t => ['19_pv', '7_pv'].includes(t.value));
+      const missingBuKeys = usedTaxCategories.filter(t => {
+          const buKey = datevConfig.taxCategoryToBuKey?.[t.value];
+          return !buKey || buKey.trim() === '';
+      });
+
+      if (missingBuKeys.length > 0) {
+          const names = missingBuKeys.map(t => t.label).join(', ');
+          errors.push(`Fehlende BU-Schlüssel für: ${names}`);
+      }
+
+      return { valid: errors.length === 0, errors };
+  };
+
   const handleSaveAccounts = () => {
+      const validation = validateDatevConfig();
+      if (!validation.valid) {
+          alert('Validierungsfehler:\n\n' + validation.errors.join('\n'));
+          return;
+      }
       onSave(buildSettingsSnapshot());
       alert('Einstellungen gespeichert!');
   };

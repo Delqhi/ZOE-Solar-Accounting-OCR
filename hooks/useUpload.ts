@@ -6,6 +6,12 @@ import { normalizeExtractedData } from '../services/extractedDataNormalization';
 import { detectPrivateDocument } from '../services/privateDocumentDetection';
 import { v4 as uuidv4 } from 'uuid';
 
+// Maximum file size: 10MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+// Maximum retry attempts
+const MAX_RETRIES = 2;
+
 interface UseUploadReturn {
   processing: boolean;
   progress: string | null;
@@ -35,57 +41,77 @@ export const useUpload = (): UseUploadReturn => {
   const [progress, setProgress] = useState<string | null>(null);
 
   const uploadFile = useCallback(async (file: File): Promise<DocumentRecord | null> => {
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      console.error('File too large:', file.size);
+      setProgress(null);
+      return null;
+    }
+
     setProcessing(true);
     setProgress('Datei wird verarbeitet...');
 
-    try {
-      // Step 1: Read file
-      const { base64, url } = await readFileToBase64(file);
-      setProgress('OCR-Analyse läuft...');
+    let lastError: Error | null = null;
 
-      // Step 2: Run AI Analysis
-      const extractedData = await analyzeDocumentWithGemini(base64, file.type);
-      setProgress('Buchungsregeln werden angewendet...');
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        // Step 1: Read file
+        const { base64, url } = await readFileToBase64(file);
+        setProgress('OCR-Analyse läuft...');
 
-      // Step 3: Apply accounting rules
-      const enrichedData = applyAccountingRules(extractedData);
+        // Step 2: Run AI Analysis
+        const extractedData = await analyzeDocumentWithGemini(base64, file.type);
+        setProgress('Buchungsregeln werden angewendet...');
 
-      // Step 4: Generate ZOE invoice ID
-      const zoeId = generateZoeInvoiceId();
+        // Step 3: Apply accounting rules
+        const enrichedData = applyAccountingRules(extractedData);
 
-      // Step 5: Check for private documents
-      const isPrivate = detectPrivateDocument(enrichedData);
+        // Step 4: Generate ZOE invoice ID
+        const zoeId = generateZoeInvoiceId();
 
-      // Step 6: Create document record
-      const doc: DocumentRecord = {
-        id: uuidv4(),
-        fileName: file.name,
-        fileType: file.type,
-        uploadDate: new Date().toISOString(),
-        status: isPrivate ? 'PRIVATE' : 'REVIEW_NEEDED',
-        duplicateOfId: undefined,
-        duplicateReason: undefined,
-        previewUrl: url,
-        data: {
-          ...normalizeExtractedData(enrichedData),
-          eigeneBelegNummer: zoeId,
-          ocr_score: extractedData.ocr_score ?? 0,
-          ocr_rationale: extractedData.ocr_rationale
-        },
-        isPrivate,
-        privateReason: isPrivate ? enrichedData.ocr_rationale : undefined
-      };
+        // Step 5: Check for private documents
+        const isPrivate = detectPrivateDocument(enrichedData);
 
-      setProgress(null);
-      return doc;
+        // Step 6: Create document record
+        const doc: DocumentRecord = {
+          id: uuidv4(),
+          fileName: file.name,
+          fileType: file.type,
+          uploadDate: new Date().toISOString(),
+          status: isPrivate ? 'PRIVATE' : 'REVIEW_NEEDED',
+          duplicateOfId: undefined,
+          duplicateReason: undefined,
+          previewUrl: url,
+          data: {
+            ...normalizeExtractedData(enrichedData),
+            eigeneBelegNummer: zoeId,
+            ocr_score: extractedData.ocr_score ?? 0,
+            ocr_rationale: extractedData.ocr_rationale
+          },
+          isPrivate,
+          privateReason: isPrivate ? enrichedData.ocr_rationale : undefined
+        };
 
-    } catch (error) {
-      console.error('Upload error:', error);
-      setProgress(null);
-      return null;
-    } finally {
-      setProcessing(false);
+        setProgress(null);
+        return doc;
+
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`Upload attempt ${attempt + 1} failed:`, lastError);
+
+        if (attempt < MAX_RETRIES) {
+          setProgress(`Fehler, wird erneut versucht (${attempt + 1}/${MAX_RETRIES})...`);
+          // Exponential backoff
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 500));
+        }
+      }
     }
+
+    // All retries failed
+    console.error('Upload failed after all retries:', lastError);
+    setProgress(null);
+    return null;
+
   }, []);
 
   return {

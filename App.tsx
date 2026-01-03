@@ -246,6 +246,7 @@ export default function App() {
             }
           } catch (syncError) {
             console.warn('Supabase sync failed, using local data:', syncError);
+            setNotification('Cloud-Sync fehlgeschlagen. Lokale Daten werden verwendet.');
           }
         }
       } catch (e) {
@@ -690,10 +691,18 @@ export default function App() {
       if (searchQuery) {
         const term = searchQuery.toLowerCase();
         const d = doc.data;
-        if (!doc.fileName.toLowerCase().includes(term) && !d?.lieferantName?.toLowerCase().includes(term) && 
+        if (!doc.fileName.toLowerCase().includes(term) && !d?.lieferantName?.toLowerCase().includes(term) &&
             !d?.eigeneBelegNummer?.toLowerCase().includes(term) && !d?.bruttoBetrag?.toString().includes(term)) return false;
       }
-      const dateStr = doc.data?.belegDatum || doc.uploadDate;
+      // Always use belegDatum for filtering (financial documents are filtered by document date, not upload date)
+      const dateStr = doc.data?.belegDatum;
+      if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        // Skip documents without valid belegDatum in date-filtered views
+        if (filterYear !== 'all' || filterMonth !== 'all' || filterQuarter !== 'all') {
+          return false;
+        }
+        return true;
+      }
       const year = dateStr.substring(0, 4);
       const month = parseInt(dateStr.substring(5, 7), 10);
       if (filterYear !== 'all' && year !== filterYear) return false;
@@ -709,8 +718,11 @@ export default function App() {
   const availableYears = useMemo(() => {
       const years = new Set<string>();
       documents.forEach(d => {
-          const date = d.data?.belegDatum || d.uploadDate;
-          if (date) years.add(date.substring(0, 4));
+          // Only use belegDatum for year extraction
+          const date = d.data?.belegDatum;
+          if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            years.add(date.substring(0, 4));
+          }
       });
       return Array.from(years).sort().reverse();
   }, [documents]);

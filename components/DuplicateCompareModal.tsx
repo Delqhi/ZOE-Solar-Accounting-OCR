@@ -91,6 +91,88 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
     onClose();
   };
 
+  // Auto-merge: Use data with higher OCR score
+  const handleAutoMergeHigherScore = async () => {
+    const originalScore = originalData.ocr_score || 0;
+    const duplicateScore = duplicateData.ocr_score || 0;
+
+    if (originalScore >= duplicateScore) {
+      // Keep original data, mark duplicate as not duplicate
+      const updatedDup = {
+        ...duplicate,
+        status: DocumentStatus.REVIEW_NEEDED as DocumentStatus,
+        duplicateOfId: undefined,
+        duplicateConfidence: undefined,
+        duplicateReason: undefined
+      };
+      await onSave(updatedDup);
+    } else {
+      // Use duplicate data, mark original as duplicate
+      const updatedOriginal = {
+        ...original,
+        status: DocumentStatus.DUPLICATE as DocumentStatus,
+        duplicateOfId: duplicate.id,
+        duplicateConfidence: duplicate.duplicateConfidence,
+        duplicateReason: 'Auto-merged: duplicate had higher OCR score'
+      };
+      await onSave(updatedOriginal);
+    }
+    onClose();
+  };
+
+  // Auto-merge: Use higher amount (take max of both)
+  const handleAutoMergeHigherAmount = async () => {
+    const originalAmount = originalData.bruttoBetrag || 0;
+    const duplicateAmount = duplicateData.bruttoBetrag || 0;
+
+    const mergedData = { ...originalData };
+    if (duplicateAmount > originalAmount) {
+      mergedData.bruttoBetrag = duplicateAmount;
+      mergedData.nettoBetrag = duplicateData.nettoBetrag;
+      mergedData.mwstBetrag19 = duplicateData.mwstBetrag19;
+      mergedData.mwstBetrag7 = duplicateData.mwstBetrag7;
+      mergedData.mwstBetrag0 = duplicateData.mwstBetrag0;
+    }
+
+    const updatedOriginal = {
+      ...original,
+      data: mergedData as ExtractedData,
+      status: DocumentStatus.REVIEW_NEEDED as DocumentStatus,
+      duplicateOfId: undefined,
+      duplicateConfidence: undefined,
+      duplicateReason: undefined
+    };
+    await onSave(updatedOriginal);
+
+    // Mark duplicate as duplicate
+    const updatedDup = {
+      ...duplicate,
+      status: DocumentStatus.DUPLICATE as DocumentStatus,
+      duplicateOfId: original.id,
+      duplicateConfidence: duplicate.duplicateConfidence,
+      duplicateReason: 'Auto-merged: kept higher amount'
+    };
+    await onSave(updatedDup);
+    onClose();
+  };
+
+  // Bulk resolve all duplicates for this original
+  const handleResolveAllDuplicates = async () => {
+    // Mark all other duplicates as "not duplicates" (keep them)
+    for (const otherDup of otherDuplicates) {
+      const updatedDup = {
+        ...otherDup,
+        status: DocumentStatus.REVIEW_NEEDED as DocumentStatus,
+        duplicateOfId: undefined,
+        duplicateConfidence: undefined,
+        duplicateReason: undefined
+      };
+      await onSave(updatedDup);
+    }
+    // Keep original as is
+    onClose();
+  };
+
   // Keyboard navigation
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -157,6 +239,29 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
             >
               Beide behalten
             </button>
+            <button
+              onClick={handleAutoMergeHigherScore}
+              className="px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-sm font-semibold transition-colors"
+              title="Automatisch das Dokument mit höherem OCR-Score behalten"
+            >
+              Auto: Höherer Score
+            </button>
+            <button
+              onClick={handleAutoMergeHigherAmount}
+              className="px-4 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg text-sm font-semibold transition-colors"
+              title="Automatisch den höheren Betrag übernehmen"
+            >
+              Auto: Höherer Betrag
+            </button>
+            {otherDuplicates.length > 0 && (
+              <button
+                onClick={handleResolveAllDuplicates}
+                className="px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg text-sm font-semibold transition-colors"
+              >
+                Alle {otherDuplicates.length + 1} behalten
+              </button>
+            )}
+            <div className="w-px h-6 bg-slate-300 mx-2" />
             <button
               onClick={handleMarkAsOriginal}
               className="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm font-semibold transition-colors"

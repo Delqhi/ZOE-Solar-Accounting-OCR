@@ -9,6 +9,7 @@ export const BackupView: React.FC<BackupViewProps> = ({ onDataChanged }) => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoreMode, setRestoreMode] = useState<'json' | 'sql'>('json');
 
   const handleDownloadJSON = async () => {
     setLoading(true);
@@ -64,6 +65,62 @@ export const BackupView: React.FC<BackupViewProps> = ({ onDataChanged }) => {
     }
   };
 
+  const handleSQLRestore = async () => {
+    if (!restoreFile) {
+      setMessage({ type: 'error', text: 'Bitte wählen Sie eine SQL-Datei aus.' });
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const text = await restoreFile.text();
+
+      // Check for SQL header
+      if (!text.includes('-- ZOE Solar Accounting') && !text.includes('belege')) {
+        setMessage({ type: 'error', text: 'Ungültiges SQL-Backup-Format.' });
+        setLoading(false);
+        return;
+      }
+
+      // For SQL restore, we show info that SQL must be imported via database tools
+      setMessage({
+        type: 'success',
+        text: `SQL-Backup erkannt. Bitte importieren Sie die Datei manuell in Ihre PostgreSQL-Datenbank mit: psql -d datenbank < ${restoreFile.name}`
+      });
+
+      // Offer download of the SQL content
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `zoe_restore_${new Date().toISOString().split('T')[0]}.sql`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+    } catch (err) {
+      setMessage({ type: 'error', text: `Fehler: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}` });
+    } finally {
+      setLoading(false);
+      setRestoreFile(null);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setRestoreFile(file);
+    if (file) {
+      if (file.name.endsWith('.sql')) {
+        setRestoreMode('sql');
+      } else {
+        setRestoreMode('json');
+      }
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-8">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Backup & Wiederherstellung</h2>
@@ -112,12 +169,12 @@ export const BackupView: React.FC<BackupViewProps> = ({ onDataChanged }) => {
         <div className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Backup-Datei auswählen (.json)
+              Backup-Datei auswählen (.json oder .sql)
             </label>
             <input
               type="file"
-              accept=".json"
-              onChange={(e) => setRestoreFile(e.target.files?.[0] || null)}
+              accept=".json,.sql"
+              onChange={handleFileChange}
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
           </div>
@@ -125,16 +182,21 @@ export const BackupView: React.FC<BackupViewProps> = ({ onDataChanged }) => {
           {restoreFile && (
             <div className="flex items-center gap-4">
               <button
-                onClick={handleRestore}
+                onClick={restoreMode === 'sql' ? handleSQLRestore : handleRestore}
                 disabled={loading}
                 className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                Wiederherstellen
+                {restoreMode === 'sql' ? 'SQL-Info anzeigen' : 'Wiederherstellen'}
               </button>
-              <span className="text-sm text-gray-600">{restoreFile.name}</span>
+              <span className="text-sm text-gray-600">
+                {restoreFile.name}
+                <span className="ml-2 text-xs text-gray-400">
+                  ({restoreMode === 'sql' ? 'SQL-Backup' : 'JSON-Backup'})
+                </span>
+              </span>
             </div>
           )}
 
@@ -148,7 +210,7 @@ export const BackupView: React.FC<BackupViewProps> = ({ onDataChanged }) => {
               <div className="ml-3">
                 <p className="text-sm text-yellow-700">
                   <strong>Wichtig:</strong> Die Wiederherstellung fügt neue Dokumente hinzu und aktualisiert existierende anhand der ID.
-                  Bereits hochgeladene Dateien werden nicht doppelt angelegt.
+                  Bereits hochgeladene Dateien werden nicht doppelt angelegt. SQL-Backups müssen in die PostgreSQL-Datenbank importiert werden.
                 </p>
               </div>
             </div>

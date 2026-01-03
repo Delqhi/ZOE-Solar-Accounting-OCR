@@ -3,6 +3,9 @@ import { ExtractedData, OcrProvider } from "../types";
 import * as pdfjsLib from 'pdfjs-dist';
 import { normalizeExtractedData } from "./extractedDataNormalization";
 
+// Import PDF.js worker locally (bundled with Vite)
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
+
 // Helper to robustly resolve PDF.js library instance from ESM import
 const getPdfJs = () => {
     const lib = pdfjsLib as any;
@@ -13,10 +16,10 @@ const getPdfJs = () => {
 
 const pdf = getPdfJs();
 
-// Safely set worker source
+// Set worker source to local bundled file
 if (pdf && pdf.GlobalWorkerOptions) {
     try {
-        pdf.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+        pdf.GlobalWorkerOptions.workerSrc = pdfWorker;
     } catch (e) {
         console.warn("Failed to set PDF worker source:", e);
     }

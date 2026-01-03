@@ -568,7 +568,7 @@ export const saveVendorRule = async (vendorName: string, accountId: string, taxC
   if (!vendorName || vendorName.length < 2) return;
 
   const client = initSupabase();
-  if (!client) return;
+  if (!client) throw new Error('Supabase not configured');
 
   const normalizedName = vendorName.toLowerCase().trim();
 
@@ -593,7 +593,115 @@ export const saveVendorRule = async (vendorName: string, accountId: string, taxC
 
   if (error) {
     console.error('Failed to save vendor rule:', error);
+    throw new Error(`Vendor rule save failed: ${error.message}`);
   }
+};
+
+// --- Schema Migration ---
+
+export interface MigrationResult {
+  success: boolean;
+  migratedCount: number;
+  errors: string[];
+}
+
+/**
+ * Migrate old Supabase documents to the new schema format.
+ * Old documents may be missing fields like belegNummerLieferant, steuernummer, etc.
+ */
+export const migrateOldDocuments = async (): Promise<MigrationResult> => {
+  const client = initSupabase();
+  if (!client) {
+    return { success: false, migratedCount: 0, errors: ['Supabase not configured'] };
+  }
+
+  const result: MigrationResult = {
+    success: true,
+    migratedCount: 0,
+    errors: []
+  };
+
+  try {
+    // Fetch all documents
+    const { data: documents, error: fetchError } = await client
+      .from('belege')
+      .select('*')
+      .is('beleg_nummer_lieferant', null); // Only get documents missing new fields
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
+    if (!documents || documents.length === 0) {
+      return { ...result, migratedCount: 0 };
+    }
+
+    // Migrate each document
+    for (const doc of documents) {
+      try {
+        // Add default values for missing fields
+        const updates: Record<string, unknown> = {
+          beleg_nummer_lieferant: doc.lieferant_name ? `${doc.lieferant_name.substring(0, 3)}_${Date.now()}` : '',
+          steuernummer: '',
+          eigene_beleg_nummer: `ZOE-${doc.id.substring(0, 8).toUpperCase()}`,
+          netto_betrag: doc.brutto_betrag || 0,
+          mwst_satz_0: 0,
+          mwst_betrag_0: 0,
+          mwst_satz_7: 0,
+          mwst_betrag_7: 0,
+          konto_skr03: doc.skr03_konto || '4900',
+          reverse_charge: false,
+          vorsteuerabzug: true,
+          kleinbetrag: (doc.brutto_betrag || 0) < 250,
+          privatanteil: false,
+          beschreibung: '',
+          ocr_text: ''
+        };
+
+        const { error: updateError } = await client
+          .from('belege')
+          .update(updates)
+          .eq('id', doc.id);
+
+        if (updateError) {
+          result.errors.push(`Failed to migrate document ${doc.id}: ${updateError.message}`);
+        } else {
+          result.migratedCount++;
+        }
+      } catch (e) {
+        result.errors.push(`Error migrating document ${doc.id}: ${e}`);
+      }
+    }
+
+    result.success = result.errors.length === 0;
+
+  } catch (e) {
+    result.success = false;
+    result.errors.push(`Migration failed: ${e}`);
+  }
+
+  return result;
+};
+
+/**
+ * Check if migration is needed
+ */
+export const checkMigrationNeeded = async (): Promise<{ needed: boolean; count: number }> => {
+  const client = initSupabase();
+  if (!client) {
+    return { needed: false, count: 0 };
+  }
+
+  const { count, error } = await client
+    .from('belege')
+    .select('*', { count: 'exact', head: true })
+    .is('beleg_nummer_lieferant', null);
+
+  if (error || count === null) {
+    return { needed: false, count: 0 };
+  }
+
+  return { needed: count > 0, count };
 };
 
 // --- SQL Export ---
