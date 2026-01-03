@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { UploadArea } from './components/UploadArea';
 import { DatabaseView } from './components/DatabaseView';
 import { DatabaseGrid } from './components/DatabaseGrid';
 import { DocumentDetail } from './components/DetailModal';
 import { DuplicateCompareModal } from './components/DuplicateCompareModal';
 import { SettingsView } from './components/SettingsView';
+import { AuthView } from './components/AuthView';
+import { BackupView } from './components/BackupView';
+import { FilterBar } from './components/FilterBar';
 import { analyzeDocumentWithGemini } from './services/geminiService';
 import { applyAccountingRules, generateZoeInvoiceId } from './services/ruleEngine';
 import * as supabaseService from './services/supabaseService';
@@ -12,6 +15,7 @@ import { detectPrivateDocument } from './services/privateDocumentDetection';
 import { DocumentRecord, DocumentStatus, AppSettings, ExtractedData, Attachment } from './types';
 import { normalizeExtractedData } from './services/extractedDataNormalization';
 import { formatPreflightForDialog, runExportPreflight } from './services/exportPreflight';
+import { User } from './services/supabaseService';
 
 const computeFileHash = async (file: File): Promise<string> => {
   const buffer = await file.arrayBuffer();
@@ -145,7 +149,7 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'document' | 'settings' | 'database'>('document');
+  const [viewMode, setViewMode] = useState<'document' | 'settings' | 'database' | 'auth' | 'backup'>('document');
   const [searchQuery, setSearchQuery] = useState('');
   const [notification, setNotification] = useState<string | null>(null);
   const [privateDocNotification, setPrivateDocNotification] = useState<{
@@ -154,9 +158,18 @@ export default function App() {
     reason: string;
   } | null>(null);
 
+  // Auth State
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // Filter State
   const [filterYear, setFilterYear] = useState<string>('all');
   const [filterQuarter, setFilterQuarter] = useState<string>('all');
   const [filterMonth, setFilterMonth] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterVendor, setFilterVendor] = useState<string>('all');
+  const [filterAccount, setFilterAccount] = useState<string>('all');
+  const [filterTaxCategory, setFilterTaxCategory] = useState<string>('all');
   
   // Drag State for Sidebar
   const [sidebarDragTarget, setSidebarDragTarget] = useState<string | null>(null);
