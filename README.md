@@ -27,6 +27,84 @@
 
 ---
 
+## 🏗️ Architektur
+
+```mermaid
+flowchart TB
+    subgraph Frontend["Frontend (Browser)"]
+        UI[React Components]
+        Hooks[Custom Hooks]
+        Services[Services Layer]
+    end
+
+    subgraph Components["UI Components"]
+        Upload[UploadArea]
+        Grid[DatabaseGrid]
+        Editor[DetailModal]
+        Settings[SettingsView]
+    end
+
+    subgraph Services2["Business Logic"]
+        OCR[geminiService + fallbackService]
+        Rules[ruleEngine]
+        Export[elsterExport + datevExport]
+        Backup[backupService]
+        PrivateDoc[privateDocumentDetection]
+    end
+
+    UI --> Components
+    Hooks --> Services
+    Services --> OCR
+    Services --> Rules
+    Services --> Export
+    Services --> Backup
+    Services --> PrivateDoc
+
+    Services2 -->|"Supabase Client"| DB[(Supabase PostgreSQL)]
+
+    subgraph Cloud["OCI VM"]
+        DB
+    end
+```
+
+---
+
+## 🔄 OCR Pipeline
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UploadArea
+    participant PdfViewer
+    participant GeminiService
+    participant RuleEngine
+    participant Supabase
+
+    User->>UploadArea: Drag & Drop PDF/JPG/PNG
+    UploadArea->>PdfViewer: Render Preview
+    PdfViewer-->>User: Show Document
+
+    User->>UploadArea: Start Processing
+    UploadArea->>GeminiService: analyzeDocument(file)
+
+    alt Gemini verfügbar
+        GeminiService->>GeminiService: Call Gemini 2.5 Flash
+        GeminiService-->>RuleEngine: ExtractedData
+    else Gemini Timeout
+        GeminiService->>GeminiService: Fallback to SiliconFlow Qwen
+        GeminiService-->>RuleEngine: ExtractedData
+    end
+
+    RuleEngine->>RuleEngine: Apply SKR03 Rules
+    RuleEngine->>RuleEngine: Check Vendor Rules
+    RuleEngine->>RuleEngine: Validate (Sum Check)
+    RuleEngine-->>Supabase: Save Document
+
+    Supabase-->>User: ✅ Document Saved
+```
+
+---
+
 ## ✨ Features
 
 <div align="center">
@@ -41,23 +119,59 @@
 
 </div>
 
+### KI-OCR Pipeline
+
+| Modell | Geschwindigkeit | Genauigkeit | Zweck |
+|--------|-----------------|-------------|-------|
+| **Google Gemini 2.5 Flash** | < 3 Sek | 99% | Primäre Extraktion |
+| **SiliconFlow Qwen 2.5 VL (72B)** | < 5 Sek | 98% | Fallback bei Timeout |
+
+**Unterstützte Formate:** PDF, JPG, PNG, WebP
+
+### Kontierungs-Engine
+
+- **SKR03 Standards:** 20 vordefinierte Konten
+  - Wareneingang (3400), Büromaterial (4930), Software (4964), etc.
+- **Steuerkategorien:** 6 Kategorien
+  - 19% Vorsteuer, 7% Vorsteuer, 0% PV, Reverse Charge, Kleinunternehmer, Privatanteil
+- **Vendor Rules:** Automatisches Lernen von Lieferanten-Zuordnungen
+
+### Qualitätssicherung
+
+- **Duplikat-Erkennung V2:**
+  - **Hard Match:** Belegnummer + Betrag
+  - **Fuzzy Match:** Ähnlichkeitsalgorithmus
+  - **Hash Check:** SHA-256 Datei-Hashing
+- **Validierung:** Netto + MwSt = Brutto (Summenprüfung)
+
 ---
 
 ## 🛠 Tech Stack
 
 <div align="center">
 
-```typescript
-Frontend     →  React 19.2.3 + TypeScript 5.8
-Styling      →  Tailwind CSS 4 (via PostCSS)
-Build        →  Vite 6.2.0
-Backend      →  Supabase (PostgreSQL)
-Tests        →  Vitest 4.0.16
-AI           →  Google Gemini 2.5 Flash
-             →  SiliconFlow Qwen 2.5 VL
-PDF          →  PDF.js 3.11, jsPDF 2.5
-Auth         →  Supabase Auth
-```
+### Dependencies
+
+| Kategorie | Paket | Version |
+|-----------|-------|---------|
+| **Framework** | React | ^19.2.3 |
+| **Sprache** | TypeScript | ~5.8.2 |
+| **Styling** | Tailwind CSS | 4.1.18 |
+| **Build** | Vite | ^6.2.0 |
+| **AI SDK** | @google/genai | ^1.33.0 |
+| **Backend** | @supabase/supabase-js | ^2.89.0 |
+| **PDF Engine** | pdfjs-dist | 3.11.174 |
+| **PDF Gen** | jspdf | 2.5.1 |
+| **Tables** | jspdf-autotable | 3.8.1 |
+
+### Dev Dependencies
+
+| Kategorie | Paket | Version |
+|-----------|-------|---------|
+| **Test** | vitest | ^4.0.16 |
+| **Test Lib** | @testing-library/react | ^16.3.1 |
+| **Test DOM** | jsdom | ^27.4.0 |
+| **Types** | @types/node | ^22.14.0 |
 
 </div>
 
@@ -100,40 +214,243 @@ VITE_SILICONFLOW_API_KEY=dein-siliconflow-key
 
 ```
 src/
-├── services/           # Business Logic
-│   ├── supabaseService.ts   # Supabase CRUD
-│   ├── geminiService.ts     # Google Gemini OCR
-│   ├── fallbackService.ts   # SiliconFlow Fallback
-│   ├── elsterExport.ts      # ELSTER XML
-│   ├── datevExport.ts       # DATEV EXTF
-│   ├── ruleEngine.ts        # SKR03 Regeln
-│   ├── backupService.ts     # Backup/Restore
-│   └── privateDocumentDetection.ts
-├── components/         # React Components
-│   ├── DatabaseView.tsx
-│   ├── DetailModal.tsx
-│   ├── DuplicateCompareModal.tsx
-│   ├── AuthView.tsx
-│   └── SettingsView.tsx
-├── hooks/              # Custom Hooks
-│   ├── useDocuments.ts
-│   ├── useSettings.ts
-│   └── useUpload.ts
-└── types.ts            # TypeScript Interfaces
+├── services/                          # Business Logic
+│   ├── geminiService.ts               # Google Gemini OCR
+│   ├── fallbackService.ts             # SiliconFlow Fallback
+│   ├── supabaseService.ts             # Supabase CRUD + Auth
+│   ├── ruleEngine.ts                  # SKR03 Kontierung
+│   ├── elsterExport.ts                # ELSTER XML
+│   ├── datevExport.ts                 # DATEV EXTF
+│   ├── datevExtfTemplate.ts           # DATEV Templates
+│   ├── backupService.ts               # Backup/Restore
+│   ├── privateDocumentDetection.ts    # Privatbeleg-Erkennung
+│   ├── exportPreflight.ts             # Export-Validierung
+│   └── extractedDataNormalization.ts  # Daten-Normalisierung
+│
+├── components/                        # React Components
+│   ├── DatabaseView.tsx               # Hauptansicht mit Filter
+│   ├── DatabaseGrid.tsx               # Sortierbare Dokument-Tabelle
+│   ├── DetailModal.tsx                # Split-View Editor
+│   ├── DuplicateCompareModal.tsx      # Duplikat-Vergleich
+│   ├── UploadArea.tsx                 # Drag & Drop Upload
+│   ├── PdfViewer.tsx                  # PDF-Rendering
+│   ├── FilterBar.tsx                  # Filter-Leiste
+│   ├── SettingsView.tsx               # Einstellungen
+│   ├── AuthView.tsx                   # Authentifizierung
+│   └── BackupView.tsx                 # Backup/Restore UI
+│
+├── hooks/                             # Custom Hooks
+│   ├── useDocuments.ts                # Document CRUD + Filter
+│   ├── useSettings.ts                 # App-Einstellungen
+│   └── useUpload.ts                   # Datei-Upload
+│
+├── App.tsx                            # Main Application
+├── index.tsx                          # Entry Point
+├── index.html                         # HTML Template
+└── types.ts                           # TypeScript Interfaces
 ```
 
 ---
 
 ## 📤 Export-Formate
 
-| Format | Beschreibung |
-|--------|-------------|
-| **ELSTER XML** | Umsatzsteuervoranmeldung für Finanzamt |
-| **DATEV EXTF** | Buchungsstapel für Steuerberater-Software |
-| **CSV** | Semikolon-getrennt, UTF-8 kodiert |
-| **SQL** | Vollständiges PostgreSQL-Schema |
-| **PDF** | Berichte: EÜR, UStVA, Beleglisten |
-| **JSON** | Backup mit allen Dokumenten |
+| Format | Beschreibung | Datei |
+|--------|-------------|-------|
+| **ELSTER XML** | UStVA für Finanzamt | `elster_ustva_{period}.xml` |
+| **DATEV EXTF** | Buchungsstapel | `datev_buchungsstapel.csv` |
+| **CSV** | Semikolon, UTF-8, 32 Spalten | `zoe_belege_{date}.csv` |
+| **SQL** | Vollständiges Schema | `zoe_backup_{date}.sql` |
+| **PDF** | Berichte: EÜR, UStVA | `zoe_bericht_{type}.pdf` |
+| **JSON** | Backup | `zoe_backup_{date}.json` |
+
+### ELSTER XML Struktur
+
+```xml
+<Elster xmlns="http://www.elster.de/2002/XMLSchema">
+  <Umsatzsteuervoranmeldung>
+    <Jahr>2025</Jahr>
+    <Zeitraum>01</Zeitraum> <!-- Q1 oder Monat -->
+    <Kz21>steuerfreie Umsätze</Kz21>
+    <Kz35>Reverse Charge</Kz35>
+    <Kz81>7% Basis</Kz81>
+    <Kz83>7% Steuer</Kz83>
+    <Kz86>19% Basis</Kz86>
+    <Kz89>19% Steuer</Kz89>
+    <Kz93>Gesamtsteuer</Kz93>
+  </Umsatzsteuervoranmeldung>
+</Elster>
+```
+
+### DATEV EXTF Format
+
+- **Kontenlänge:** 4-stellig (SKR03)
+- **Währung:** EUR
+- **Fibu-Schema:** EXTF (externes Format)
+
+---
+
+## 📊 Datenmodell
+
+### ExtractedData Interface
+
+```typescript
+interface ExtractedData {
+  // Basisdaten
+  belegDatum: string;
+  belegNummerLieferant: string;
+  lieferantName: string;
+  lieferantAdresse: string;
+  steuernummer?: string;
+
+  // Finanzdaten
+  nettoBetrag: number;
+  bruttoBetrag: number;
+  mwstBetrag19: number;
+  mwstBetrag7: number;
+  mwstBetrag0: number;
+  mwstSatz19: number;
+  mwstSatz7: number;
+  mwstSatz0: number;
+
+  // Buchhaltung
+  kontierungskonto: string;
+  sollKonto: string;
+  habenKonto: string;
+  steuerkategorie: string;
+
+  // Positionen
+  lineItems: LineItem[];
+
+  // Qualität
+  ocr_score: number;
+  ocr_rationale: string;
+  textContent?: string;
+}
+
+interface LineItem {
+  description: string;
+  amount: number;
+}
+```
+
+### DocumentRecord Interface
+
+```typescript
+interface DocumentRecord {
+  id: string;
+  fileName: string;
+  fileType: string;
+  uploadDate: string;
+  status: DocumentStatus;
+  data: ExtractedData | null;
+  previewUrl: string;
+  fileHash?: string;
+  duplicateOfId?: string;
+  duplicateConfidence?: number;
+  duplicateReason?: string;
+}
+
+type DocumentStatus =
+  | 'pending'
+  | 'processing'
+  | 'completed'
+  | 'duplicate'
+  | 'error';
+```
+
+---
+
+## 🔌 API Reference
+
+### Services
+
+| Service | Funktion | Export |
+|---------|----------|--------|
+| `geminiService.ts` | OCR mit Gemini 2.5 Flash | `analyzeDocument(file)` |
+| `fallbackService.ts` | SiliconFlow Qwen Fallback | `analyzeDocument(file)` |
+| `supabaseService.ts` | CRUD + Auth | `getAllDocuments()`, `saveDocument()` |
+| `ruleEngine.ts` | SKR03 Kontierung | `applyRules(data, vendor)` |
+| `elsterExport.ts` | ELSTER XML | `generateUstva(docs, settings)` |
+| `datevExport.ts` | DATEV EXTF | `generateBuchungsstapel(docs)` |
+| `backupService.ts` | Backup/Restore | `createBackup()`, `restoreFromBackup()` |
+
+### React Hooks
+
+| Hook | State | Funktion |
+|------|-------|----------|
+| `useDocuments()` | `documents`, `loading` | Document CRUD + Pagination |
+| `useSettings()` | `settings`, `updateSettings` | App-Einstellungen |
+| `useUpload()` | `uploading`, `progress` | Datei-Upload + OCR |
+
+### Custom Components
+
+```tsx
+// Hauptansicht mit Filter
+<DatabaseView />
+
+// Sortierbare Tabelle
+<DatabaseGrid documents={docs} onEdit={handleEdit} />
+
+// Split-View Editor
+<DetailModal document={doc} onSave={handleSave} />
+
+// Duplikat-Vergleich
+<DuplicateCompareModal original={doc} duplicate={dup} />
+
+// Drag & Drop Upload
+<UploadArea onUpload={handleUpload} />
+
+// PDF Rendering
+<PdfViewer url={url} scale={1.5} />
+
+// Filter-Leiste
+<FilterBar filters={filters} onChange={setFilters} />
+
+// Einstellungen
+<SettingsView settings={settings} onSave={saveSettings} />
+
+// Authentifizierung
+<AuthView onLogin={login} onLogout={logout} />
+
+// Backup/Restore
+<BackupView onBackup={createBackup} onRestore={restore} />
+```
+
+---
+
+## 🧪 Testing
+
+| Framework | vitest ^4.0.16 |
+|-----------|----------------|
+| **Environment** | jsdom |
+| **Test-Count** | 160 Unit Tests |
+| **Coverage** | 12 Test-Dateien |
+
+### Test-Dateien
+
+| Test | Was getestet wird |
+|------|-------------------|
+| `ruleEngine.test.ts` | SKR03 Kontierung, Vendor Rules |
+| `exportPreflight.test.ts` | Export-Validierung |
+| `extractedDataNormalization.test.ts` | Daten-Normalisierung |
+| `datevExport.test.ts` | DATEV Format-Generierung |
+| `elsterExport.test.ts` | ELSTER XML-Generierung |
+
+### Test-Kommandos
+
+```bash
+# Alle Tests ausführen
+npm run test
+
+# Watch-Modus
+npm run test:watch
+
+# Nur TypeScript checken
+npm run typecheck
+
+# Check + Build
+npm run check
+```
 
 ---
 
@@ -141,24 +458,31 @@ src/
 
 ### Abgeschlossen
 
-- [x] KI-gestützte OCR (Gemini + SiliconFlow)
-- [x] SKR03 Soll/Haben Kontierung
-- [x] Positionen Extraktion
-- [x] Duplikat-Erkennung V2
-- [x] PDF/CSV/SQL Export
-- [x] ELSTER XML Export
-- [x] DATEV EXTF Export
-- [x] Supabase Auth UI
-- [x] Backup/Restore
-- [x] Pagination & Filterung
-- [x] Private Document Detection
-- [x] 160 Unit Tests
+| Epic | Feature | Status |
+|------|---------|--------|
+| **A: OCR & Extraktion** | PDF Upload & Preview | ✅ |
+| | Gemini OCR Integration | ✅ |
+| | Fallback Pipeline (SiliconFlow) | ✅ |
+| **B: Kontierung & Regeln** | SKR03 Mapping | ✅ |
+| | Steuerkategorien (6 Kategorien) | ✅ |
+| | Vendor Rules Learning | ✅ |
+| **C: Qualität & Duplikate** | Duplikat-Erkennung V2 | ✅ |
+| | Validierung Engine | ✅ |
+| | Private Document Detection | ✅ |
+| **D: Export** | ELSTER XML | ✅ |
+| | DATEV EXTF | ✅ |
+| | CSV/SQL/PDF | ✅ |
+| **E: Backend & Sync** | Supabase Integration | ✅ |
+| | Auth UI | ✅ |
+| | Backup/Restore | ✅ |
 
 ### Geplant
 
-- [ ] KI-gestützte Korrekturvorschläge
-- [ ] Mobile App (React Native)
-- [ ] Echtzeit Kollaboration
+| Feature | Priorität |
+|---------|-----------|
+| KI-gestützte Korrekturvorschläge | Hoch |
+| Mobile App (React Native) | Mittel |
+| Echtzeit Kollaboration | Niedrig |
 
 ---
 
