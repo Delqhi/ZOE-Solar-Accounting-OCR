@@ -10,6 +10,7 @@ import { BackupView } from './components/BackupView';
 import { FilterBar } from './components/FilterBar';
 import { analyzeDocumentWithGemini } from './services/geminiService';
 import { applyAccountingRules, generateZoeInvoiceId } from './services/ruleEngine';
+import * as storageService from './services/storageService';
 import * as supabaseService from './services/supabaseService';
 import { detectPrivateDocument } from './services/privateDocumentDetection';
 import { DocumentRecord, DocumentStatus, AppSettings, ExtractedData, Attachment } from './types';
@@ -36,6 +37,33 @@ const readFileToBase64 = (file: File): Promise<{base64: string, url: string}> =>
 };
 
 type DuplicateMatch = { doc: DocumentRecord; reason: string; confidence: number };
+
+// --- Document Merge Helper for Sync ---
+const mergeDocuments = (localDocs: DocumentRecord[], cloudDocs: DocumentRecord[]): DocumentRecord[] => {
+  const docMap = new Map<string, DocumentRecord>();
+
+  // Add all local docs
+  for (const doc of localDocs) {
+    docMap.set(doc.id, doc);
+  }
+
+  // Merge cloud docs (prefer newer versions)
+  for (const cloudDoc of cloudDocs) {
+    const existing = docMap.get(cloudDoc.id);
+    if (!existing) {
+      docMap.set(cloudDoc.id, cloudDoc);
+    } else {
+      // Compare by upload date, prefer newer
+      const localDate = new Date(existing.uploadDate).getTime();
+      const cloudDate = new Date(cloudDoc.uploadDate).getTime();
+      if (cloudDate > localDate) {
+        docMap.set(cloudDoc.id, cloudDoc);
+      }
+    }
+  }
+
+  return Array.from(docMap.values());
+};
 
 const classifyOcrOutcome = (data: ExtractedData): { status: DocumentStatus; error?: string } => {
     const score = data.ocr_score ?? 0;
@@ -186,20 +214,43 @@ export default function App() {
   useEffect(() => {
     const initData = async () => {
       try {
-        // Check if Supabase is configured
-        if (!supabaseService.isSupabaseConfigured()) {
-          setNotification('Supabase ist nicht konfiguriert. Bitte .env Datei prüfen.');
-          return;
-        }
-        const [savedDocs, savedSettings] = await Promise.all([
-           supabaseService.getAllDocuments(),
-           supabaseService.getSettings()
+        // Local-first: Load from IndexedDB first
+        const [localDocs, localSettings] = await Promise.all([
+          storageService.getAllDocuments(),
+          storageService.getSettings()
         ]);
-        setDocuments(savedDocs.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()));
-        setSettings(savedSettings);
+        setDocuments(localDocs.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()));
+        setSettings(localSettings);
+
+        // Optionally sync with Supabase if configured
+        if (supabaseService.isSupabaseConfigured()) {
+          try {
+            const [cloudDocs, cloudSettings] = await Promise.all([
+              supabaseService.getAllDocuments(),
+              supabaseService.getSettings()
+            ]);
+
+            // Merge strategy: Prefer newer documents, handle duplicates
+            const mergedDocs = mergeDocuments(localDocs, cloudDocs);
+            setDocuments(mergedDocs.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()));
+
+            // Save merged data back to local storage
+            for (const doc of mergedDocs) {
+              await storageService.saveDocument(doc);
+            }
+
+            // Update settings if cloud is newer (simple approach: use cloud settings)
+            if (cloudSettings) {
+              await storageService.saveSettings(cloudSettings);
+              setSettings(cloudSettings);
+            }
+          } catch (syncError) {
+            console.warn('Supabase sync failed, using local data:', syncError);
+          }
+        }
       } catch (e) {
         console.error("Init Error:", e);
-        setNotification('Fehler beim Laden der Daten. Bitte Supabase-Verbindung prüfen.');
+        setNotification('Fehler beim Laden der Daten. IndexedDB oder Supabase prüfen.');
       }
     };
     initData();
@@ -266,7 +317,7 @@ export default function App() {
 
     setDocuments(prev => [...newDocs, ...prev]);
 
-    const currentSettings = settings || await supabaseService.getSettings();
+    const currentSettings = settings || await storageService.getSettings();
     const processedBatch: DocumentRecord[] = [];
     // Use functional state access to get the current documents
     const currentDocsSnapshotRef: { current: DocumentRecord[] } = { current: [] };
@@ -427,7 +478,7 @@ export default function App() {
                 let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
                 
                 if (data.lieferantName) {
-                    const rule = await supabaseService.getVendorRule(data.lieferantName);
+                    const rule = await storageService.getVendorRule(data.lieferantName);
                     if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
                 }
                 
@@ -446,7 +497,15 @@ export default function App() {
             
             if (finalDoc) {
                 processedBatch.push(finalDoc);
-                await supabaseService.saveDocument(finalDoc);
+                await storageService.saveDocument(finalDoc);
+                // Optionally sync to Supabase
+                if (supabaseService.isSupabaseConfigured()) {
+                  try {
+                    await supabaseService.saveDocument(finalDoc);
+                  } catch (e) {
+                    console.warn('Failed to sync document to Supabase:', e);
+                  }
+                }
             }
         }
     }
@@ -474,16 +533,42 @@ export default function App() {
 
   const handleSaveDocument = async (updatedDoc: DocumentRecord) => {
     setDocuments(prev => prev.map(doc => doc.id === updatedDoc.id ? updatedDoc : doc));
-    await supabaseService.saveDocument(updatedDoc);
+    // Local-first: Save to IndexedDB first
+    await storageService.saveDocument(updatedDoc);
+    // Optionally sync to Supabase if configured
+    if (supabaseService.isSupabaseConfigured()) {
+      try {
+        await supabaseService.saveDocument(updatedDoc);
+      } catch (e) {
+        console.warn('Failed to sync document to Supabase:', e);
+      }
+    }
+    // Save vendor rule if applicable
     if (updatedDoc.data?.lieferantName && updatedDoc.data?.kontierungskonto && updatedDoc.data?.steuerkategorie) {
-         await supabaseService.saveVendorRule(updatedDoc.data.lieferantName, updatedDoc.data.kontierungskonto, updatedDoc.data.steuerkategorie);
+      await storageService.saveVendorRule(updatedDoc.data.lieferantName, updatedDoc.data.kontierungskonto, updatedDoc.data.steuerkategorie);
+      if (supabaseService.isSupabaseConfigured()) {
+        try {
+          await supabaseService.saveVendorRule(updatedDoc.data.lieferantName, updatedDoc.data.kontierungskonto, updatedDoc.data.steuerkategorie);
+        } catch (e) {
+          console.warn('Failed to sync vendor rule to Supabase:', e);
+        }
+      }
     }
   };
 
   const handleDeleteDocument = async (id: string) => {
     setDocuments(prev => prev.filter(d => d.id !== id));
     if (selectedDocId === id) setSelectedDocId(null);
-    await supabaseService.deleteDocument(id);
+    // Local-first: Delete from IndexedDB first
+    await storageService.deleteDocument(id);
+    // Optionally sync to Supabase if configured
+    if (supabaseService.isSupabaseConfigured()) {
+      try {
+        await supabaseService.deleteDocument(id);
+      } catch (e) {
+        console.warn('Failed to delete document from Supabase:', e);
+      }
+    }
   };
 
   const handleMergeDocuments = async (sourceId: string, targetId: string) => {
@@ -528,8 +613,19 @@ export default function App() {
         ]
     };
 
-    await supabaseService.saveDocument(updatedTarget);
-    await supabaseService.deleteDocument(sourceId);
+    // Save merged document locally first
+    await storageService.saveDocument(updatedTarget);
+    await storageService.deleteDocument(sourceId);
+
+    // Optionally sync to Supabase if configured
+    if (supabaseService.isSupabaseConfigured()) {
+      try {
+        await supabaseService.saveDocument(updatedTarget);
+        await supabaseService.deleteDocument(sourceId);
+      } catch (e) {
+        console.warn('Failed to sync merge to Supabase:', e);
+      }
+    }
     
     setDocuments(prev => prev.filter(d => d.id !== sourceId).map(d => d.id === targetId ? updatedTarget : d));
     
@@ -545,11 +641,11 @@ export default function App() {
       const base64 = doc.previewUrl.split(',')[1];
             const extractedRaw = await analyzeDocumentWithGemini(base64, doc.fileType);
             const extracted = normalizeExtractedData(extractedRaw);
-      const currentSettings = settings || await supabaseService.getSettings();
+      const currentSettings = settings || await storageService.getSettings();
       const existingId = doc.data?.eigeneBelegNummer;
       let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
       if (extracted.lieferantName) {
-           const rule = await supabaseService.getVendorRule(extracted.lieferantName);
+           const rule = await storageService.getVendorRule(extracted.lieferantName);
            if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
       }
             let finalData = applyAccountingRules(extracted, documents, currentSettings, overrideRule);
@@ -621,11 +717,23 @@ export default function App() {
 
   const renderContent = () => {
       if (viewMode === 'settings' && settings) {
-          return <SettingsView settings={settings} onSave={(s) => { setSettings(s); supabaseService.saveSettings(s); }} onClose={() => setViewMode('document')} />;
+          return <SettingsView settings={settings} onSave={async (s) => {
+            setSettings(s);
+            // Local-first: Save to IndexedDB first
+            await storageService.saveSettings(s);
+            // Optionally sync to Supabase
+            if (supabaseService.isSupabaseConfigured()) {
+              try {
+                await supabaseService.saveSettings(s);
+              } catch (e) {
+                console.warn('Failed to sync settings to Supabase:', e);
+              }
+            }
+          }} onClose={() => setViewMode('document')} />;
       }
       if (viewMode === 'database') {
           const handleExportSQLWithPreflight = async () => {
-              const currentSettings = settings || await supabaseService.getSettings();
+              const currentSettings = settings || await storageService.getSettings();
               const docsToExport = filteredDocuments;
               const preflight = runExportPreflight(docsToExport, currentSettings);
               const dialog = formatPreflightForDialog(preflight);
