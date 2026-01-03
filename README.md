@@ -1,226 +1,60 @@
+# ZOE Solar Accounting OCR
 
-<div align="left">
-
-# 🌟 ZOE Solar Accounting OCR
-
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/DeepthinkAI2025/ZOE-Solar-Accounting-OCR)
-[![Status](https://img.shields.io/badge/status-production-brightgreen.svg)](https://github.com/DeepthinkAI2025/ZOE-Solar-Accounting-OCR)
-[![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178c6.svg)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-
-**🚀 Die Zukunft der Buchhaltung für Solar-Unternehmen**
-
-*Automatisierte KI-gestützte Rechnungsextraktion • SKR03-Kontierung • EÜR/UStVA-Vorbereitung • ELSTER XML-Export*
-
-[📥 Download](#-installation--setup) • [🎯 Live Demo](#) • [📚 Dokumentation](#-features) • [🐛 Issues](https://github.com/DeepthinkAI2025/ZOE-Solar-Accounting-OCR/issues)
+[![React 19.2.3](https://img.shields.io/badge/React-19.2.3-61dafb?logo=react)](https://react.dev)
+[![TypeScript 5.8](https://img.shields.io/badge/TypeScript-5.8-3178c6?logo=typescript)](https://www.typescriptlang.org)
+[![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-4-38b2ac?logo=tailwind-css)](https://tailwindcss.com)
+[![Vite 6](https://img.shields.io/badge/Vite-6.0-646cff?logo=vite)](https://vitejs.dev)
+[![Supabase](https://img.shields.io/badge/Supabase-3.11.174-3ecf8e)](https://supabase.com)
+[![Vitest Tests](https://img.shields.io/badge/Tests-160-6c9a8b)](https://vitest.dev)
 
 ---
 
-## ✨ Was macht diese App besonders?
+## Was ist ZOE Solar Accounting OCR?
 
-<table>
-  <tr>
-    <td>
-      <h3>🤖 KI-gestützt</h3>
-      <p>Modernste Vision-KI für 99% Genauigkeit bei der Datenerfassung</p>
-    </td>
-    <td>
-      <h3>⚡ Blitzschnell</h3>
-      <p>Rechnungen in Sekunden analysiert, nicht Stunden</p>
-    </td>
-    <td>
-      <h3>🔒 Datenschutz</h3>
-      <p>100% lokal - keine Daten verlassen Ihren Browser</p>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <h3>🎯 SKR03</h3>
-      <p>Automatische Soll/Haben-Kontierung nach deutschem Standard</p>
-    </td>
-    <td>
-      <h3>📊 ELSTER Ready</h3>
-      <p>Direkter XML-Export für ELSTER Umsatzsteuervoranmeldung</p>
-    </td>
-    <td>
-      <h3>🛡️ Qualitätssicherung</h3>
-      <p>Intelligente Duplikat-Erkennung und Validierung</p>
-    </td>
-  </tr>
-</table>
+**ZOE Solar Accounting OCR** ist eine professionelle Buchhaltungsanwendung für Solarunternehmen in Deutschland. Die Software extrahiert automatisch Rechnungsdaten mittels KI, ordnet nach SKR03 zu und bereitet EÜR/UStVA vor.
+
+**Architektur:** Cloud-First mit Supabase auf OCI VM (kein IndexedDB, keine lokalen Daten)
 
 ---
 
-## 🎬 Quick Start (2 Minuten)
+## Features
 
-```bash
-git clone https://github.com/DeepthinkAI2025/ZOE-Solar-Accounting-OCR.git
-cd ZOE-Solar-Accounting-OCR
-npm install
-echo "VITE_GEMINI_API_KEY=your_key_here" > .env
-npm run dev
+| Feature | Beschreibung |
+|---------|-------------|
+| **KI-gestützte OCR** | Google Gemini 2.5 Flash + SiliconFlow Qwen 2.5 VL |
+| **SKR03 Kontierung** | Automatische Soll/Haben-Buchung nach deutschem Standard |
+| **ELSTER XML Export** | Direkter Export für Umsatzsteuervoranmeldung |
+| **DATEV EXTF Export** | Buchungsstapel für Steuerberater |
+| **Supabase Backend** | PostgreSQL auf OCI VM |
+| **Private Document Detection** | Automatische Erkennung von Privatbelegen |
+| **Duplikat-Erkennung** | Hard-, Fuzzy- und Hash-Matching |
+| **160 Unit Tests** | Vollständige Testabdeckung |
+
+---
+
+## Tech Stack
+
+```
+Frontend:     React 19.2.3 + TypeScript 5.8
+Styling:      Tailwind CSS 4 (via PostCSS)
+Build:        Vite 6.2.0
+Backend:      Supabase (PostgreSQL)
+Tests:        Vitest 4.0.16
+AI:           Google Gemini 2.5 Flash, SiliconFlow Qwen 2.5 VL
+PDF:          PDF.js 3.11, jsPDF 2.5 + AutoTable
+Auth:         Supabase Auth
 ```
 
-**🎉 Fertig!** Öffne [http://localhost:5173](http://localhost:5173) in deinem Browser.
-
 ---
 
-## 🧠 Revolutionäre KI-Technologie
+## Installation
 
-### 🔥 High-Fidelity 2-Stufen KI-Pipeline
+### Voraussetzungen
 
-| Stufe | Modell | Geschwindigkeit | Genauigkeit | Zweck |
-|-------|--------|----------------|-------------|-------|
-| **1️⃣ Primär** | Google Gemini 2.5 Flash ⚡ | < 3 Sekunden | 99% | Komplexe Strukturen & Positionen |
-| **2️⃣ Fallback** | SiliconFlow Qwen 2.5 VL (72B) 🧠 | < 5 Sekunden | 98% | Maximale Zuverlässigkeit |
+- Node.js 18+
+- Supabase Projekt auf OCI VM
 
-**🚫 Kein Tesseract!** Wir verwenden ausschließlich Large Multimodal Models (LMMs) für höchste Präzision.
-
----
-
-## 🎯 Kernfunktionen
-
-### 📑 Intelligente Belegverarbeitung
-
-<details>
-<summary><strong>📄 PDF & Bild Upload</strong> - Drag & Drop einfachheit</summary>
-
-- **Multi-Format Support:** PDF, JPG, PNG, WebP
-- **Batch Upload:** Mehrere Dateien gleichzeitig
-- **Automatische Erkennung:** Rechnungstyp und Layout
-- **Vorschau:** Sofortige Anzeige vor Verarbeitung
-
-</details>
-
-<details>
-<summary><strong>🎯 SKR03 Kontierung</strong> - Deutsche Buchführungsstandards</summary>
-
-- **Automatisch:** Soll & Haben Konten werden intelligent ermittelt
-- **Solar-spezifisch:** Optimierte Regeln für PV-Branche
-- **Editierbar:** SKR03-Kontenrahmen in Einstellungen anpassbar
-- **Validierung:** Plausibilitätsprüfungen gegen Steuerbeträge
-
-```typescript
-// Beispiel für automatische Kontierung
-const kontierung = {
-  sollKonto: "3400", // Wareneingang
-  habenKonto: "70000", // Kreditor
-  steuerkategorie: "19% Umsatzsteuer"
-};
-```
-
-</details>
-
-<details>
-<summary><strong>📊 Positionen Extraktion</strong> - Jedes Detail zählt</summary>
-
-- **KI-gestützt:** Einzelne Rechnungspositionen werden erkannt
-- **Accordion View:** Zeilen aufklappen ohne PDF zu öffnen
-- **Bearbeitbar:** Positionen hinzufügen, ändern, löschen
-- **Summenvalidierung:** Automatische Prüfung gegen Gesamtbetrag
-
-</details>
-
-### 🛡️ Qualitätssicherung
-
-<details>
-<summary><strong>🚫 Duplikat-Erkennung V2</strong> - Zero Tolerance für Doppelbuchungen</summary>
-
-- **Hard Match:** Belegnummer + Betrag = Sofort blockiert
-- **Fuzzy Match:** Ähnlichkeitsalgorithmus für ähnliche Belege
-- **Hash Check:** Identische Dateien werden abgefangen
-- **Visuelle Indikatoren:** Farbkodierung für Status
-
-</details>
-
-### 🎨 Benutzeroberfläche
-
-<details>
-<summary><strong>🎭 Split-View Editor</strong> - Professionelle Bearbeitung</summary>
-
-- **Links:** PDF-Vorschau mit Zoom & Pan
-- **Rechts:** Extrahierte Daten editierbar
-- **Synchronisiert:** Änderungen live aktualisiert
-- **Keyboard Shortcuts:** Effiziente Bedienung
-
-</details>
-
-<details>
-<summary><strong>🔗 Beleg-Zusammenführung</strong> - Nahtlose Integration</summary>
-
-- **Drag & Drop:** Einfach Belege zusammenziehen
-- **Intelligente Suche:** Ähnliche Belege finden
-- **Automatische Nummerierung:** ZOEYYMM.### Format
-- **Versionierung:** Änderungshistorie behalten
-
-</details>
-
----
-
-## 📊 Export & Integrationen
-
-### 🚀 Export-Formate
-
-| Format | Zweck | Besonderheiten |
-|--------|-------|----------------|
-| **📄 PDF** | Berichte & Archivierung | EÜR, UStVA, Beleglisten |
-| **💾 SQL** | Datenmigration | Vollständiges Schema mit Relationen |
-| **📊 CSV** | Tabellenkalkulation | UTF-8, semikolon-getrennt |
-| **📋 ELSTER XML** | Steuerbehörde | Direkter Upload ins ELSTER Portal |
-| **🏦 DATEV** | Steuerberater | EXTF Buchungsstapel |
-
-### 🎯 ELSTER Integration (NEU!)
-
-```xml
-<!-- Automatisch generiertes ELSTER XML -->
-<Elster xmlns="http://www.elster.de/2002/XMLSchema">
-  <Umsatzsteuervoranmeldung>
-    <Jahr>2024</Jahr>
-    <Zeitraum>41</Zeitraum> <!-- Q1 -->
-    <Kz81>1250.00</Kz81> <!-- 7% Basis -->
-    <Kz83>87.50</Kz83>   <!-- 7% Steuer -->
-    <Kz86>2500.00</Kz86> <!-- 19% Basis -->
-    <Kz89>475.00</Kz89>  <!-- 19% Steuer -->
-    <Kz93>562.50</Kz93>  <!-- Gesamtsteuer -->
-  </Umsatzsteuervoranmeldung>
-</Elster>
-```
-
-**🎉 Ein Klick** → XML-Datei herunterladen → [ELSTER Online Portal](https://www.elster.de/portal/) → Hochladen fertig!
-
----
-
-## 🛠 Tech Stack
-
-### Frontend Architecture
-![React](https://img.shields.io/badge/React-19-61dafb?style=for-the-badge&logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178c6?style=for-the-badge&logo=typescript)
-![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css)
-![Vite](https://img.shields.io/badge/Vite-5.0-646CFF?style=for-the-badge&logo=vite)
-
-### AI & Data
-![Google Gemini](https://img.shields.io/badge/Google_Gemini-2.5_Flash-4285F4?style=for-the-badge&logo=google)
-![SiliconFlow](https://img.shields.io/badge/SiliconFlow-Qwen_72B-FF6B35?style=for-the-badge)
-![IndexedDB](https://img.shields.io/badge/IndexedDB-Local_Storage-FF9500?style=for-the-badge)
-
-### Export & Integration
-![PDF.js](https://img.shields.io/badge/PDF.js-4.0-DC2626?style=for-the-badge)
-![jsPDF](https://img.shields.io/badge/jsPDF-2.5-EA4335?style=for-the-badge)
-![ELSTER](https://img.shields.io/badge/ELSTER-XML-000000?style=for-the-badge)
-![DATEV](https://img.shields.io/badge/DATEV-EXTF-005CA9?style=for-the-badge)
-
----
-
-## ⚙️ Installation & Setup
-
-### 📋 Voraussetzungen
-
-- ✅ Node.js 18+
-- ✅ Moderner Browser (Chrome/Edge/Firefox)
-- ✅ Google Gemini API Key (kostenlos bis 60 Anfragen/Tag)
-
-### 🚀 Schnellstart
+### Setup
 
 ```bash
 # 1. Repository klonen
@@ -230,315 +64,113 @@ cd ZOE-Solar-Accounting-OCR
 # 2. Abhängigkeiten installieren
 npm install
 
-# 3. API Keys konfigurieren
+# 3. Umgebungsvariablen konfigurieren
 cp .env.example .env
-# Bearbeite .env mit deinen API Keys
+# Bearbeite .env mit deinen Supabase Credentials
 
 # 4. Entwicklungsserver starten
 npm run dev
-
-# 5. Öffne Browser
-# http://localhost:5173
 ```
 
-### 🔑 API Konfiguration
+### Umgebungsvariablen (.env)
 
 ```env
-# Google Gemini (Primär - Empfohlen)
-VITE_GEMINI_API_KEY=AIzaSy...
+# Supabase (Pflicht)
+VITE_SUPABASE_URL=https://deine-supabase-url.oci.oraclecloud.com
+VITE_SUPABASE_ANON_KEY=dein-anon-key
 
-# SiliconFlow (Fallback - Optional)
-VITE_SILICONFLOW_API_KEY=sk-...
+# Google Gemini API (optional - Fallback)
+VITE_GEMINI_API_KEY=dein-gemini-key
+
+# SiliconFlow API (optional - Fallback)
+VITE_SILICONFLOW_API_KEY=dein-siliconflow-key
 ```
 
-> **💡 Tipp:** Gemini API ist kostenlos für bis zu 60 Anfragen pro Tag. Perfect für kleine bis mittlere Unternehmen!
+---
+
+## Verwendung
+
+### 1. Beleg hochladen
+
+- Drag & Drop oder Klick zum Auswählen
+- KI analysiert automatisch alle Daten
+- Überprüfen und korrigieren falls nötig
+- Speichern in Supabase
+
+### 2. Kontierung prüfen
+
+- SKR03-Konten automatisch zugewiesen
+- Steuerkategorie (19%, 7%, etc.) erkannt
+- Vendor Rules werden gelernt
+
+### 3. Export
+
+| Format | Verwendung |
+|--------|------------|
+| **ELSTER XML** | UStVA an Finanzamt |
+| **DATEV EXTF** | Buchhaltungssoftware |
+| **CSV** | Excel/Tabellenkalkulation |
+| **SQL** | Datenbank-Migration |
+| **PDF** | Berichte & Archivierung |
 
 ---
 
-## 🎮 Verwendung
+## Projektstruktur
 
-### 📤 Beleg hochladen
-
-1. **Drag & Drop** oder **Klick zum Auswählen**
-2. **KI analysiert** automatisch alle Daten
-3. **Überprüfen & Korrigieren** falls nötig
-4. **Speichern** - Fertig!
-
-### 📊 Berichte erstellen
-
-1. **Filter setzen** (Jahr/Quartal/Monat)
-2. **Export-Format wählen** (PDF/CSV/ELSTER)
-3. **Download** - Bereit für Steuerberater!
-
-### ⚙️ Einstellungen
-
-- **SKR03 Kontenrahmen** anpassen
-- **ELSTER Stammdaten** konfigurieren
-- **API Keys** verwalten
-- **UI Themes** wählen
+```
+src/
+├── services/           # Business Logic
+│   ├── supabaseService.ts   # Supabase CRUD
+│   ├── geminiService.ts     # Google Gemini OCR
+│   ├── fallbackService.ts   # SiliconFlow Fallback
+│   ├── elsterExport.ts      # ELSTER XML
+│   ├── datevExport.ts       # DATEV EXTF
+│   ├── ruleEngine.ts        # SKR03 Regeln
+│   └── backupService.ts     # Backup/Restore
+├── components/         # React Components
+├── hooks/              # Custom Hooks
+└── types.ts            # TypeScript Interfaces
+```
 
 ---
 
-## 📈 Roadmap
+## Roadmap
 
-### ✅ Bereits implementiert
+### Abgeschlossen
+
 - [x] KI-gestützte OCR (Gemini + SiliconFlow)
 - [x] SKR03 Soll/Haben Kontierung
 - [x] Positionen Extraktion
 - [x] Duplikat-Erkennung V2
 - [x] PDF/CSV/SQL Export
 - [x] ELSTER XML Export
-- [x] DATEV Integration
+- [x] DATEV EXTF Export
+- [x] Supabase Auth UI
+- [x] Backup/Restore
+- [x] Pagination & Filterung
+- [x] Private Document Detection
+- [x] 160 Unit Tests
 
-### 🚧 In Arbeit
-- [ ] Mobile App (React Native)
-- [ ] Multi-Benutzer Support
-- [ ] Cloud-Synchronisation
-- [ ] Advanced Analytics Dashboard
+### Geplant
 
-### 🔮 Geplant
 - [ ] KI-gestützte Korrekturvorschläge
-- [ ] Integration mit Buchhaltungssoftware
-- [ ] Automatische Beleg-Klassifizierung
+- [ ] Mobile App (React Native)
 - [ ] Echtzeit Kollaboration
 
 ---
 
-## 🤝 Beitragen
+## Lizenz
 
-Wir freuen uns über Contributions! 🎉
+**Proprietär** - ZOE Solar GmbH & Co. KG
 
-1. **Fork** das Repository
-2. **Branch** erstellen: `git checkout -b feature/AmazingFeature`
-3. **Commit** deine Änderungen: `git commit -m 'Add AmazingFeature'`
-4. **Push** zum Branch: `git push origin feature/AmazingFeature`
-5. **Pull Request** öffnen
-
-### 🐛 Bug Reports & Feature Requests
-
-[🐛 Issue erstellen](https://github.com/DeepthinkAI2025/ZOE-Solar-Accounting-OCR/issues/new)
-
-**Bitte inkludere:**
-- Browser & Version
-- Betriebssystem
-- Schritte zur Reproduktion
-- Erwartetes vs. tatsächliches Verhalten
+Alle Rechte vorbehalten. Die Nutzung ist ausschließlich für ZOE Solar gestattet.
 
 ---
 
-## 📄 Lizenz
+## Support
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-Dieses Projekt ist unter der MIT Lizenz lizenziert - siehe die [LICENSE](LICENSE) Datei für Details.
+Bei Fragen oder Problemen bitte Issue erstellen auf GitHub.
 
 ---
 
-## 🙏 Danksagungen
-
-- **Google** für die Gemini API
-- **SiliconFlow** für das Qwen Modell
-- **ZOE Solar** für die Inspiration
-- **Open Source Community** für die großartigen Tools
-
----
-
-<div align="left">
-
-**Made with ❤️ for the Solar Industry**
-
-[⬆️ Nach oben](#-zoe-solar-accounting-ocr) • [📧 Kontakt](#) • [🐙 GitHub](https://github.com/DeepthinkAI2025/ZOE-Solar-Accounting-OCR)
-
-</div>
-
-#### ELSTER XML-Export (Neu in v1.2.0)
-*   **Zweck:** Generiert ELSTER-kompatible XML-Dateien für die elektronische Umsatzsteuervoranmeldung.
-*   **Format:** ElsterAnmeldung v8 (Coala-XML) mit Umsatzsteuervoranmeldung-Daten.
-*   **Kennzahlen:** Kz21 (steuerfreie Umsätze), Kz35 (Reverse Charge), Kz81/Kz83 (7% Steuer), Kz86/Kz89 (19% Steuer), Kz93 (Gesamtsteuer).
-*   **Zeitraum:** Automatische Erkennung von Quartal (Q1-Q4) oder Monat (01-12).
-*   **Verwendung:** XML-Datei manuell im [ELSTER Online Portal](https://www.elster.de/portal/) hochladen.
-*   **Voraussetzung:** ELSTER-Stammdaten müssen in den Einstellungen konfiguriert sein.
-
-**Export-Datei:** `elster_ustva_{period}.xml` (z.B. `elster_ustva_2024Q1.xml`)
-
-#### CSV-Export (Format)
-
-- **Umfang:** Exportiert die aktuell gefilterte Dokumentliste (Jahr/Quartal/Monat) aus der Übersicht.
-- **Kodierung:** UTF-8
-- **Trennzeichen:** `;`
-- **Quoting:** Alle Werte werden in `"..."` geschrieben (auch Zahlen), um Sonderzeichen/Zeilenumbrüche robust zu handhaben.
-- **Datumsformat:** ISO `YYYY-MM-DD`
-- **Zahlenformat:** Immer mit 2 Nachkommastellen (z.B. `"123.45"`).
-
-**Export-Dateien:**
-
-1) `zoe_belege_*.csv` (1 Zeile pro Beleg)
-
-**Spalten (in dieser Reihenfolge):**
-
-1. `datum`
-2. `lieferant`
-3. `adresse`
-4. `steuernummer`
-5. `belegnummer_lieferant`
-6. `interne_nummer`
-7. `zahlungsmethode`
-8. `zahlungsdatum`
-9. `zahlungsstatus`
-10. `rechnungs_empfaenger`
-11. `aufbewahrungsort`
-12. `netto`
-13. `mwst_satz_0`
-14. `mwst_0`
-15. `mwst_satz_7`
-16. `mwst_7`
-17. `mwst_satz_19`
-18. `mwst_19`
-19. `brutto`
-20. `steuerkategorie`
-21. `kontierungskonto`
-22. `soll_konto`
-23. `haben_konto`
-24. `reverse_charge`
-25. `vorsteuerabzug`
-26. `kleinbetrag`
-27. `privatanteil`
-28. `ocr_score`
-29. `ocr_rationale`
-30. `beschreibung`
-31. `text_content`
-32. `status`
-
-2) `zoe_positionen_*.csv` (Positionen / 1:n)
-
-**Spalten:**
-
-1. `doc_id`
-2. `line_index`
-3. `description`
-4. `amount`
-
----
-
-## 🛠 Tech Stack
-
-*   **Frontend Framework:** React 19
-*   **Sprache:** TypeScript
-*   **Styling:** Tailwind CSS
-*   **Datenbank:** IndexedDB (Wrapper `storageService.ts`)
-*   **PDF Engine:** PDF.js & jsPDF
-*   **KI SDK:** `@google/genai` (Google) & `fetch` (SiliconFlow)
-
----
-
-## ⚙️ Installation & Setup
-
-### Voraussetzungen
-*   Node.js (v18 oder höher)
-*   Ein Google Cloud Projekt mit aktiviertem **Gemini API Key**.
-
-### 1. Repository klonen
-```bash
-git clone <repo-url>
-cd zoe-accounting-ocr
-```
-
-### 2. Abhängigkeiten installieren
-```bash
-npm install
-```
-
-### 3. Umgebungsvariablen konfigurieren
-Erstellen Sie eine `.env` Datei im Root-Verzeichnis (oder kopieren Sie `.env.example` nach `.env`):
-```env
-# Google Gemini API Key (Zwingend erforderlich)
-VITE_GEMINI_API_KEY="AIzaSy..."
-
-# SiliconFlow API Key (Fallback für Gemini)
-VITE_SILICONFLOW_API_KEY="sk-..."
-```
-
-Hinweis: Wenn ein API-Key versehentlich in einem Chat/Issue/Screenshot gelandet ist, sollten Sie ihn beim Anbieter **rotieren** (neuen Key erzeugen, alten deaktivieren) und danach nur den neuen Key lokal in `.env` eintragen.
-
-### 4. Starten
-```bash
-npm start
-# oder
-npm run dev
-```
-
-### 5. Checks (empfohlen)
-`vite build` ist nicht immer ein verlässlicher TypeScript-/JSX-Check. Daher zusätzlich ausführen:
-
-```bash
-npm run typecheck
-```
-
-Oder als Einzeiler (Typecheck + Build):
-
-```bash
-npm run check
-```
-
----
-
-## 📖 Bedienungsanleitung
-
-### 1. Upload & KI-Analyse
-Ziehen Sie Dateien in den Upload-Bereich. Die KI analysiert sofort. Falls Gemini überlastet ist ("429"), wechselt das System automatisch zu Qwen 2.5 VL.
-
-### 2. Prüfung (Detail-Ansicht)
-*   **Soll/Haben:** Prüfen Sie die automatisch zugewiesenen SKR03 Konten.
-*   **Positionen:** Ergänzen oder korrigieren Sie die einzelnen Rechnungsposten in der Tabelle unten.
-*   **Regel-Lernen:** Wenn Sie ein Konto bei einem Lieferanten ändern, merkt sich das System dies für die Zukunft.
-
-### 3. Duplikate
-Rot markierte Belege sind Duplikate. Der Grund (z.B. "Belegnummer und Betrag identisch") wird im Modal angezeigt. Sie können diese Belege löschen oder (falls es sich um einen Fehler handelt) die Belegnummer ändern, um den Status zurückzusetzen.
-
-### 4. Export
-Nutzen Sie den Button "Berichte", um die Daten für den Steuerberater (PDF/SQL) zu exportieren. Der SQL-Export enthält nun explizite Spalten für `soll_konto` und `haben_konto`.
-
----
-
-## 🏛 Datenmodell (`ExtractedData`)
-
-```typescript
-interface ExtractedData {
-  // ...Basisdaten
-  belegDatum: string;
-  belegNummerLieferant: string;
-  lieferantName: string;
-  
-  // Finanzdaten
-  nettoBetrag: number;
-  bruttoBetrag: number;
-  mwstBetrag19: number; 
-  mwstBetrag7: number;
-  
-  // Buchhaltung (NEU)
-  kontierungskonto: string;    // Interne ID (z.B. "buero")
-  sollKonto: string;           // SKR03 (z.B. "4930")
-  habenKonto: string;          // SKR03 (z.B. "1200")
-  steuerkategorie: string;     // z.B. "19_pv"
-  
-  // Inhalt
-  lineItems: LineItem[];       // Array [{ description: "...", amount: 10.00 }]
-}
-```
-
----
-
-## ⚠️ Troubleshooting
-
-**KI antwortet nicht / Fallback greift nicht:**
-*   Prüfen Sie, ob der `GEMINI_API_KEY` korrekt gesetzt ist.
-*   Falls Gemini überlastet ist, prüfen Sie `SILICONFLOW_API_KEY` in der `.env` Datei.
-
-**PDF Vorschau unscharf:**
-*   Die Vorschau nutzt `pdf.js` mit Scale 2.0. Bei sehr kleinen Displays kann es zu Skalierungseffekten kommen. Nutzen Sie Zoom (Mausrad + Ctrl).
-
----
-
-## 📄 Lizenz
-
-Proprietäre Software für ZOE Solar.
+*Made with for the Solar Industry*
