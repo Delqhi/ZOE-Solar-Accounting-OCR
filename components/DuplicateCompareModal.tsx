@@ -7,7 +7,7 @@ const INPUT_CLASS = "w-full bg-white border border-gray-200 rounded-md px-3 py-2
 const LABEL_CLASS = "block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide";
 const BUTTON_PRIMARY = "bg-black text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-800 active:bg-gray-900 transition-all";
 const BUTTON_SECONDARY = "bg-white text-gray-900 border border-gray-200 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 active:bg-gray-100 transition-all";
-const BUTTON_DANGER = "bg-white text-red-600 border border-gray-200 px-4 py-2 rounded-md text-sm font-medium hover:bg-red-50 active:bg-red-100 transition-all";
+const BUTTON_DANGER = "bg-white text-gray-600 border border-gray-200 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 active:bg-gray-100 transition-all";
 
 interface DuplicateCompareModalProps {
   original: DocumentRecord;
@@ -113,11 +113,11 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
         <div className="h-14 px-6 flex items-center justify-between flex-none bg-white border-b border-gray-100">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-gray-400"></div>
               <h2 className="font-semibold text-gray-900 text-base">Duplikat-Vergleich</h2>
             </div>
             <span className="text-sm text-gray-500">
-              Aehnlichkeit: <span className="font-semibold text-red-600">{(duplicate.duplicateConfidence || 0).toFixed(0)}%</span>
+              Aehnlichkeit: <span className="font-semibold text-gray-700">{(duplicate.duplicateConfidence || 0).toFixed(0)}%</span>
             </span>
           </div>
 
@@ -168,7 +168,7 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
             </button>
             <button
               onClick={handleDeleteDuplicate}
-              className="px-4 py-2 bg-white border border-gray-200 text-red-600 rounded-md text-sm font-medium hover:bg-red-50 hover:border-red-200 transition-all"
+              className="px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-md text-sm font-medium hover:bg-gray-50 hover:border-gray-300 transition-all"
             >
               Duplikat loeschen
             </button>
@@ -179,11 +179,11 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
         <div className="flex-1 flex overflow-hidden">
           {/* Left: Original */}
           <div className="flex-1 flex flex-col border-r border-gray-200 min-w-0">
-            <div className="px-4 py-2 bg-green-50 border-b border-green-100 flex items-center justify-between">
-              <span className="font-medium text-green-700 text-sm">Original</span>
+            <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+              <span className="font-medium text-gray-700 text-sm">Original</span>
               <button
                 onClick={() => onSelectDocument(original)}
-                className="text-xs text-green-600 hover:text-green-800 transition-colors"
+                className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
               >
                 Im Detail oeffnen
               </button>
@@ -290,9 +290,9 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
 
           {/* Right: Duplicate */}
           <div className="flex-1 flex flex-col min-w-0">
-            <div className="px-4 py-2 bg-red-50 border-b border-red-100 flex items-center justify-between">
-              <span className="font-medium text-red-700 text-sm">Duplikat</span>
-              <span className="text-xs text-red-500">{duplicate.duplicateReason}</span>
+            <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+              <span className="font-medium text-gray-700 text-sm">Duplikat</span>
+              <span className="text-xs text-gray-500">{duplicate.duplicateReason}</span>
             </div>
 
             <div className="h-1/2 bg-gray-50 relative">

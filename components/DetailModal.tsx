@@ -8,7 +8,7 @@ const INPUT_CLASS = "w-full bg-white border border-gray-200 rounded-md px-3 py-2
 const LABEL_CLASS = "block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide";
 const BUTTON_PRIMARY = "bg-black text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-800 active:bg-gray-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed";
 const BUTTON_SECONDARY = "bg-white text-gray-900 border border-gray-200 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 active:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed";
-const BUTTON_DANGER = "bg-white text-red-600 border border-gray-200 px-4 py-2 rounded-md text-sm font-medium hover:bg-red-50 active:bg-red-100 transition-all";
+const BUTTON_DANGER = "bg-white text-gray-600 border border-gray-200 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 active:bg-gray-100 transition-all";
 const CARD_STYLE = "bg-white border border-gray-200 rounded-xl overflow-hidden";
 const SECTION_TITLE = "text-lg font-semibold text-gray-900 flex items-center gap-2";
 
@@ -298,8 +298,8 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
              </button>
              <div>
-                <h3 className={`font-semibold text-base md:text-lg flex items-center gap-2 ${isDuplicate ? 'text-red-600' : 'text-gray-900'}`}>
-                    {isDuplicate && <span className="w-2 h-2 rounded-full bg-red-500"/>}
+                <h3 className={`font-semibold text-base md:text-lg flex items-center gap-2 ${isDuplicate ? 'text-gray-900' : 'text-gray-900'}`}>
+                    {isDuplicate && <span className="w-2 h-2 rounded-full bg-gray-400"/>}
                     {isDuplicate ? 'Duplikat' : 'Beleg Details'}
                 </h3>
                 <div className="text-xs text-gray-400 font-mono hidden md:block">{document.id.substring(0, 8)}</div>
@@ -439,7 +439,7 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
 
                 {/* Duplicate Warning */}
                 {isDuplicate && (
-                     <div className="bg-red-50 border border-red-100 rounded-lg p-4 text-sm text-red-700 flex gap-3 items-start">
+                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700 flex gap-3 items-start">
                          <svg className="w-5 h-5 flex-none mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                          <div>
                             <strong className="font-medium">Duplikat erkannt</strong>
@@ -448,7 +448,7 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
                             {originalDoc && (
                                 <button
                                     onClick={() => onSelectDocument(originalDoc)}
-                                    className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-red-200 rounded-md text-xs font-medium text-red-700 hover:bg-red-50 transition-colors"
+                                    className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                                 >
                                     Original oeffnen
                                 </button>
@@ -459,7 +459,7 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
 
                 {/* Error/Review Banner */}
                 {(isError || isReview) && (
-                    <div className={`${isError ? 'bg-red-50 border-red-100 text-red-700' : 'bg-amber-50 border-amber-100 text-amber-800'} border rounded-lg p-4 text-sm flex gap-3 items-start`}
+                    <div className={`${isError ? 'bg-gray-50 border-gray-200 text-gray-700' : 'bg-gray-50 border-gray-200 text-gray-700'} border rounded-lg p-4 text-sm flex gap-3 items-start`}
                          title={errorMessage}
                     >
                         <svg className="w-5 h-5 flex-none mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
@@ -494,7 +494,7 @@ export const DocumentDetail: React.FC<DocumentDetailProps> = ({ document, allDoc
                      <div className="flex justify-between items-center">
                          <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">KI Konfidenz</span>
                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${formData.ocr_score && formData.ocr_score > 8 ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                            <div className={`w-2 h-2 rounded-full ${formData.ocr_score && formData.ocr_score > 8 ? 'bg-gray-600' : 'bg-gray-400'}`}></div>
                             <span className="text-sm font-medium text-gray-700">{formData.ocr_score || 0}/10</span>
                          </div>
                      </div>
