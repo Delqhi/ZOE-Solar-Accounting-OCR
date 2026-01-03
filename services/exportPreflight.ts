@@ -72,9 +72,10 @@ export const runExportPreflight = (docs: DocumentRecord[], settings?: AppSetting
       continue;
     }
 
-    // Pflichtfelder
+    // Pflichtfelder (type-safe access)
     for (const field of requiredFields) {
-      if (!isPresent((data as any)[field])) {
+      const fieldValue = data[field];
+      if (!isPresent(fieldValue)) {
         pushIssue({ level: 'blocker', docId, fileName, message: `Pflichtfeld fehlt/leer: ${String(field)}` });
       }
     }
