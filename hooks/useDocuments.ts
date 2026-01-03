@@ -58,20 +58,33 @@ export const useDocuments = (): UseDocumentsReturn => {
   }, []);
 
   const markAsReviewed = useCallback(async (ids: string[]) => {
-    // Optimistic update
-    setDocuments(prev => prev.map(d =>
-      ids.includes(d.id) ? { ...d, status: DocumentStatus.COMPLETED } : d
-    ));
-    // In a real app, this would call an API to bulk update
-    // For now, we just update local state
+    try {
+      // Optimistic update
+      setDocuments(prev => prev.map(d =>
+        ids.includes(d.id) ? { ...d, status: DocumentStatus.COMPLETED } : d
+      ));
+      // Update in Supabase
+      await supabaseService.markDocumentsReviewed(ids);
+    } catch (e) {
+      setError('Fehler beim Markieren als überprüft');
+      throw e;
+    }
   }, []);
 
   const reRunOcr = useCallback(async (ids: string[]) => {
-    // Set documents to processing state
-    setDocuments(prev => prev.map(d =>
-      ids.includes(d.id) ? { ...d, status: DocumentStatus.PROCESSING } : d
-    ));
-    // In a real app, this would trigger re-OCR for selected documents
+    try {
+      // Set documents to processing state
+      setDocuments(prev => prev.map(d =>
+        ids.includes(d.id) ? { ...d, status: DocumentStatus.PROCESSING } : d
+      ));
+      // Update status in Supabase
+      for (const id of ids) {
+        await supabaseService.updateDocumentStatus(id, 'PROCESSING');
+      }
+    } catch (e) {
+      setError('Fehler beim Neustart der OCR');
+      throw e;
+    }
   }, []);
 
   return {

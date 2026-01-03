@@ -2,8 +2,16 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { DocumentRecord, DocumentStatus, ExtractedData, AppSettings } from '../types';
 
 // Environment variables (must be set in .env)
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Support both Vite (import.meta.env) and Node.js (process.env)
+const getEnv = (key: string) => {
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env[key] || '';
+  }
+  return process.env[key] || '';
+};
+
+const SUPABASE_URL = getEnv('VITE_SUPABASE_URL') || getEnv('SUPABASE_URL') || '';
+const SUPABASE_ANON_KEY = getEnv('VITE_SUPABASE_ANON_KEY') || getEnv('SUPABASE_ANON_KEY') || '';
 
 let supabaseClient: SupabaseClient | null = null;
 
@@ -408,6 +416,38 @@ export const deleteDocument = async (id: string): Promise<void> => {
 
   if (error) {
     throw new Error(`Failed to delete document: ${error.message}`);
+  }
+};
+
+export const markDocumentsReviewed = async (ids: string[]): Promise<void> => {
+  const client = initSupabase();
+  if (!client) {
+    throw new Error('Supabase not configured');
+  }
+
+  const { error } = await client
+    .from('belege')
+    .update({ status: 'COMPLETED' })
+    .in('id', ids);
+
+  if (error) {
+    throw new Error(`Failed to mark documents as reviewed: ${error.message}`);
+  }
+};
+
+export const updateDocumentStatus = async (id: string, status: string): Promise<void> => {
+  const client = initSupabase();
+  if (!client) {
+    throw new Error('Supabase not configured');
+  }
+
+  const { error } = await client
+    .from('belege')
+    .update({ status })
+    .eq('id', id);
+
+  if (error) {
+    throw new Error(`Failed to update document status: ${error.message}`);
   }
 };
 

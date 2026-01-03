@@ -542,3 +542,96 @@ interface ExtractedData {
 ## 📄 Lizenz
 
 Proprietäre Software für ZOE Solar.
+
+---
+
+## ☁️ OCI VM & Batch OCR
+
+### VM Zugangsdaten
+
+| Info | Wert |
+|------|------|
+| **Host** | `ubuntu@130.162.235.142` |
+| **SSH Key** | Dein SSH Key (muss auf VM autorisiert sein) |
+| **Supabase DB** | `ngze-techstack-supabase-db-1` |
+
+### Verbindung herstellen
+
+```bash
+# 1. SSH Key autorisieren (einmalig)
+ssh-copy-id -i ~/.ssh/id_ed25519 ubuntu@130.162.235.142
+
+# 2. Zur VM verbinden
+ssh -i ~/.ssh/id_ed25519 ubuntu@130.162.235.142
+```
+
+### Docker Container verwalten
+
+```bash
+# Alle Container anzeigen
+docker ps | grep supabase
+
+# Supabase Database Shell öffnen
+docker exec -it ngze-techstack-supabase-db-1 psql -U postgres -d postgres
+
+# Supabase Status prüfen
+docker logs ngze-techstack_supabase-rest_1 --tail 20
+```
+
+### OCR Batch Processing
+
+```bash
+# 1. Zum Projektverzeichnis
+cd /home/ubuntu
+
+# 2. Script hochladen (vom lokalen Rechner)
+scp -i ~/.ssh/id_ed25519 scripts/batch-ocr-vm.mjs ubuntu@130.162.235.142:/home/ubuntu/
+
+# 3. Test mit 10 Dokumenten
+node batch-ocr-vm.mjs --limit=10
+
+# 4. Alle verbleibenden Dokumente verarbeiten
+node batch-ocr-vm.mjs
+
+# 5. Nur DB Update (ohne OCR)
+node batch-ocr-vm.mjs --skip-ocr
+```
+
+### API Keys Konfiguration
+
+Die API Keys sind **direkt im Script hardcoded** (`scripts/batch-ocr-vm.mjs`):
+
+| Key | Typ | Limit |
+|-----|-----|-------|
+| `AIzaSyAMeanjUyVncbj93mNGd4_pxAzKW5YbF5o` | **Primary** (Billing) | 5000 RPM |
+| `AIzaSyChCp74anMmhQJAUKmFKI25KAH7nqOCKZ8` | Fallback (Free) | 15 RPM |
+| `AIzaSyBcB81AhWglyp9JFQy7MYtCgijks_fogy4` | Fallback (Free) | 15 RPM |
+
+**WICHTIG:** Der Primary Key benötigt die **Google Generative Language API** aktiviert:
+- Link: https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=1038183295008
+- Dort auf "Enable API" klicken
+
+### Troubleshooting
+
+```bash
+# OCR Script läuft nicht?
+cd /home/ubuntu && ls -la batch-ocr-vm.mjs
+
+# Node Version prüfen (braucht v18+)
+node --version
+
+# Logs anzeigen
+cat /home/ubuntu/ocr.log 2>/dev/null || echo "Keine Log-Datei"
+
+# Manueller DB Check
+docker exec -it ngze-techstack-supabase-db-1 psql -U postgres -d postgres -c "SELECT COUNT(*) FROM belege WHERE brutto_betrag IS NULL;"
+```
+
+### Dateien auf VM
+
+```
+/home/ubuntu/
+├── batch-ocr-vm.mjs      # Batch OCR Script
+├── .env                   # Env Vars (falls benötigt)
+└── ocr.log               # Log Datei (wird erstellt)
+```

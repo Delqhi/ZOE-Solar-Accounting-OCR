@@ -4,12 +4,13 @@ import { analyzeDocumentWithGemini } from '../services/geminiService';
 import { applyAccountingRules, generateZoeInvoiceId } from '../services/ruleEngine';
 import { normalizeExtractedData } from '../services/extractedDataNormalization';
 import { detectPrivateDocument } from '../services/privateDocumentDetection';
+import * as supabaseService from '../services/supabaseService';
 import { v4 as uuidv4 } from 'uuid';
 
 interface UseUploadReturn {
   processing: boolean;
   progress: string | null;
-  uploadFile: (file: File) => Promise<DocumentRecord | null>;
+  uploadFile: (file: File, saveToSupabase?: boolean) => Promise<DocumentRecord | null>;
 }
 
 const computeFileHash = async (file: File): Promise<string> => {
@@ -34,7 +35,7 @@ export const useUpload = (): UseUploadReturn => {
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
 
-  const uploadFile = useCallback(async (file: File): Promise<DocumentRecord | null> => {
+  const uploadFile = useCallback(async (file: File, saveToSupabase = true): Promise<DocumentRecord | null> => {
     setProcessing(true);
     setProgress('Datei wird verarbeitet...');
 
@@ -75,6 +76,17 @@ export const useUpload = (): UseUploadReturn => {
         isPrivate,
         privateReason: isPrivate ? enrichedData.ocr_rationale : undefined
       };
+
+      // Step 7: Save to Supabase if requested
+      if (saveToSupabase) {
+        setProgress('Speichere in Datenbank...');
+        try {
+          await supabaseService.saveDocument(doc);
+        } catch (saveError) {
+          console.error('Failed to save to Supabase:', saveError);
+          // Continue anyway - document is still usable locally
+        }
+      }
 
       setProgress(null);
       return doc;
