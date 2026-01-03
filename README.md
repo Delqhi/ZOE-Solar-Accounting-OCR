@@ -31,7 +31,7 @@
     </td>
     <td>
       <h3>🔒 Datenschutz</h3>
-      <p>100% lokal - keine Daten verlassen Ihren Browser</p>
+      <p>Sichere Cloud-Speicherung in Deutschland</p>
     </td>
   </tr>
   <tr>
@@ -202,7 +202,8 @@ const kontierung = {
 ### AI & Data
 ![Google Gemini](https://img.shields.io/badge/Google_Gemini-2.5_Flash-4285F4?style=for-the-badge&logo=google)
 ![SiliconFlow](https://img.shields.io/badge/SiliconFlow-Qwen_72B-FF6B35?style=for-the-badge)
-![IndexedDB](https://img.shields.io/badge/IndexedDB-Local_Storage-FF9500?style=for-the-badge)
+![Supabase](https://img.shields.io/badge/Supabase-Database-3FCF8E?style=for-the-badge&logo=supabase)
+![GitLab](https://img.shields.io/badge/GitLab-File_Storage-FC6D26?style=for-the-badge&logo=gitlab)
 
 ### Export & Integration
 ![PDF.js](https://img.shields.io/badge/PDF.js-4.0-DC2626?style=for-the-badge)
@@ -249,6 +250,14 @@ GEMINI_API_KEY=AIzaSy...
 
 # SiliconFlow (Fallback - Optional)
 SILICONFLOW_API_KEY=sk-...
+
+# Supabase (Datenbank)
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_ANON_KEY=eyJ...
+
+# GitLab (Dateispeicher)
+GITLAB_URL=https://gitlab.com
+GITLAB_TOKEN=glpat-...
 ```
 
 > **💡 Tipp:** Gemini API ist kostenlos für bis zu 60 Anfragen pro Tag. Perfect für kleine bis mittlere Unternehmen!
@@ -425,7 +434,8 @@ Dieses Projekt ist unter der MIT Lizenz lizenziert - siehe die [LICENSE](LICENSE
 *   **Frontend Framework:** React 19
 *   **Sprache:** TypeScript
 *   **Styling:** Tailwind CSS
-*   **Datenbank:** IndexedDB (Wrapper `storageService.ts`)
+*   **Datenbank:** Supabase (PostgreSQL)
+*   **Dateispeicher:** GitLab
 *   **PDF Engine:** PDF.js & jsPDF
 *   **KI SDK:** `@google/genai` (Google) & `fetch` (SiliconFlow)
 
@@ -456,6 +466,14 @@ GEMINI_API_KEY="AIzaSy..."
 
 # SiliconFlow API Key (Fallback für Gemini)
 SILICONFLOW_API_KEY="sk-..."
+
+# Supabase (Datenbank)
+SUPABASE_URL="https://xxx.supabase.co"
+SUPABASE_ANON_KEY="eyJ..."
+
+# GitLab (Dateispeicher)
+GITLAB_URL="https://gitlab.com"
+GITLAB_TOKEN="glpat-..."
 ```
 
 Hinweis: Wenn ein API-Key versehentlich in einem Chat/Issue/Screenshot gelandet ist, sollten Sie ihn beim Anbieter **rotieren** (neuen Key erzeugen, alten deaktivieren) und danach nur den neuen Key lokal in `.env` eintragen.
