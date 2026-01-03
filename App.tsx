@@ -213,25 +213,36 @@ export default function App() {
 
   useEffect(() => {
     const initData = async () => {
+      console.log('[App] Initializing data...');
+
+      // Check Supabase configuration
+      const supabaseConfigured = supabaseService.isSupabaseConfigured();
+      console.log('[App] Supabase configured:', supabaseConfigured);
+
       try {
         // Local-first: Load from IndexedDB first
+        console.log('[App] Loading from IndexedDB...');
         const [localDocs, localSettings] = await Promise.all([
           storageService.getAllDocuments(),
           storageService.getSettings()
         ]);
+        console.log(`[App] Loaded ${localDocs.length} documents from IndexedDB`);
         setDocuments(localDocs.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()));
         setSettings(localSettings);
 
         // Optionally sync with Supabase if configured
-        if (supabaseService.isSupabaseConfigured()) {
+        if (supabaseConfigured) {
+          console.log('[App] Syncing with Supabase...');
           try {
             const [cloudDocs, cloudSettings] = await Promise.all([
               supabaseService.getAllDocuments(),
               supabaseService.getSettings()
             ]);
+            console.log(`[App] Loaded ${cloudDocs.length} documents from Supabase`);
 
             // Merge strategy: Prefer newer documents, handle duplicates
             const mergedDocs = mergeDocuments(localDocs, cloudDocs);
+            console.log(`[App] Merged to ${mergedDocs.length} documents`);
             setDocuments(mergedDocs.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()));
 
             // Save merged data back to local storage
@@ -245,11 +256,13 @@ export default function App() {
               setSettings(cloudSettings);
             }
           } catch (syncError) {
-            console.warn('Supabase sync failed, using local data:', syncError);
+            console.warn('[App] Supabase sync failed, using local data:', syncError);
           }
+        } else {
+          console.log('[App] Supabase not configured, using local data only');
         }
       } catch (e) {
-        console.error("Init Error:", e);
+        console.error('[App] Init Error:', e);
         setNotification('Fehler beim Laden der Daten. IndexedDB oder Supabase prüfen.');
       }
     };
