@@ -5,12 +5,13 @@
 
 ## 1. Problem / Ziel
 
-**Problem:** (TBD)
+**Problem:** Benutzer haben keine lokale, offline-fähige Lösung für Rechnungsverarbeitung
 
-**Ziel:** (TBD)
+**Ziel:** Eine 100% lokale, browser-basierte Lösung mit optionaler Cloud-Synchronisation
 
 **Nicht-Ziele:**
-- (TBD)
+- Keine Cloud-Zwangsregistrierung
+- Keine Abhängigkeit von externen Servern für Kernfunktionalität
 
 ## 2. Kontext (Ist-Zustand)
 
@@ -32,8 +33,9 @@ Relevante Referenzen:
 
 ### 4.1 Functional Requirements (FR)
 
-- FR1: (TBD)
-- FR2: (TBD)
+- FR1: Lokale Datenspeicherung mit IndexedDB
+- FR2: Optionale Supabase-Synchronisation wenn konfiguriert
+- FR3: Environment-Variablen mit VITE_ Prefix für Vite
 
 ### 4.2 Non-Functional Requirements (NFR)
 
@@ -58,4 +60,6 @@ Relevante Referenzen:
 
 ## 8. Out of Scope / Später
 
-- (TBD)
+- Mobile App
+- Multi-User Support (später)
+- Cloud-Synchronisation (nur optional)

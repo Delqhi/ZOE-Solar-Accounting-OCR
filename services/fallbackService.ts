@@ -23,7 +23,7 @@ if (pdf && pdf.GlobalWorkerOptions) {
 }
 
 // SiliconFlow API Config
-const SF_API_KEY = process.env.SILICONFLOW_API_KEY;
+const SF_API_KEY = import.meta.env.VITE_SILICONFLOW_API_KEY || '';
 const SF_API_URL = "https://api.siliconflow.com/v1/chat/completions";
 
 // PDF Stitching Limits (B3)

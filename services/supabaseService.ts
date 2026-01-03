@@ -290,6 +290,16 @@ export const savePrivateDocument = async (
 // --- Transformations ---
 
 function transformSupabaseToDocument(doc: SupabaseDocument): DocumentRecord {
+  // Parse line_items if it's a string (from JSON serialization)
+  let parsedLineItems = doc.line_items;
+  if (typeof doc.line_items === 'string') {
+    try {
+      parsedLineItems = JSON.parse(doc.line_items);
+    } catch {
+      parsedLineItems = [];
+    }
+  }
+
   return {
     id: doc.id,
     fileName: doc.file_name,
@@ -297,6 +307,7 @@ function transformSupabaseToDocument(doc: SupabaseDocument): DocumentRecord {
     uploadDate: doc.created_at,
     status: doc.status as DocumentStatus,
     data: {
+      // Basic fields - map from Supabase columns
       lieferantName: doc.lieferant_name || '',
       lieferantAdresse: doc.lieferant_adresse || '',
       belegDatum: doc.beleg_datum || '',
@@ -305,13 +316,20 @@ function transformSupabaseToDocument(doc: SupabaseDocument): DocumentRecord {
       mwstSatz19: doc.mwst_satz || 0,
       steuerkategorie: doc.steuerkategorie || '',
       kontierungskonto: doc.skr03_konto || '',
-      lineItems: doc.line_items || [],
+      lineItems: parsedLineItems || [],
+
+      // Legacy fields - derive from available data
       kontogruppe: '',
       konto_skr03: doc.skr03_konto || '',
       ust_typ: '',
+
+      // Derived fields
       sollKonto: '',
       habenKonto: '',
       steuerKategorie: doc.steuerkategorie || '',
+
+      // These fields were not in the original Supabase schema
+      // They will be empty/missing when loading from Supabase
       belegNummerLieferant: '',
       steuernummer: '',
       nettoBetrag: 0,
@@ -332,8 +350,11 @@ function transformSupabaseToDocument(doc: SupabaseDocument): DocumentRecord {
       beschreibung: '',
       documentType: undefined,
       kontierungBegruendung: undefined,
+
+      // Quality scores
       qualityScore: doc.score || undefined,
       ocr_score: doc.score || undefined,
+      ocr_rationale: undefined,
       textContent: undefined,
       ruleApplied: undefined
     },
