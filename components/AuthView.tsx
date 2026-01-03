@@ -8,7 +8,7 @@ interface AuthViewProps {
 
 export const AuthView: React.FC<AuthViewProps> = ({ user, onSignOut }) => {
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState('jeremyschulze93@gmail.com');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);

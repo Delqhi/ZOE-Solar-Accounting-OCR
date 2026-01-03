@@ -6,6 +6,7 @@ import { DocumentDetail } from './components/DetailModal';
 import { DuplicateCompareModal } from './components/DuplicateCompareModal';
 import { SettingsView } from './components/SettingsView';
 import { AuthView } from './components/AuthView';
+import { LandingPage } from './components/LandingPage';
 import { BackupView } from './components/BackupView';
 import { FilterBar } from './components/FilterBar';
 import { analyzeDocumentWithGemini } from './services/geminiService';
@@ -189,6 +190,7 @@ export default function App() {
   // Auth State
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Filter State
   const [filterYear, setFilterYear] = useState<string>('all');
@@ -254,6 +256,25 @@ export default function App() {
       }
     };
     initData();
+  }, []);
+
+  // Auth State Initialization
+  useEffect(() => {
+    // Check for existing session on app load
+    const checkAuth = async () => {
+      const { user } = await supabaseService.getCurrentUser();
+      setUser(user);
+      setAuthLoading(false);
+    };
+    checkAuth();
+
+    // Listen for auth state changes
+    const unsubscribe = supabaseService.onAuthStateChange((user) => {
+      setUser(user);
+      setAuthLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -823,6 +844,58 @@ export default function App() {
         {label}
       </button>
   );
+
+  // Show landing page if not authenticated
+  if (!user && !authLoading) {
+    return (
+      <>
+        <LandingPage onLogin={() => setShowLoginModal(true)} />
+        {/* Login Modal Overlay */}
+        {showLoginModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="relative w-full max-w-md">
+              <button
+                onClick={() => setShowLoginModal(false)}
+                className="absolute -top-12 right-0 text-white/80 hover:text-white text-xl"
+              >
+                ✕
+              </button>
+              <AuthView
+                user={user}
+                onSignOut={() => {
+                  setUser(null);
+                  setShowLoginModal(false);
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  // Show login modal when requested (even if already authenticated but wants to switch accounts)
+  if (showLoginModal) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="relative w-full max-w-md">
+          <button
+            onClick={() => setShowLoginModal(false)}
+            className="absolute -top-12 right-0 text-white/80 hover:text-white text-xl"
+          >
+            ✕
+          </button>
+          <AuthView
+            user={user}
+            onSignOut={() => {
+              setUser(null);
+              setShowLoginModal(false);
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-[100dvh] flex bg-white text-slate-900 font-sans text-sm antialiased relative overflow-hidden">
