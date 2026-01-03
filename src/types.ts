@@ -4,12 +4,22 @@ export enum DocumentStatus {
   REVIEW_NEEDED = 'REVIEW_NEEDED',
   COMPLETED = 'COMPLETED',
   ERROR = 'ERROR',
-  DUPLICATE = 'DUPLICATE'
+  DUPLICATE = 'DUPLICATE',
+  PRIVATE = 'PRIVATE'
 }
 
 export interface LineItem {
-  description: string;
+  // Original properties
+  description?: string;
   amount?: number;
+  // Database properties for positionen
+  beschreibung?: string | null;
+  menge?: number | null;
+  einzelpreis?: number | null;
+  gesamtbetrag?: number | null;
+  mwstSatz?: number | null;
+  konto?: string | null;
+  steuerkategorie?: string | null;
 }
 
 export interface TaxCategoryDefinition {

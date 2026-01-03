@@ -1,4 +1,4 @@
-import { supabase, Beleg, BelegPosition, Steuerkategorie, Kontierungskonto, LieferantenRegel, Einstellung } from './supabaseClient';
+import { supabase, Beleg, Steuerkategorie, Kontierungskonto, LieferantenRegel, Einstellung } from './supabaseClient';
 import { ExtractedData, DocumentStatus } from '../types';
 
 // Convert extracted data to database format
@@ -47,43 +47,6 @@ function belegToDb(data: ExtractedData, fileInfo: {
     privatanteil: data.privatanteil || false,
     ocr_score: data.ocr_score || null,
     ocr_rationale: data.ocr_rationale || null,
-  };
-}
-
-// Convert database format to extracted data
-function dbToBeleg(beleg: Beleg): Partial<ExtractedData> {
-  return {
-    documentType: beleg.document_type || undefined,
-    belegDatum: beleg.beleg_datum || '',
-    belegNummerLieferant: beleg.belegnummer_lieferant || '',
-    lieferantName: beleg.lieferant_name || '',
-    lieferantAdresse: beleg.lieferant_adresse || '',
-    steuernummer: beleg.steuernummer || '',
-    nettoBetrag: beleg.netto_betrag || 0,
-    bruttoBetrag: beleg.brutto_betrag || 0,
-    mwstSatz0: beleg.mwst_satz_0 || undefined,
-    mwstBetrag0: beleg.mwst_betrag_0 || undefined,
-    mwstSatz7: beleg.mwst_satz_7 || undefined,
-    mwstBetrag7: beleg.mwst_betrag_7 || undefined,
-    mwstSatz19: beleg.mwst_satz_19 || undefined,
-    mwstBetrag19: beleg.mwst_betrag_19 || undefined,
-    zahlungsmethode: beleg.zahlungsmethode || '',
-    eigeneBelegNummer: beleg.eigene_beleg_nummer || '',
-    kontierungskonto: beleg.kontierungskonto || undefined,
-    steuerkategorie: beleg.steuerkategorie || undefined,
-    kontierungBegruendung: beleg.kontierung_begruendung || undefined,
-    sollKonto: beleg.soll_konto || '',
-    habenKonto: beleg.haben_konto || '',
-    zahlungsDatum: beleg.zahlungs_datum || '',
-    zahlungsStatus: beleg.zahlungs_status || '',
-    aufbewahrungsOrt: beleg.aufbewahrungs_ort || '',
-    rechnungsEmpfaenger: beleg.rechnungs_empfaenger || '',
-    kleinbetrag: beleg.kleinbetrag || false,
-    vorsteuerabzug: beleg.vorsteuerabzug || false,
-    reverseCharge: beleg.reverse_charge || false,
-    privatanteil: beleg.privatanteil || false,
-    ocr_score: beleg.ocr_score || undefined,
-    ocr_rationale: beleg.ocr_rationale || undefined,
   };
 }
 
@@ -438,7 +401,7 @@ export const steuerkategorienService = {
         .upsert(cat, { onConflict: 'wert' });
 
       if (error) {
-        console.error('Error seeding steuerkategorie:', error);
+        throw new Error(`Failed to seed steuerkategorie '${cat.label}': ${error.message}`);
       }
     }
   },
@@ -504,7 +467,7 @@ export const kontierungskontenService = {
         .upsert(konto, { onConflict: 'konto_nr' });
 
       if (error) {
-        console.error('Error seeding kontierungskonto:', error);
+        throw new Error(`Failed to seed kontierungskonto '${konto.konto_nr}': ${error.message}`);
       }
     }
   },

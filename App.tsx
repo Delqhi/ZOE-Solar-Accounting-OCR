@@ -246,6 +246,7 @@ export default function App() {
             }
           } catch (syncError) {
             console.warn('Supabase sync failed, using local data:', syncError);
+            setNotification('Supabase-Sync fehlgeschlagen. Lokale Daten werden verwendet.');
           }
         }
       } catch (e) {
@@ -436,21 +437,7 @@ export default function App() {
             continue;
         }
 
-        if (res.type === 'MERGE') {
-             // Logic kept for potential future use, currently findSemanticDuplicate mainly flags as DUPLICATE
-             // Use type assertion because currently no path returns MERGE, so TS infers only DOC types
-             const mergeRes = res as any;
-             const targetDoc = currentDocsSnapshotRef.current.find(d => d.id === mergeRes.targetId);
-             if (targetDoc) {
-                 const updatedDoc = {
-                     ...targetDoc,
-                     attachments: [...(targetDoc.attachments || []), mergeRes.attachment]
-                 };
-                 await supabaseService.saveDocument(updatedDoc);
-                 currentDocsSnapshotRef.current = currentDocsSnapshotRef.current.map(d => d.id === targetDoc.id ? updatedDoc : d);
-                 autoMergedCount++;
-             }
-        } else if (res.type === 'DOC') {
+        if (res.type === 'DOC') {
             let finalDoc: DocumentRecord | undefined;
 
             if ('doc' in res && res.doc) {
@@ -541,6 +528,7 @@ export default function App() {
         await supabaseService.saveDocument(updatedDoc);
       } catch (e) {
         console.warn('Failed to sync document to Supabase:', e);
+        setNotification('Warnung: Dokument konnte nicht mit Supabase synchronisiert werden.');
       }
     }
     // Save vendor rule if applicable
@@ -551,6 +539,7 @@ export default function App() {
           await supabaseService.saveVendorRule(updatedDoc.data.lieferantName, updatedDoc.data.kontierungskonto, updatedDoc.data.steuerkategorie);
         } catch (e) {
           console.warn('Failed to sync vendor rule to Supabase:', e);
+          setNotification('Warnung: Lieferantenregel konnte nicht mit Supabase synchronisiert werden.');
         }
       }
     }
@@ -567,6 +556,7 @@ export default function App() {
         await supabaseService.deleteDocument(id);
       } catch (e) {
         console.warn('Failed to delete document from Supabase:', e);
+        setNotification('Warnung: Dokument konnte nicht aus Supabase gelöscht werden.');
       }
     }
   };
@@ -624,6 +614,7 @@ export default function App() {
         await supabaseService.deleteDocument(sourceId);
       } catch (e) {
         console.warn('Failed to sync merge to Supabase:', e);
+        setNotification('Warnung: Merge konnte nicht mit Supabase synchronisiert werden.');
       }
     }
     
@@ -716,6 +707,12 @@ export default function App() {
   }, [documents]);
 
   const renderContent = () => {
+      if (viewMode === 'auth') {
+          return <AuthView onClose={() => setViewMode('document')} />;
+      }
+      if (viewMode === 'backup') {
+          return <BackupView onClose={() => setViewMode('document')} />;
+      }
       if (viewMode === 'settings' && settings) {
           return <SettingsView settings={settings} onSave={async (s) => {
             setSettings(s);
@@ -727,6 +724,7 @@ export default function App() {
                 await supabaseService.saveSettings(s);
               } catch (e) {
                 console.warn('Failed to sync settings to Supabase:', e);
+                setNotification('Warnung: Einstellungen konnten nicht mit Supabase synchronisiert werden.');
               }
             }
           }} onClose={() => setViewMode('document')} />;
@@ -1021,45 +1019,61 @@ export default function App() {
              </div>
           </div>
 
-          <div className="p-4 border-t border-slate-200/60 bg-slate-50/30">
-               <SidebarItem 
-                 active={viewMode === 'settings'} 
-                 label="Einstellungen" 
+          <div className="p-4 border-t border-slate-200/60 bg-slate-50/30 space-y-1">
+               <SidebarItem
+                 active={viewMode === 'auth'}
+                 label="Auth"
+                 icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
+                 onClick={() => { setSelectedDocId(null); setViewMode('auth'); }}
+               />
+               <SidebarItem
+                 active={viewMode === 'backup'}
+                 label="Backup"
+                 icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>}
+                 onClick={() => { setSelectedDocId(null); setViewMode('backup'); }}
+               />
+               <SidebarItem
+                 active={viewMode === 'settings'}
+                 label="Einstellungen"
                  icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2-2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>}
-                 onClick={() => { setSelectedDocId(null); setViewMode('settings'); }} 
+                 onClick={() => { setSelectedDocId(null); setViewMode('settings'); }}
                />
           </div>
       </aside>
 
       {/* --- MOBILE BOTTOM NAVIGATION (Visible only on Mobile) --- */}
       <nav className="md:hidden fixed bottom-6 left-4 right-4 h-16 bg-white/80 backdrop-blur-2xl border border-white/20 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-2xl z-50 flex items-center justify-around px-2">
-          <button 
+          <button
              onClick={() => { setSelectedDocId(null); setViewMode('document'); }}
              className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${viewMode === 'document' && !selectedDocId ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
           >
              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
           </button>
-          
-          <button 
+
+          <button
              onClick={() => { if(documents.length > 0) setSelectedDocId(documents[0].id); else setViewMode('document'); }}
              className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${selectedDocId ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
           >
              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           </button>
 
-          <button 
+          <button
              onClick={() => { setSelectedDocId(null); setViewMode('database'); }}
              className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${viewMode === 'database' ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
           >
              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           </button>
 
-          <button 
-             onClick={() => { setSelectedDocId(null); setViewMode('settings'); }}
-             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${viewMode === 'settings' ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
-          >
-             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2-2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          </button>
+          <div className="relative group">
+              <button className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all text-slate-400 hover:text-slate-600">
+                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+              </button>
+              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-white shadow-lg rounded-lg py-2 hidden group-hover:block min-w-[120px]">
+                  <button onClick={() => { setSelectedDocId(null); setViewMode('auth'); }} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100">Auth</button>
+                  <button onClick={() => { setSelectedDocId(null); setViewMode('backup'); }} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100">Backup</button>
+                  <button onClick={() => { setSelectedDocId(null); setViewMode('settings'); }} className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100">Einstellungen</button>
+              </div>
+          </div>
       </nav>
 
       {/* Main Content */}

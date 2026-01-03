@@ -1,9 +1,9 @@
 // GitLab Storage Service for uploading PDFs and images
 // Files are stored in a GitLab repository using the GitLab API
 
-const GITLAB_URL = import.meta.env.VITE_GITLAB_INSTANCE_URL || 'https://gitlab.com';
-const GITLAB_API_TOKEN = import.meta.env.VITE_GITLAB_API_TOKEN || '';
-const GITLAB_STORAGE_PROJECT = import.meta.env.VITE_GITLAB_STORAGE_PROJECT || 'zukunftsorientierte.energie/zoe-solar-storage';
+const GITLAB_URL = import.meta.env['VITE_GITLAB_INSTANCE_URL'] || 'https://gitlab.com';
+const GITLAB_API_TOKEN = import.meta.env['VITE_GITLAB_API_TOKEN'] || '';
+const GITLAB_STORAGE_PROJECT = import.meta.env['VITE_GITLAB_STORAGE_PROJECT'] || 'zukunftsorientierte.energie/zoe-solar-storage';
 
 export interface GitLabFileInfo {
   filePath: string;
@@ -26,7 +26,14 @@ export function isGitLabConfigured(): boolean {
 }
 
 // Get project ID from project path
-async function getProjectId(): Promise<number | null> {
+export class GitLabStorageError extends Error {
+  constructor(message: string, public readonly originalError?: unknown) {
+    super(message);
+    this.name = 'GitLabStorageError';
+  }
+}
+
+async function getProjectId(): Promise<number> {
   const response = await fetch(`${GITLAB_URL}/api/v4/projects/${encodeURIComponent(GITLAB_STORAGE_PROJECT)}`, {
     headers: {
       'Authorization': `Bearer ${GITLAB_API_TOKEN}`,
@@ -35,8 +42,8 @@ async function getProjectId(): Promise<number | null> {
   });
 
   if (!response.ok) {
-    console.error('Failed to get GitLab project:', await response.text());
-    return null;
+    const errorText = await response.text();
+    throw new GitLabStorageError(`Failed to get GitLab project: ${response.status} ${response.statusText}`, errorText);
   }
 
   const project = await response.json();
@@ -71,12 +78,8 @@ async function createOrUpdateFile(
   );
 
   if (!response.ok) {
-    const error = await response.text();
-    console.error('Failed to upload file to GitLab:', error);
-    return {
-      success: false,
-      error: error,
-    };
+    const errorText = await response.text();
+    throw new GitLabStorageError(`Failed to upload file to GitLab: ${response.status} ${response.statusText}`, errorText);
   }
 
   const data = await response.json();
@@ -115,29 +118,36 @@ export async function uploadToGitLabStorage(
     };
   }
 
-  const projectId = await getProjectId();
-  if (!projectId) {
+  try {
+    const projectId = await getProjectId();
+
+    const filePath = generateFilePath(fileName, belegDatum);
+    const commitMessage = `Upload: ${fileName} - ${new Date().toISOString()}`;
+
+    // Progress callback (GitLab API doesn't support chunked uploads natively for small files)
+    if (options?.onProgress) {
+      options.onProgress(50);
+    }
+
+    const result = await createOrUpdateFile(projectId, filePath, base64Content, commitMessage, options?.branch);
+
+    if (result.success && options?.onProgress) {
+      options.onProgress(100);
+    }
+
+    return result;
+  } catch (error) {
+    if (error instanceof GitLabStorageError) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
     return {
       success: false,
-      error: 'Could not find GitLab project',
+      error: error instanceof Error ? error.message : 'Unknown error during GitLab upload',
     };
   }
-
-  const filePath = generateFilePath(fileName, belegDatum);
-  const commitMessage = `Upload: ${fileName} - ${new Date().toISOString()}`;
-
-  // Progress callback (GitLab API doesn't support chunked uploads natively for small files)
-  if (options?.onProgress) {
-    options.onProgress(50);
-  }
-
-  const result = await createOrUpdateFile(projectId, filePath, base64Content, commitMessage, options?.branch);
-
-  if (result.success && options?.onProgress) {
-    options.onProgress(100);
-  }
-
-  return result;
 }
 
 // Upload PDF file
@@ -170,43 +180,47 @@ export async function deleteFromGitLabStorage(
     };
   }
 
-  const projectId = await getProjectId();
-  if (!projectId) {
-    return {
-      success: false,
-      error: 'Could not find GitLab project',
-    };
-  }
+  try {
+    const projectId = await getProjectId();
 
-  const response = await fetch(
-    `${GITLAB_URL}/api/v4/projects/${projectId}/repository/files/${encodeURIComponent(filePath)}`,
-    {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${GITLAB_API_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        branch,
-        author_name: 'Zoe Solar Accounting OCR',
-        author_email: 'system@zoe-solar.de',
-        commit_message: `Delete: ${filePath}`,
-      }),
+    const response = await fetch(
+      `${GITLAB_URL}/api/v4/projects/${projectId}/repository/files/${encodeURIComponent(filePath)}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${GITLAB_API_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          branch,
+          author_name: 'Zoe Solar Accounting OCR',
+          author_email: 'system@zoe-solar.de',
+          commit_message: `Delete: ${filePath}`,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new GitLabStorageError(`Failed to delete file from GitLab: ${response.status} ${response.statusText}`, errorText);
     }
-  );
 
-  if (!response.ok) {
-    const error = await response.text();
+    return {
+      success: true,
+      filePath,
+    };
+  } catch (error) {
+    if (error instanceof GitLabStorageError) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
     return {
       success: false,
-      error,
+      error: error instanceof Error ? error.message : 'Unknown error during GitLab delete',
     };
   }
-
-  return {
-    success: true,
-    filePath,
-  };
 }
 
 // Get file content from GitLab
@@ -218,26 +232,30 @@ export async function getFileFromGitLab(
     return { success: false, error: 'GitLab storage not configured' };
   }
 
-  const projectId = await getProjectId();
-  if (!projectId) {
-    return { success: false, error: 'Could not find GitLab project' };
-  }
+  try {
+    const projectId = await getProjectId();
 
-  const response = await fetch(
-    `${GITLAB_URL}/api/v4/projects/${projectId}/repository/files/${encodeURIComponent(filePath)}?ref=${branch}`,
-    {
-      headers: {
-        'Authorization': `Bearer ${GITLAB_API_TOKEN}`,
-      },
+    const response = await fetch(
+      `${GITLAB_URL}/api/v4/projects/${projectId}/repository/files/${encodeURIComponent(filePath)}?ref=${branch}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${GITLAB_API_TOKEN}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      return { success: false, error: `File not found: ${filePath}` };
     }
-  );
 
-  if (!response.ok) {
-    return { success: false, error: `File not found: ${filePath}` };
+    const data = await response.json();
+    return { success: true, content: data.content };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error during GitLab getFile',
+    };
   }
-
-  const data = await response.json();
-  return { success: true, content: data.content };
 }
 
 // List files in a directory
@@ -249,26 +267,30 @@ export async function listFilesInGitLab(
     return { success: false, error: 'GitLab storage not configured' };
   }
 
-  const projectId = await getProjectId();
-  if (!projectId) {
-    return { success: false, error: 'Could not find GitLab project' };
-  }
+  try {
+    const projectId = await getProjectId();
 
-  const response = await fetch(
-    `${GITLAB_URL}/api/v4/projects/${projectId}/repository/tree?path=${encodeURIComponent(path)}&ref=${branch}&per_page=100`,
-    {
-      headers: {
-        'Authorization': `Bearer ${GITLAB_API_TOKEN}`,
-      },
+    const response = await fetch(
+      `${GITLAB_URL}/api/v4/projects/${projectId}/repository/tree?path=${encodeURIComponent(path)}&ref=${branch}&per_page=100`,
+      {
+        headers: {
+          'Authorization': `Bearer ${GITLAB_API_TOKEN}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      return { success: false, error: await response.text() };
     }
-  );
 
-  if (!response.ok) {
-    return { success: false, error: await response.text() };
+    const files = await response.json();
+    return { success: true, files };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error during GitLab listFiles',
+    };
   }
-
-  const files = await response.json();
-  return { success: true, files };
 }
 
 // Create the GitLab storage service

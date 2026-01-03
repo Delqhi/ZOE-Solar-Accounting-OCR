@@ -1,8 +1,8 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Environment variables (imported via import.meta.env for Vite)
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = import.meta.env['VITE_SUPABASE_URL'] || '';
+const SUPABASE_ANON_KEY = import.meta.env['VITE_SUPABASE_ANON_KEY'] || '';
 
 // Validate configuration
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -31,7 +31,7 @@ export interface Beleg {
   dateigroesse: number | null;
   file_hash: string | null;
   gitlab_storage_url: string | null;
-  status: 'PROCESSING' | 'REVIEW_NEEDED' | 'COMPLETED' | 'ERROR' | 'DUPLICATE';
+  status: 'PROCESSING' | 'REVIEW_NEEDED' | 'COMPLETED' | 'ERROR' | 'DUPLICATE' | 'PRIVATE';
   fehler: string | null;
   ocr_score: number | null;
   ocr_rationale: string | null;
