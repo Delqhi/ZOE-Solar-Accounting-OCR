@@ -1,4 +1,35 @@
-import { ExtractedData, LineItem } from "../types";
+import { ExtractedData, LineItem, DocumentTypeClassification } from "../types";
+
+const documentTypeMap: Record<string, DocumentTypeClassification> = {
+  'rechnung': DocumentTypeClassification.RECHNUNG,
+  'invoice': DocumentTypeClassification.RECHNUNG,
+  'beleg': DocumentTypeClassification.BELEG_QUITTUNG,
+  'quittung': DocumentTypeClassification.BELEG_QUITTUNG,
+  'kassenzettel': DocumentTypeClassification.BELEG_QUITTUNG,
+  'receipt': DocumentTypeClassification.BELEG_QUITTUNG,
+  'bestellbestaetigung': DocumentTypeClassification.BESTELLBESTAETIGUNG,
+  'order confirmation': DocumentTypeClassification.BESTELLBESTAETIGUNG,
+  'lieferschein': DocumentTypeClassification.LIEFERSCHEIN,
+  'delivery note': DocumentTypeClassification.LIEFERSCHEIN,
+  'andere': DocumentTypeClassification.ANDERE,
+  'other': DocumentTypeClassification.ANDERE
+};
+
+const normalizeDocumentType = (value: unknown): {
+  type: DocumentTypeClassification | undefined;
+  confidence: number;
+} => {
+  if (typeof value !== 'string') {
+    return { type: undefined, confidence: 1.0 };
+  }
+
+  const normalized = value.toLowerCase().trim();
+
+  return {
+    type: documentTypeMap[normalized] || DocumentTypeClassification.ANDERE,
+    confidence: documentTypeMap[normalized] ? 0.95 : 0.5
+  };
+};
 
 const isIsoDate = (value: unknown): boolean =>
   typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -206,7 +237,11 @@ export const normalizeExtractedData = (input: Partial<ExtractedData> | unknown):
     }
   }
 
-  const documentType = typeof obj.documentType === "string" ? obj.documentType : undefined;
+  const documentTypeNormalized = normalizeDocumentType(obj.documentType);
+  const documentType = documentTypeNormalized.type;
+  const documentTypeConfidence = typeof obj.documentTypeConfidence === 'number'
+    ? Math.max(0, Math.min(1, obj.documentTypeConfidence))
+    : documentTypeNormalized.confidence;
 
   const existingRationale = obj.ocr_rationale !== undefined ? toStringSafe(obj.ocr_rationale, "") : undefined;
   const combinedRationale = (
@@ -217,6 +252,9 @@ export const normalizeExtractedData = (input: Partial<ExtractedData> | unknown):
 
   return {
     documentType,
+    documentTypeConfidence,
+    relatedDocumentIds: obj.relatedDocumentIds || [],
+    relatedDocumentMatches: obj.relatedDocumentMatches || [],
 
     belegDatum,
     belegNummerLieferant: toStringSafe(obj.belegNummerLieferant, ""),

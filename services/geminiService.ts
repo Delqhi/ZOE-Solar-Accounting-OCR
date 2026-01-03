@@ -9,6 +9,18 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const accountingSchema: Schema = {
   type: Type.OBJECT,
   properties: {
+    // Document type classification (NEW)
+    documentType: {
+      type: Type.STRING,
+      enum: ['rechnung', 'beleg_quittung', 'bestellbestaetigung', 'lieferschein', 'andere'],
+      description: "Classify the document type"
+    },
+    documentTypeConfidence: {
+      type: Type.NUMBER,
+      description: "Confidence level from 0.0 to 1.0"
+    },
+
+    // Basic accounting fields
     belegDatum: { type: Type.STRING, description: "YYYY-MM-DD" },
     belegNummerLieferant: { type: Type.STRING },
     lieferantName: { type: Type.STRING },
@@ -37,13 +49,27 @@ const accountingSchema: Schema = {
     beschreibung: { type: Type.STRING },
     kontogruppe: { type: Type.STRING, description: "Calculated by rule engine later" }
   },
-  required: ["belegDatum", "lieferantName", "bruttoBetrag"]
+  required: ["belegDatum", "lieferantName", "bruttoBetrag", "documentType"]
 };
 
-// IMPROVED PROMPT WITH MATH VERIFICATION
+// IMPROVED PROMPT WITH MATH VERIFICATION AND DOCUMENT CLASSIFICATION
 const SYSTEM_INSTRUCTION = `
 You are an elite German Accounting Data Extraction AI.
 Your goal is 100% ACCURACY for "Bruttobetrag" (Total Amount).
+
+CRITICAL: First, CLASSIFY the document type:
+- "rechnung" (Invoice): Contains "Rechnung", invoice number, payment terms, detailed line items with prices
+- "beleg_quittung" (Receipt): Short document, "Kassenzettel", "Beleg", "Quittung", no payment terms
+- "bestellbestaetigung" (Order Confirmation): "Bestellbestätigung", order number, delivery date promises
+- "lieferschein" (Delivery Note): "Lieferschein", "Lieferchein", goods listing, no prices or minimal prices
+- "andere" (Other): Anything that doesn't fit above
+
+Look for:
+- Header text (Rechnung, Kassenzettel, Bestellbestätigung, etc.)
+- Payment terms (within 14 days, net, etc.)
+- Line item detail level
+- Presence of VAT breakdown
+- Document length and structure
 
 CRITICAL EXTRACTION PROTOCOL:
 1. **Find the Total**: Look for keywords: "Zahlbetrag", "Gesamtbetrag", "Rechnungsbetrag", "Summe". It is usually the last number at the bottom right, often bold.

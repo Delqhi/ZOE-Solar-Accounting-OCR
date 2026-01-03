@@ -8,6 +8,25 @@ export enum DocumentStatus {
   PRIVATE = 'PRIVATE' // Document moved to belege_privat table
 }
 
+export enum DocumentTypeClassification {
+  RECHNUNG = 'rechnung',
+  BELEG_QUITTUNG = 'beleg_quittung',
+  BESTELLBESTAETIGUNG = 'bestellbestaetigung',
+  LIEFERSCHEIN = 'lieferschein',
+  ANDERE = 'andere'
+}
+
+export interface RelatedDocumentMatch {
+  documentId: string;
+  matchScore: number;
+  matchCriteria: {
+    dateMatch: boolean;
+    amountMatch: boolean;
+    vendorMatch: boolean;
+    typeCompatibility: boolean;
+  };
+}
+
 export interface LineItem {
   description: string;
   amount?: number;
@@ -30,7 +49,11 @@ export interface AccountDefinition {
 
 export interface ExtractedData {
   // Grunddaten
-  documentType?: string; 
+  documentType?: DocumentTypeClassification;
+  documentTypeConfidence?: number;
+  relatedDocumentIds?: string[];
+  relatedDocumentMatches?: RelatedDocumentMatch[];
+
   belegDatum: string;
   belegNummerLieferant: string;
   lieferantName: string;
@@ -108,14 +131,19 @@ export interface DocumentRecord {
   data: ExtractedData | null;
   error?: string;
   previewUrl?: string;
-  
-  // New: Multiple pages/attachments
+
+  // Multiple pages/attachments
   attachments?: Attachment[];
-  
+
   fileHash?: string;
   duplicateOfId?: string;
   duplicateConfidence?: number;
   duplicateReason?: string;
+
+  // Document relationships
+  relatedDocumentIds?: string[];
+  isOrphaned?: boolean;
+  queueStatus?: string;
 }
 
 // --- Configuration Types ---
