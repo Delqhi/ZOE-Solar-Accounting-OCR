@@ -5,12 +5,14 @@
 
 ## 1. Problem / Ziel
 
-**Problem:** (TBD)
+**Problem:** Buchhaltung von ZOE Solar benötigt eine effiziente Lösung zur digitalen Erfassung, Kategorisierung und Buchung von Belegen (Rechnungen, Quittungen). Der aktuelle Prozess ist manuell, zeitaufwendig und fehleranfällig.
 
-**Ziel:** (TBD)
+**Ziel:** Eine browserbasierte OCR-Anwendung, die Belege automatisch extrahiert, kategorisiert und für den Export in DATEV und ELSTER vorbereitet, mit Fokus auf Solar-spezifische Buchhaltungsanforderungen.
 
 **Nicht-Ziele:**
-- (TBD)
+- Änderung der bestehenden DATEV-Software oder ELSTER-Schnittstelle
+- Vollständige Automatisierung ohne menschliche Prüfung
+- Multi-Mandanten-Support
 
 ## 2. Kontext (Ist-Zustand)
 
@@ -32,8 +34,11 @@ Relevante Referenzen:
 
 ### 4.1 Functional Requirements (FR)
 
-- FR1: (TBD)
-- FR2: (TBD)
+- FR1: OCR-Extraktion von Belegdaten (Datum, Betrag, Lieferant, MwSt) mit Qualitätsbewertung
+- FR2: Automatische Kontierungsvorschläge basierend auf Lieferanten-Regeln und Steuerkategorien
+- FR3: DATEV-Export im externen Buchungsstapel-Format (EXTF)
+- FR4: ELSTER UStVA XML-Export für Umsatzsteuervoranmeldung
+- FR5: Duplikaterkennung und Merge-Funktion für Belege
 
 ### 4.2 Non-Functional Requirements (NFR)
 
@@ -49,7 +54,7 @@ Relevante Referenzen:
 ## 6. UX / UI
 
 - UI vorhanden → UX-Design-Workflow optional/conditional.
-- Falls Änderungen am Flow/Screen nötig sind: hier grob skizzieren. (TBD)
+- Falls Änderungen am Flow/Screen nötig sind: hier grob skizzieren. Aktuell keine größeren UI-Änderungen geplant, nur Export-Flow-Verbesserungen.
 
 ## 7. Risiken & Abhängigkeiten
 
@@ -58,4 +63,6 @@ Relevante Referenzen:
 
 ## 8. Out of Scope / Später
 
-- (TBD)
+- Echtzeit-ELSTER-Übermittlung mit Zertifikat
+- Automatische Buchungsübergabe an Steuerberater
+- Mobile App oder Offline-First ohne Cloud-Anbindung

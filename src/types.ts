@@ -10,6 +10,14 @@ export enum DocumentStatus {
 export interface LineItem {
   description: string;
   amount?: number;
+  // Additional fields for database persistence (belegeService.ts)
+  beschreibung?: string;
+  menge?: number;
+  einzelpreis?: number;
+  gesamtbetrag?: number;
+  mwstSatz?: number;
+  konto?: string;
+  steuerkategorie?: string;
 }
 
 export interface TaxCategoryDefinition {

@@ -278,7 +278,12 @@ describe('datevExport', () => {
 
     it('should return blocker if beraterNr is empty', () => {
       const docs = [createDoc()];
-      const settings = createSettings({ datevConfig: { beraterNr: '  ' } });
+      const settings = createSettings({
+        datevConfig: {
+          ...createSettings().datevConfig!,
+          beraterNr: '  ',
+        },
+      });
       const result = runDatevExportPreflight(docs, settings);
 
       expect(result.blockers.some(b => b.message.includes('Berater-Nr.'))).toBe(true);
@@ -286,7 +291,12 @@ describe('datevExport', () => {
 
     it('should return blocker if mandantNr is empty', () => {
       const docs = [createDoc()];
-      const settings = createSettings({ datevConfig: { mandantNr: '' } });
+      const settings = createSettings({
+        datevConfig: {
+          ...createSettings().datevConfig!,
+          mandantNr: '',
+        },
+      });
       const result = runDatevExportPreflight(docs, settings);
 
       expect(result.blockers.some(b => b.message.includes('Mandant-Nr.'))).toBe(true);
@@ -294,7 +304,12 @@ describe('datevExport', () => {
 
     it('should return blocker if wirtschaftsjahrBeginn is empty', () => {
       const docs = [createDoc()];
-      const settings = createSettings({ datevConfig: { wirtschaftsjahrBeginn: undefined } });
+      const settings = createSettings({
+        datevConfig: {
+          ...createSettings().datevConfig!,
+          wirtschaftsjahrBeginn: '',
+        },
+      });
       const result = runDatevExportPreflight(docs, settings);
 
       expect(result.blockers.some(b => b.message.includes('Wirtschaftsjahr-Beginn'))).toBe(true);
@@ -311,7 +326,12 @@ describe('datevExport', () => {
 
     it('should return blocker for non-numeric beraterNr', () => {
       const docs = [createDoc()];
-      const settings = createSettings({ datevConfig: { beraterNr: 'abc' } });
+      const settings = createSettings({
+        datevConfig: {
+          ...createSettings().datevConfig!,
+          beraterNr: 'abc',
+        },
+      });
       const result = runDatevExportPreflight(docs, settings);
 
       expect(result.blockers.some(b => b.message.includes('numerisch'))).toBe(true);
@@ -319,7 +339,12 @@ describe('datevExport', () => {
 
     it('should return blocker for invalid wirtschaftsjahrBeginn format', () => {
       const docs = [createDoc()];
-      const settings = createSettings({ datevConfig: { wirtschaftsjahrBeginn: '2024-01-01' } });
+      const settings = createSettings({
+        datevConfig: {
+          ...createSettings().datevConfig!,
+          wirtschaftsjahrBeginn: '2024-01-01',
+        },
+      });
       const result = runDatevExportPreflight(docs, settings);
 
       expect(result.blockers.some(b => b.message.includes('YYYYMMDD'))).toBe(true);
@@ -327,7 +352,12 @@ describe('datevExport', () => {
 
     it('should return warning if waehrung is empty', () => {
       const docs = [createDoc()];
-      const settings = createSettings({ datevConfig: { waehrung: '' } });
+      const settings = createSettings({
+        datevConfig: {
+          ...createSettings().datevConfig!,
+          waehrung: '',
+        },
+      });
       const result = runDatevExportPreflight(docs, settings);
 
       expect(result.warnings.some(b => b.message.includes('Währung'))).toBe(true);
@@ -336,7 +366,12 @@ describe('datevExport', () => {
     it('should return warning if account length does not match sachkontenlaenge', () => {
       const doc = createDoc({ data: { ...createDoc().data!, sollKonto: '12345' } }); // 5 digits
       const docs = [doc];
-      const settings = createSettings({ datevConfig: { sachkontenlaenge: 4 } });
+      const settings = createSettings({
+        datevConfig: {
+          ...createSettings().datevConfig!,
+          sachkontenlaenge: 4,
+        },
+      });
       const result = runDatevExportPreflight(docs, settings);
 
       expect(result.warnings.some(b => b.message.includes('Sachkontenlänge'))).toBe(true);

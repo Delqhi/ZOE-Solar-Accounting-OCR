@@ -40,4 +40,4 @@ Start-Sprint mit einem kleinen, risikoarmen Slice:
 
 ## Offene Punkte
 
-- (TBD) Finaler Sprint-Scope: welche Stories kommen in Sprint 1?
+- Finaler Sprint-Scope: Stories K1 (Feldkatalog-Typen), K2 (DATEV-Export), L2 (ELSTER-Export) und A1-A2 (API-Key/Env-Konsistenz)

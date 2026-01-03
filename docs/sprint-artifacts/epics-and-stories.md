@@ -3,9 +3,9 @@
 > Dieses Dokument ist ein Startpunkt für `create-epics-and-stories`.
 > Es leitet sich aus [docs/prd.md](../prd.md) und [docs/solution-architecture.md](../solution-architecture.md) ab.
 
-## Epics (TBD)
+## Epics
 
-> Hinweis: Epics A–D wurden im aktuellen Stand umgesetzt; neue Arbeit läuft als weitere Epics.
+> Hinweis: Epics A–D wurden im aktuellen Stand umgesetzt; neue Arbeit läuft als weitere Epics. Aktive Entwicklung in Epics K und L.
 
 ### Epic A: Sicherheit & Konfiguration
 

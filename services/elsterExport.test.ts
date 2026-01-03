@@ -171,7 +171,10 @@ describe('elsterExport', () => {
 
     it('should use default finanzamtNr if not provided', () => {
       const xml = generateElsterXml(createRequest({
-        stammdaten: { finanzamtNr: undefined },
+        stammdaten: {
+          ...createRequest().stammdaten,
+          finanzamtNr: undefined,
+        },
       }));
 
       expect(xml).toContain('<Empfaenger id="F">0000</Empfaenger>');

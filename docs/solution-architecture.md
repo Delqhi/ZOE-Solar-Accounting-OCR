@@ -5,8 +5,11 @@
 
 ## 1. Scope / Vorhaben
 
-- (TBD) Welche konkreten Features/Änderungen werden umgesetzt?
-- (TBD) Welche Bereiche sind betroffen (UI, Services, Storage, Export)?
+- DATEV-Export (EXTF CSV-Format) für Buchhaltung
+- ELSTER UStVA XML-Export für Umsatzsteuervoranmeldung
+- Erweiterte Lieferanten-Regelengine mit Memory-System
+- TypScript-Konsolidierung und Test-Coverage-Aufbau
+- Betroffene Bereiche: Services (Export, RuleEngine), Types, Components (DatabaseView, Export-Dialoge)
 
 ## 2. Architektur-Ziele
 
@@ -49,5 +52,5 @@
 
 ## 7. Offene Punkte
 
-- (TBD) Was ist das nächste konkrete Feature/Problem?
-- (TBD) Brauchen wir UX-Redesign oder reicht kleine UI-Anpassung?
+- Nächstes Feature: Supabase-Integration für Cloud-Speicherung und Multi-Device-Sync
+- UX: Kein Redesign nötig, kleine Optimierungen an Export-Dialogen ausreichend

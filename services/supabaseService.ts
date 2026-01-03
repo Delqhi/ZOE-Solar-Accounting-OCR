@@ -184,7 +184,7 @@ const getDefaultSettings = (): AppSettings => ({
   taxDefinitions: DEFAULT_TAX_DEFINITIONS,
   accountDefinitions: DEFAULT_ACCOUNT_DEFINITIONS,
   datevConfig: DEFAULT_DATEV_CONFIG,
-  elsterStammdaten: DEFAULT_ELSTER_STAMMDATEN,
+  elsterStammdaten: DEFAULT_ELSTER_STAMMDATEN as any,
   accountGroups: [],
   ocrConfig: {
     scores: {
@@ -301,7 +301,7 @@ function transformSupabaseToDocument(doc: SupabaseDocument): DocumentRecord {
       lieferantAdresse: doc.lieferant_adresse || '',
       belegDatum: doc.beleg_datum || '',
       bruttoBetrag: doc.brutto_betrag || 0,
-      mwstBetrag: doc.mwst_betrag || 0,
+      mwstBetrag19: doc.mwst_betrag || 0,
       mwstSatz19: doc.mwst_satz || 0,
       steuerkategorie: doc.steuerkategorie || '',
       kontierungskonto: doc.skr03_konto || '',
@@ -352,7 +352,7 @@ function transformDocumentToSupabase(doc: DocumentRecord): SupabaseDocument {
     lieferant_adresse: data?.lieferantAdresse || null,
     beleg_datum: data?.belegDatum || null,
     brutto_betrag: data?.bruttoBetrag || null,
-    mwst_betrag: data?.mwstBetrag || null,
+    mwst_betrag: (data?.mwstBetrag19 || 0) + (data?.mwstBetrag7 || 0) + (data?.mwstBetrag0 || 0),
     mwst_satz: data?.mwstSatz19 || null,
     steuerkategorie: data?.steuerkategorie || null,
     skr03_konto: data?.konto_skr03 || null,

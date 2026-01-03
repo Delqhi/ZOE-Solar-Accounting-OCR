@@ -5,7 +5,6 @@ import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
 import { formatPreflightForDialog, runExportPreflight } from '../services/exportPreflight';
 import { generateDatevExtfBuchungsstapelCsv, runDatevExportPreflight } from '../services/datevExport';
-import { validateUstva, submitUstva, UstvaValidationRequest, UstvaSubmissionRequest } from '../services/submissionService';
 import { generateElsterXml, downloadElsterXml, ElsterExportRequest } from '../services/elsterExport';
 
 interface DatabaseGridProps {
@@ -50,12 +49,6 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
   // Sort State
   const [sortField, setSortField] = useState<string>('uploadDate');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-
-  // Submission State
-  const [pfxFile, setPfxFile] = useState<File | null>(null);
-  const [pfxPassword, setPfxPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionResult, setSubmissionResult] = useState<string>('');
 
   // Sorting Logic - optimized to avoid repeated split()
   const sortFieldKey = sortField.startsWith('data.') ? sortField.split('.')[1] : null;
@@ -178,91 +171,6 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
           else next.add(id);
           return next;
       });
-  };
-
-  // Submission Functions
-  const getSubmissionUrl = () => {
-    const config = settings?.submissionConfig;
-    if (!config) return null;
-
-    if (config.mode === 'local') {
-      return config.localUrl || 'http://localhost:8080';
-    } else if (config.mode === 'oci') {
-      return config.ociUrl;
-    }
-    return null;
-  };
-
-  const getSubmissionApiKey = () => {
-    return settings?.submissionConfig?.apiKey;
-  };
-
-  const handleValidateUstva = async () => {
-    const url = getSubmissionUrl();
-    if (!url) {
-      setSubmissionResult('Fehler: Keine Backend-URL konfiguriert. Prüfen Sie die Einstellungen.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setSubmissionResult('Validierung läuft...');
-
-    const period = filterYear === 'all' ? 'all' : `${filterYear}${filterQuarter !== 'all' ? filterQuarter : filterMonth !== 'all' ? filterMonth : ''}`;
-
-    const request: UstvaValidationRequest = {
-      period,
-      data: ustvaData,
-    };
-
-    const result = await validateUstva(url, request, getSubmissionApiKey());
-
-    if (result.success) {
-      setSubmissionResult('Validierung erfolgreich!');
-    } else {
-      setSubmissionResult(`Validierungsfehler: ${result.error}`);
-    }
-
-    setIsSubmitting(false);
-  };
-
-  const handleSubmitUstva = async () => {
-    if (!pfxFile) {
-      setSubmissionResult('Fehler: Keine Zertifikatsdatei ausgewählt.');
-      return;
-    }
-
-    if (!pfxPassword) {
-      setSubmissionResult('Fehler: Kein PIN/Passwort eingegeben.');
-      return;
-    }
-
-    const url = getSubmissionUrl();
-    if (!url) {
-      setSubmissionResult('Fehler: Keine Backend-URL konfiguriert. Prüfen Sie die Einstellungen.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setSubmissionResult('Übermittlung läuft...');
-
-    const period = filterYear === 'all' ? 'all' : `${filterYear}${filterQuarter !== 'all' ? filterQuarter : filterMonth !== 'all' ? filterMonth : ''}`;
-
-    const request: UstvaSubmissionRequest = {
-      period,
-      data: ustvaData,
-      pfxFile,
-      pfxPassword,
-    };
-
-    const result = await submitUstva(url, request, getSubmissionApiKey());
-
-    if (result.success) {
-      setSubmissionResult(`Übermittlung erfolgreich! Ticket: ${result.ticket || 'N/A'}`);
-    } else {
-      setSubmissionResult(`Übermittlungsfehler: ${result.error}`);
-    }
-
-    setIsSubmitting(false);
   };
 
   const calculateUstvaData = () => {
