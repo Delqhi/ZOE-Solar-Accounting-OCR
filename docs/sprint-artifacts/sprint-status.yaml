@@ -16,8 +16,8 @@ development_status:
   epic-h-workflow-ux-feinschliff: completed
   epic-i-export-reporting-feinschliff: completed
   epic-j-datev-steuerberater-uebergabe: completed
-  epic-k-belegdaten-vollstaendigkeit-export-schema: backlog
-  epic-l-elster-ustva-euer-vorbereitung: backlog
+  epic-k-belegdaten-vollstaendigkeit-export-schema: completed
+  epic-l-elster-ustva-euer-vorbereitung: completed
 
   # Stories
   a1: completed
@@ -50,11 +50,11 @@ development_status:
   j2: completed
 
   # Sprint 9 (planned)
-  k1: backlog
-  k2: backlog
+  k1: completed
+  k2: completed
 
   # Sprint 10 (planned)
-  l2: backlog
+  l2: completed
 
   # Optional retros
   epic-a-retrospective: completed
