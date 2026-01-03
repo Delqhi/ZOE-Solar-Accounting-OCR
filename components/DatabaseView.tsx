@@ -24,6 +24,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   onToggleSelect,
   onToggleAll,
   onBulkDelete,
+  onBulkMarkReviewed,
+  onBulkOCR,
   onCompareDuplicates
 }) => {
   const [dragTargetId, setDragTargetId] = useState<string | null>(null);
@@ -329,12 +331,30 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       {selectedIds.length > 0 && (
         <div className="bg-white border-t border-slate-100 p-4 flex justify-between items-center px-6 sticky bottom-0 z-30 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
           <span className="text-sm text-slate-600 font-medium">{selectedIds.length} ausgewählt</span>
-          <button
-            onClick={onBulkDelete}
-            className="bg-white border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-50 hover:border-red-300 transition-all shadow-sm"
-          >
-            Löschen
-          </button>
+          <div className="flex gap-2">
+            {onBulkOCR && (
+              <button
+                onClick={onBulkOCR}
+                className="bg-white border border-blue-200 text-blue-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 hover:border-blue-300 transition-all shadow-sm"
+              >
+                Erneut OCR
+              </button>
+            )}
+            {onBulkMarkReviewed && (
+              <button
+                onClick={onBulkMarkReviewed}
+                className="bg-white border border-emerald-200 text-emerald-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-50 hover:border-emerald-300 transition-all shadow-sm"
+              >
+                Als geprüft
+              </button>
+            )}
+            <button
+              onClick={onBulkDelete}
+              className="bg-white border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-50 hover:border-red-300 transition-all shadow-sm"
+            >
+              Löschen
+            </button>
+          </div>
         </div>
       )}
     </div>
