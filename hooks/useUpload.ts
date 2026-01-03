@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { DocumentRecord, ExtractedData, Attachment } from '../types';
+import { DocumentRecord, ExtractedData, Attachment, DocumentStatus, AppSettings } from '../types';
 import { analyzeDocumentWithGemini } from '../services/geminiService';
 import { applyAccountingRules, generateZoeInvoiceId } from '../services/ruleEngine';
 import { normalizeExtractedData } from '../services/extractedDataNormalization';
@@ -30,6 +30,11 @@ const readFileToBase64 = (file: File): Promise<{ base64: string; url: string }> 
   });
 };
 
+// Helper to get date from extracted data
+const getDocumentDate = (data: ExtractedData): string => {
+  return data.belegDatum || new Date().toISOString();
+};
+
 export const useUpload = (): UseUploadReturn => {
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
@@ -47,11 +52,11 @@ export const useUpload = (): UseUploadReturn => {
       const extractedData = await analyzeDocumentWithGemini(base64, file.type);
       setProgress('Buchungsregeln werden angewendet...');
 
-      // Step 3: Apply accounting rules
-      const enrichedData = applyAccountingRules(extractedData);
+      // Step 3: Apply accounting rules (with defaults for missing args)
+      const enrichedData = applyAccountingRules(extractedData, [], {} as AppSettings);
 
       // Step 4: Generate ZOE invoice ID
-      const zoeId = generateZoeInvoiceId();
+      const zoeId = generateZoeInvoiceId(getDocumentDate(extractedData), []);
 
       // Step 5: Check for private documents
       const isPrivate = detectPrivateDocument(enrichedData);
@@ -62,7 +67,7 @@ export const useUpload = (): UseUploadReturn => {
         fileName: file.name,
         fileType: file.type,
         uploadDate: new Date().toISOString(),
-        status: isPrivate ? 'PRIVATE' : 'REVIEW_NEEDED',
+        status: isPrivate ? DocumentStatus.PRIVATE : DocumentStatus.REVIEW_NEEDED,
         duplicateOfId: undefined,
         duplicateReason: undefined,
         previewUrl: url,

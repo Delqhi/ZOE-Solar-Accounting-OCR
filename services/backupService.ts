@@ -1,5 +1,5 @@
 import { DocumentRecord, AppSettings } from '../types';
-import { getAllDocuments, getSettings, initSupabase, SupabaseClient } from './supabaseService';
+import { getAllDocuments, getSettings, initSupabase } from './supabaseService';
 import { exportDocumentsToSQL } from './supabaseService';
 
 export interface BackupData {
@@ -112,7 +112,7 @@ export const restoreFromBackup = async (file: File): Promise<{
             lieferant_adresse: doc.data?.lieferantAdresse || null,
             beleg_datum: doc.data?.belegDatum || null,
             brutto_betrag: doc.data?.bruttoBetrag || null,
-            mwst_betrag: doc.data?.mwstBetrag || null,
+            mwst_betrag: (doc.data?.mwstBetrag19 || 0) + (doc.data?.mwstBetrag7 || 0) + (doc.data?.mwstBetrag0 || 0),
             mwst_satz: doc.data?.mwstSatz19 || null,
             steuerkategorie: doc.data?.steuerkategorie || null,
             skr03_konto: doc.data?.konto_skr03 || null,

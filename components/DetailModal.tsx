@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { DocumentRecord, ExtractedData, AppSettings, Attachment, DocumentStatus, LineItem } from '../types';
 import { PdfViewer } from './PdfViewer';
-import { getSettings } from '../services/storageService';
+import { getSettings } from '../../services/storageService';
 
 const isPresent = (value: unknown): boolean => {
     if (value === null || value === undefined) return false;

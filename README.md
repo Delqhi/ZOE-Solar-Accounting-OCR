@@ -213,10 +213,10 @@ VITE_SILICONFLOW_API_KEY=dein-siliconflow-key
 ## 📁 Projektstruktur
 
 ```
-src/
 ├── services/                          # Business Logic
 │   ├── geminiService.ts               # Google Gemini OCR
 │   ├── fallbackService.ts             # SiliconFlow Fallback
+│   ├── storageService.ts              # IndexedDB Local-First Storage
 │   ├── supabaseService.ts             # Supabase CRUD + Auth
 │   ├── ruleEngine.ts                  # SKR03 Kontierung
 │   ├── elsterExport.ts                # ELSTER XML

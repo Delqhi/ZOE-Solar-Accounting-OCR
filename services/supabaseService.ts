@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { DocumentRecord, DocumentStatus, ExtractedData, AppSettings } from '../types';
+import { DocumentRecord, DocumentStatus, ExtractedData, AppSettings, ElsterStammdaten } from '../types';
 
 // Environment variables (must be set in .env)
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
@@ -134,7 +134,7 @@ export const onAuthStateChange = (callback: (user: User | null) => void): (() =>
     return () => {};
   }
 
-  return client.auth.onAuthStateChange((event, session) => {
+  const { data } = client.auth.onAuthStateChange((event, session) => {
     if (session?.user) {
       callback({
         id: session.user.id,
@@ -145,6 +145,12 @@ export const onAuthStateChange = (callback: (user: User | null) => void): (() =>
       callback(null);
     }
   });
+
+  return () => {
+    if (data?.subscription) {
+      data.subscription.unsubscribe();
+    }
+  };
 };
 
 // --- Document Operations ---
@@ -283,7 +289,7 @@ const DEFAULT_DATEV_CONFIG = {
   }
 };
 
-const DEFAULT_ELSTER_STAMMDATEN = {
+const DEFAULT_ELSTER_STAMMDATEN: ElsterStammdaten = {
   unternehmensName: '',
   land: 'DE',
   plz: '',
@@ -470,7 +476,9 @@ function transformSupabaseToDocument(doc: SupabaseDocument): DocumentRecord {
       lieferantAdresse: doc.lieferant_adresse || '',
       belegDatum: doc.beleg_datum || '',
       bruttoBetrag: doc.brutto_betrag || 0,
-      mwstBetrag: doc.mwst_betrag || 0,
+      mwstBetrag0: 0,
+      mwstBetrag7: 0,
+      mwstBetrag19: doc.mwst_betrag || 0,
       mwstSatz19: doc.mwst_satz || 0,
       steuerkategorie: doc.steuerkategorie || '',
       kontierungskonto: doc.skr03_konto || '',
@@ -531,7 +539,7 @@ function transformDocumentToSupabase(doc: DocumentRecord): SupabaseDocument {
     lieferant_adresse: data?.lieferantAdresse || null,
     beleg_datum: data?.belegDatum || null,
     brutto_betrag: data?.bruttoBetrag || null,
-    mwst_betrag: data?.mwstBetrag || null,
+    mwst_betrag: (data?.mwstBetrag19 || 0) + (data?.mwstBetrag7 || 0) + (data?.mwstBetrag0 || 0),
     mwst_satz: data?.mwstSatz19 || null,
     steuerkategorie: data?.steuerkategorie || null,
     skr03_konto: data?.konto_skr03 || null,
