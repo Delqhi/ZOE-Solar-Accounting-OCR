@@ -1,28 +1,50 @@
+/**
+ * Backup Service for ZOE Solar Accounting OCR
+ * Supports both IndexedDB (local) and Supabase (cloud) backups
+ */
+
 import { DocumentRecord, AppSettings } from '../types';
-import { getAllDocuments, getSettings, initSupabase, SupabaseClient } from './supabaseService';
-import { exportDocumentsToSQL } from './supabaseService';
+import * as storageService from './storageService';
+import * as supabaseService from './supabaseService';
 
 export interface BackupData {
   version: string;
   timestamp: string;
   documents: DocumentRecord[];
-  settings: AppSettings;
+  settings: AppSettings | null;
+  source: 'local' | 'cloud';
+}
+
+export interface RestoreResult {
+  success: boolean;
+  documentsRestored: number;
+  settingsRestored: boolean;
+  error?: string;
 }
 
 const BACKUP_VERSION = '1.0.0';
 
+/**
+ * Create backup from IndexedDB (local-first)
+ */
 export const createBackup = async (): Promise<BackupData> => {
-  const documents = await getAllDocuments();
-  const settings = await getSettings();
+  const [documents, settings] = await Promise.all([
+    storageService.getAllDocuments(),
+    storageService.getSettings()
+  ]);
 
   return {
     version: BACKUP_VERSION,
     timestamp: new Date().toISOString(),
     documents,
-    settings
+    settings,
+    source: 'local'
   };
 };
 
+/**
+ * Download backup as JSON file
+ */
 export const downloadBackupJSON = async (): Promise<void> => {
   const backup = await createBackup();
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -35,25 +57,29 @@ export const downloadBackupJSON = async (): Promise<void> => {
   URL.revokeObjectURL(url);
 };
 
+/**
+ * Download backup as SQL file
+ */
 export const downloadBackupSQL = async (): Promise<void> => {
-  const documents = await getAllDocuments();
-  const settings = await getSettings();
-  const sql = exportDocumentsToSQL(documents, settings);
+  const [documents, settings] = await Promise.all([
+    storageService.getAllDocuments(),
+    storageService.getSettings()
+  ]);
+  const sql = supabaseService.exportDocumentsToSQL(documents, settings);
   const blob = new Blob([sql], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const date = new Date().toISOString().split('T')[0];
   a.href = url;
+  const date = new Date().toISOString().split('T')[0];
   a.download = `zoe_backup_${date}.sql`;
   a.click();
   URL.revokeObjectURL(url);
 };
 
-export const restoreFromBackup = async (file: File): Promise<{
-  success: boolean;
-  documentsRestored: number;
-  error?: string;
-}> => {
+/**
+ * Restore backup from JSON file (to IndexedDB)
+ */
+export const restoreFromBackup = async (file: File): Promise<RestoreResult> => {
   return new Promise((resolve) => {
     const reader = new FileReader();
 
@@ -63,83 +89,60 @@ export const restoreFromBackup = async (file: File): Promise<{
         const backup: BackupData = JSON.parse(content);
 
         // Validate backup format
-        if (!backup.version || !backup.documents || !backup.settings) {
+        if (!backup.version || !backup.documents) {
           resolve({
             success: false,
             documentsRestored: 0,
+            settingsRestored: false,
             error: 'Ungültiges Backup-Format.'
           });
           return;
         }
 
-        const client = initSupabase();
-        if (!client) {
-          resolve({
-            success: false,
-            documentsRestored: 0,
-            error: 'Supabase nicht konfiguriert.'
-          });
-          return;
-        }
+        let documentsRestored = 0;
+        let settingsRestored = false;
 
         // Restore settings first
-        const { error: settingsError } = await client
-          .from('app_settings')
-          .upsert({
-            id: 'global',
-            settings_data: backup.settings,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'id' });
-
-        if (settingsError) {
-          resolve({
-            success: false,
-            documentsRestored: 0,
-            error: `Fehler beim Wiederherstellen der Einstellungen: ${settingsError.message}`
-          });
-          return;
+        if (backup.settings) {
+          await storageService.saveSettings(backup.settings);
+          settingsRestored = true;
         }
 
         // Restore documents
-        let restoredCount = 0;
         for (const doc of backup.documents) {
-          const supabaseDoc = {
-            id: doc.id,
-            file_data: doc.previewUrl?.split(',')[1] || '',
-            file_name: doc.fileName,
-            file_type: doc.fileType,
-            lieferant_name: doc.data?.lieferantName || null,
-            lieferant_adresse: doc.data?.lieferantAdresse || null,
-            beleg_datum: doc.data?.belegDatum || null,
-            brutto_betrag: doc.data?.bruttoBetrag || null,
-            mwst_betrag: doc.data?.mwstBetrag || null,
-            mwst_satz: doc.data?.mwstSatz19 || null,
-            steuerkategorie: doc.data?.steuerkategorie || null,
-            skr03_konto: doc.data?.konto_skr03 || null,
-            line_items: doc.data?.lineItems || null,
-            status: doc.status,
-            score: doc.data?.ocr_score || null,
-            created_at: doc.uploadDate
-          };
+          try {
+            await storageService.saveDocument(doc);
+            documentsRestored++;
+          } catch (err) {
+            console.warn(`Failed to restore document ${doc.id}:`, err);
+          }
+        }
 
-          const { error: docError } = await client
-            .from('belege')
-            .upsert(supabaseDoc, { onConflict: 'id' });
-
-          if (!docError) {
-            restoredCount++;
+        // Optionally sync to Supabase if configured
+        if (supabaseService.isSupabaseConfigured()) {
+          try {
+            if (settingsRestored && backup.settings) {
+              await supabaseService.saveSettings(backup.settings);
+            }
+            for (const doc of backup.documents) {
+              await supabaseService.saveDocument(doc);
+            }
+          } catch (syncErr) {
+            console.warn('Failed to sync restored data to Supabase:', syncErr);
           }
         }
 
         resolve({
           success: true,
-          documentsRestored: restoredCount
+          documentsRestored,
+          settingsRestored
         });
 
       } catch (err) {
         resolve({
           success: false,
           documentsRestored: 0,
+          settingsRestored: false,
           error: `Fehler beim Parsen der Backup-Datei: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`
         });
       }
@@ -149,10 +152,50 @@ export const restoreFromBackup = async (file: File): Promise<{
       resolve({
         success: false,
         documentsRestored: 0,
+        settingsRestored: false,
         error: 'Fehler beim Lesen der Datei.'
       });
     };
 
     reader.readAsText(file);
   });
+};
+
+/**
+ * Get backup preview without loading all data
+ */
+export const getBackupPreview = async (): Promise<{
+  documentCount: number;
+  hasSettings: boolean;
+  yearRange: { min: number; max: number } | null;
+  totalAmount: number;
+}> => {
+  const [documents, settings] = await Promise.all([
+    storageService.getAllDocuments(),
+    storageService.getSettings()
+  ]);
+
+  const years = new Set<number>();
+  let totalAmount = 0;
+
+  for (const doc of documents) {
+    if (doc.data?.belegDatum) {
+      const year = parseInt(doc.data.belegDatum.substring(0, 4), 10);
+      if (!isNaN(year)) years.add(year);
+    }
+    if (doc.data?.bruttoBetrag) {
+      totalAmount += doc.data.bruttoBetrag;
+    }
+  }
+
+  const yearArray = Array.from(years).sort();
+
+  return {
+    documentCount: documents.length,
+    hasSettings: !!settings,
+    yearRange: yearArray.length > 0
+      ? { min: yearArray[0], max: yearArray[yearArray.length - 1] }
+      : null,
+    totalAmount: Math.round(totalAmount * 100) / 100
+  };
 };

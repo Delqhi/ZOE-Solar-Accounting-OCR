@@ -48,10 +48,11 @@ export const BackupView: React.FC<BackupViewProps> = ({ onDataChanged }) => {
     try {
       const result = await restoreFromBackup(restoreFile);
       if (result.success) {
-        setMessage({
-          type: 'success',
-          text: `${result.documentsRestored} Dokumente wiederhergestellt.`
-        });
+        let text = `${result.documentsImported} Dokumente wiederhergestellt.`;
+        if (result.settingsRestored) {
+          text += ' Einstellungen wurden ebenfalls wiederhergestellt.';
+        }
+        setMessage({ type: 'success', text });
         onDataChanged();
       } else {
         setMessage({ type: 'error', text: result.error || 'Wiederherstellung fehlgeschlagen.' });
