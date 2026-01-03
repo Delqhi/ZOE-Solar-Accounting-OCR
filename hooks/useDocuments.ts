@@ -11,7 +11,7 @@ interface UseDocumentsReturn {
   updateDocument: (doc: DocumentRecord) => void;
   deleteDocument: (id: string) => Promise<void>;
   markAsReviewed: (ids: string[]) => Promise<void>;
-  reRunOcr: (ids: string[]) => Promise<void>;
+  reRunOcr: (ids: string[]) => Promise<string[]>;
 }
 
 export const useDocuments = (): UseDocumentsReturn => {
@@ -58,20 +58,47 @@ export const useDocuments = (): UseDocumentsReturn => {
   }, []);
 
   const markAsReviewed = useCallback(async (ids: string[]) => {
-    // Optimistic update
-    setDocuments(prev => prev.map(d =>
-      ids.includes(d.id) ? { ...d, status: DocumentStatus.COMPLETED } : d
-    ));
-    // In a real app, this would call an API to bulk update
-    // For now, we just update local state
-  }, []);
+    try {
+      // Optimistic update - update local state first
+      setDocuments(prev => prev.map(d =>
+        ids.includes(d.id) ? { ...d, status: DocumentStatus.COMPLETED } : d
+      ));
+
+      // Persist to Supabase (or fallback to local storage)
+      for (const id of ids) {
+        const doc = documents.find(d => d.id === id);
+        if (doc) {
+          const updatedDoc = { ...doc, status: DocumentStatus.COMPLETED };
+          try {
+            await supabaseService.saveDocument(updatedDoc);
+          } catch {
+            // Fallback to storageService if Supabase not configured
+            await (await import('../services/storageService')).saveDocument(updatedDoc);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error marking documents as reviewed:', e);
+      throw e;
+    }
+  }, [documents]);
 
   const reRunOcr = useCallback(async (ids: string[]) => {
-    // Set documents to processing state
+    // Set documents to processing state first
     setDocuments(prev => prev.map(d =>
-      ids.includes(d.id) ? { ...d, status: DocumentStatus.PROCESSING } : d
+      ids.includes(d.id) ? { ...d, status: DocumentStatus.PROCESSING, error: undefined } : d
     ));
-    // In a real app, this would trigger re-OCR for selected documents
+
+    // Note: The actual OCR re-run is complex and requires access to:
+    // - The document's previewUrl/base64 data
+    // - The OCR services (geminiService)
+    // - Settings for accounting rules
+    //
+    // This is typically handled by the caller (App.tsx) which has all the context.
+    // We just update the status here to indicate "about to re-run OCR".
+
+    // Return the IDs that need OCR re-run for the caller to handle
+    return ids;
   }, []);
 
   return {

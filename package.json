@@ -21,7 +21,8 @@
     "jspdf-autotable": "3.8.1",
     "pdfjs-dist": "3.11.174",
     "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react-dom": "^19.2.3",
+    "uuid": "^11.0.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

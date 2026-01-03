@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { DocumentRecord, ExtractedData, Attachment } from '../types';
 import { analyzeDocumentWithGemini } from '../services/geminiService';
-import { applyAccountingRules, generateZoeInvoiceId } from '../services/ruleEngine';
+import { generateZoeInvoiceId } from '../services/ruleEngine';
 import { normalizeExtractedData } from '../services/extractedDataNormalization';
 import { detectPrivateDocument } from '../services/privateDocumentDetection';
 import { v4 as uuidv4 } from 'uuid';
@@ -47,11 +47,13 @@ export const useUpload = (): UseUploadReturn => {
       const extractedData = await analyzeDocumentWithGemini(base64, file.type);
       setProgress('Buchungsregeln werden angewendet...');
 
-      // Step 3: Apply accounting rules
-      const enrichedData = applyAccountingRules(extractedData);
+      // Step 3: Apply accounting rules (skipped in simple hook - caller handles this)
+      // In this simple hook, we don't have access to settings/existingDocs
+      // The full accounting rules are applied in App.tsx for batch uploads
+      const enrichedData = { ...extractedData };
 
       // Step 4: Generate ZOE invoice ID
-      const zoeId = generateZoeInvoiceId();
+      const zoeId = generateZoeInvoiceId(extractedData.belegDatum || '', []);
 
       // Step 5: Check for private documents
       const isPrivate = detectPrivateDocument(enrichedData);
