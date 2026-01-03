@@ -25,6 +25,128 @@ export const isSupabaseConfigured = (): boolean => {
   return !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 };
 
+// --- Authentication ---
+
+export interface User {
+  id: string;
+  email: string;
+  createdAt: string;
+}
+
+export const signUp = async (email: string, password: string): Promise<{ user: User | null; error: string | null }> => {
+  const client = initSupabase();
+  if (!client) {
+    return { user: null, error: 'Supabase not configured' };
+  }
+
+  const { data, error } = await client.auth.signUp({
+    email,
+    password
+  });
+
+  if (error) {
+    return { user: null, error: error.message };
+  }
+
+  if (data.user) {
+    return {
+      user: {
+        id: data.user.id,
+        email: data.user.email || '',
+        createdAt: data.user.created_at
+      },
+      error: null
+    };
+  }
+
+  return { user: null, error: 'Unknown error' };
+};
+
+export const signIn = async (email: string, password: string): Promise<{ user: User | null; error: string | null }> => {
+  const client = initSupabase();
+  if (!client) {
+    return { user: null, error: 'Supabase not configured' };
+  }
+
+  const { data, error } = await client.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    return { user: null, error: error.message };
+  }
+
+  if (data.user) {
+    return {
+      user: {
+        id: data.user.id,
+        email: data.user.email || '',
+        createdAt: data.user.created_at
+      },
+      error: null
+    };
+  }
+
+  return { user: null, error: 'Unknown error' };
+};
+
+export const signOut = async (): Promise<{ error: string | null }> => {
+  const client = initSupabase();
+  if (!client) {
+    return { error: 'Supabase not configured' };
+  }
+
+  const { error } = await client.auth.signOut();
+  return { error: error?.message || null };
+};
+
+export const getCurrentUser = async (): Promise<{ user: User | null; error: string | null }> => {
+  const client = initSupabase();
+  if (!client) {
+    return { user: null, error: 'Supabase not configured' };
+  }
+
+  const { data, error } = await client.auth.getUser();
+
+  if (error) {
+    return { user: null, error: error.message };
+  }
+
+  if (data.user) {
+    return {
+      user: {
+        id: data.user.id,
+        email: data.user.email || '',
+        createdAt: data.user.created_at
+      },
+      error: null
+    };
+  }
+
+  return { user: null, error: 'No user' };
+};
+
+export const onAuthStateChange = (callback: (user: User | null) => void): (() => void) => {
+  const client = initSupabase();
+  if (!client) {
+    callback(null);
+    return () => {};
+  }
+
+  return client.auth.onAuthStateChange((event, session) => {
+    if (session?.user) {
+      callback({
+        id: session.user.id,
+        email: session.user.email || '',
+        createdAt: session.user.created_at
+      });
+    } else {
+      callback(null);
+    }
+  });
+};
+
 // --- Document Operations ---
 
 export interface SupabaseDocument {
@@ -218,6 +340,42 @@ export const getAllDocuments = async (): Promise<DocumentRecord[]> => {
   }
 
   return (data || []).map(doc => transformSupabaseToDocument(doc));
+};
+
+export const getDocumentsPaginated = async (
+  page: number = 1,
+  pageSize: number = 50
+): Promise<{ documents: DocumentRecord[]; total: number; hasMore: boolean }> => {
+  const client = initSupabase();
+  if (!client) {
+    throw new Error('Supabase not configured');
+  }
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  // Get total count
+  const { count } = await client
+    .from('belege')
+    .select('*', { count: 'exact', head: true });
+
+  // Get paginated data
+  const { data, error } = await client
+    .from('belege')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  if (error) {
+    console.error('Error fetching documents:', error);
+    return { documents: [], total: count || 0, hasMore: false };
+  }
+
+  const documents = (data || []).map(doc => transformSupabaseToDocument(doc));
+  const total = count || 0;
+  const hasMore = to < total - 1;
+
+  return { documents, total, hasMore };
 };
 
 export const saveDocument = async (doc: DocumentRecord): Promise<void> => {
