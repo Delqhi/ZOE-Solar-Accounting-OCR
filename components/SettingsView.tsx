@@ -358,7 +358,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, on
                   </div>
 
                   <div className="px-4 pb-4">
-                      <div className="text-sm font-medium text-gray-900 mb-2">BU-Schluessel Mapping (Steuerkategorie -> DATEV)</div>
+                      <div className="text-sm font-medium text-gray-900 mb-2">BU-Schlüssel Mapping (Steuerkategorie → DATEV)</div>
                       <div className="text-xs text-gray-500 mb-3">
                           Bitte mit der Steuerkanzlei abstimmen. Leere Werte blockieren den DATEV-Export, sobald die Steuerkategorie verwendet wird.
                       </div>
