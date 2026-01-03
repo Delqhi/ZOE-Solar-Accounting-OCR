@@ -13,7 +13,8 @@ export default defineConfig(({ mode }) => {
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.SILICONFLOW_API_KEY': JSON.stringify(env.SILICONFLOW_API_KEY)
+        'process.env.SILICONFLOW_API_KEY': JSON.stringify(env.SILICONFLOW_API_KEY),
+        'process.env.MINIMAX_API_KEY': JSON.stringify(env.MINIMAX_API_KEY || '')
       },
       resolve: {
         alias: {

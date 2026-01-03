@@ -4,11 +4,15 @@
  * NICHT für OCR (dafür: geminiService.ts → fallbackService.ts)
  */
 
-const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY;
 const MINIMAX_API_URL = "https://api.minimax.chat/v1/text/chatcompletion_v2";
 
 // MiniMax Text Modelle - abab6.5s-chat ist schnell und kostengünstig
 const MINI_MAX_MODEL = "abab6.5s-chat";
+
+// Helper to get API key at runtime (not module load time)
+function getApiKey(): string {
+  return process.env.MINIMAX_API_KEY || '';
+}
 
 export interface MiniMaxResponse {
   text: string;
@@ -29,7 +33,8 @@ export async function generateText(
     systemPrompt?: string;
   }
 ): Promise<MiniMaxResponse> {
-  if (!MINIMAX_API_KEY) {
+  const apiKey = getApiKey();
+  if (!apiKey) {
     throw new Error("MiniMax API Key nicht konfiguriert. Bitte MINIMAX_API_KEY in .env setzen.");
   }
 
@@ -44,7 +49,7 @@ export async function generateText(
   const response = await fetch(MINIMAX_API_URL, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${MINIMAX_API_KEY}`,
+      "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
