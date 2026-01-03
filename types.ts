@@ -4,7 +4,8 @@ export enum DocumentStatus {
   REVIEW_NEEDED = 'REVIEW_NEEDED',
   COMPLETED = 'COMPLETED',
   ERROR = 'ERROR',
-  DUPLICATE = 'DUPLICATE'
+  DUPLICATE = 'DUPLICATE',
+  PRIVATE = 'PRIVATE' // Document moved to belege_privat table
 }
 
 export interface LineItem {

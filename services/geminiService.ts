@@ -4,7 +4,7 @@ import { ExtractedData, OcrProvider } from "../types";
 import { analyzeDocumentWithFallback } from "./fallbackService";
 import { normalizeExtractedData } from "./extractedDataNormalization";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const accountingSchema: Schema = {
   type: Type.OBJECT,
@@ -117,7 +117,12 @@ export const analyzeDocumentWithGemini = async (base64Data: string, mimeType: st
         jsonString = jsonString.replace(/^```/, '').replace(/```$/, '');
     }
     
-    const parsed = JSON.parse(jsonString);
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonString);
+    } catch (parseError: any) {
+      throw new Error(`JSON parse error: ${parseError.message}. Raw response: ${jsonString.substring(0, 200)}...`);
+    }
     return normalizeExtractedData(parsed);
 
   } catch (error: any) {
