@@ -2,9 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { DocumentRecord, ExtractedData, DocumentStatus } from '../types';
 import { PdfViewer } from './PdfViewer';
 
-// Modern Input Styles
-const INPUT_CLASS = "w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 shadow-sm focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none placeholder-slate-400 transition-all";
-const LABEL_CLASS = "block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide";
+// Vercel-style constants
+const INPUT_CLASS = "w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-200 transition-all placeholder-gray-400";
+const LABEL_CLASS = "block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide";
+const BUTTON_PRIMARY = "bg-black text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-800 active:bg-gray-900 transition-all";
+const BUTTON_SECONDARY = "bg-white text-gray-900 border border-gray-200 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 active:bg-gray-100 transition-all";
+const BUTTON_DANGER = "bg-white text-red-600 border border-gray-200 px-4 py-2 rounded-md text-sm font-medium hover:bg-red-50 active:bg-red-100 transition-all";
 
 interface DuplicateCompareModalProps {
   original: DocumentRecord;
@@ -34,7 +37,6 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
   const [activeSide, setActiveSide] = useState<'original' | 'duplicate'>('duplicate');
   const [saving, setSaving] = useState(false);
 
-  // Get view URL and type for each document
   const getViewUrl = (doc: DocumentRecord) => doc.previewUrl || '';
   const getViewType = (doc: DocumentRecord) => doc.fileType || '';
 
@@ -59,7 +61,6 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
   };
 
   const handleMarkAsOriginal = async () => {
-    // Remove duplicate status from duplicate, keep original
     const updatedDup = {
       ...duplicate,
       status: DocumentStatus.REVIEW_NEEDED as DocumentStatus,
@@ -72,14 +73,13 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
   };
 
   const handleDeleteDuplicate = async () => {
-    if (confirm('Möchten Sie dieses Duplikat wirklich löschen?')) {
+    if (confirm('Moechten Sie dieses Duplikat wirklich loeschen?')) {
       await onDelete(duplicate.id);
       onClose();
     }
   };
 
   const handleKeepBoth = async () => {
-    // Remove duplicate status from duplicate
     const updatedDup = {
       ...duplicate,
       status: DocumentStatus.REVIEW_NEEDED as DocumentStatus,
@@ -91,7 +91,6 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
     onClose();
   };
 
-  // Keyboard navigation
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -103,31 +102,29 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
 
-  // Find other duplicates of the same original
   const otherDuplicates = allDocuments.filter(
     d => d.duplicateOfId === original.id && d.id !== duplicate.id
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-white w-[95vw] h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white w-[95vw] h-[90vh] rounded-xl border border-gray-200 flex flex-col overflow-hidden animate-scale-in">
         {/* Header */}
-        <div className="h-16 px-6 flex items-center justify-between flex-none bg-slate-50 border-b border-slate-200">
+        <div className="h-14 px-6 flex items-center justify-between flex-none bg-white border-b border-gray-100">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500"></div>
-              <h2 className="font-bold text-slate-800 text-lg">Duplikat-Vergleich</h2>
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+              <h2 className="font-semibold text-gray-900 text-base">Duplikat-Vergleich</h2>
             </div>
-            <span className="text-sm text-slate-500">
-              Ähnlichkeit: <span className="font-bold text-red-600">{(duplicate.duplicateConfidence || 0).toFixed(0)}%</span>
+            <span className="text-sm text-gray-500">
+              Aehnlichkeit: <span className="font-semibold text-red-600">{(duplicate.duplicateConfidence || 0).toFixed(0)}%</span>
             </span>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Navigation between duplicates */}
             {otherDuplicates.length > 0 && (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg text-sm">
-                <span className="text-slate-600">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-md text-sm">
+                <span className="text-gray-600">
                   {otherDuplicates.indexOf(duplicate) + 1} von {otherDuplicates.length + 1} Duplikaten
                 </span>
               </div>
@@ -135,9 +132,9 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-2 hover:bg-slate-200 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-md text-gray-500 transition-colors"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="18" y1="6" x2="6" y2="18"/>
                 <line x1="6" y1="6" x2="18" y2="18"/>
               </svg>
@@ -146,54 +143,53 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
         </div>
 
         {/* Action Bar */}
-        <div className="px-6 py-3 bg-white border-b border-slate-100 flex items-center justify-between">
+        <div className="px-6 py-3 bg-white border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-slate-600">Aktionen:</span>
+            <span className="text-sm font-medium text-gray-600">Aktionen:</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handleKeepBoth}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold transition-colors"
+              className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50 hover:border-gray-300 transition-all"
             >
               Beide behalten
             </button>
             <button
               onClick={handleMarkAsOriginal}
-              className="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm font-semibold transition-colors"
+              className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50 hover:border-gray-300 transition-all"
             >
               Als Original markieren
             </button>
             <button
               onClick={() => onMerge(duplicate.id, original.id)}
-              className="px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-lg text-sm font-semibold transition-colors"
+              className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50 hover:border-gray-300 transition-all"
             >
-              Zusammenführen
+              Zusammenfuehren
             </button>
             <button
               onClick={handleDeleteDuplicate}
-              className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-semibold transition-colors"
+              className="px-4 py-2 bg-white border border-gray-200 text-red-600 rounded-md text-sm font-medium hover:bg-red-50 hover:border-red-200 transition-all"
             >
-              Duplikat löschen
+              Duplikat loeschen
             </button>
           </div>
         </div>
 
-        {/* Main Content - Side by Side */}
+        {/* Main Content */}
         <div className="flex-1 flex overflow-hidden">
           {/* Left: Original */}
-          <div className="flex-1 flex flex-col border-r border-slate-200 min-w-0">
+          <div className="flex-1 flex flex-col border-r border-gray-200 min-w-0">
             <div className="px-4 py-2 bg-green-50 border-b border-green-100 flex items-center justify-between">
-              <span className="font-semibold text-green-700 text-sm">Original</span>
+              <span className="font-medium text-green-700 text-sm">Original</span>
               <button
                 onClick={() => onSelectDocument(original)}
-                className="text-xs text-green-600 hover:text-green-800 underline"
+                className="text-xs text-green-600 hover:text-green-800 transition-colors"
               >
-                Im Detail öffnen
+                Im Detail oeffnen
               </button>
             </div>
 
-            {/* Preview */}
-            <div className="h-1/2 bg-slate-100 relative">
+            <div className="h-1/2 bg-gray-50 relative">
               {getViewUrl(original) && (
                 <PdfViewer
                   url={getViewUrl(original)}
@@ -202,9 +198,8 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
               )}
             </div>
 
-            {/* Data */}
             <div className="h-1/2 overflow-y-auto p-4 bg-white">
-              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                   <polyline points="14 2 14 8 20 8"/>
@@ -212,7 +207,7 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
                 Buchungsdaten
               </h3>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={LABEL_CLASS}>Datum</label>
                   <input
@@ -238,7 +233,7 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
                     value={originalData.lieferantName || ''}
                     onChange={(e) => handleOriginalChange('lieferantName', e.target.value)}
                     onBlur={handleSaveOriginal}
-                    className={`${INPUT_CLASS} font-bold`}
+                    className={`${INPUT_CLASS} font-medium`}
                   />
                 </div>
                 <div>
@@ -258,7 +253,7 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
                     value={originalData.bruttoBetrag || ''}
                     onChange={(e) => handleOriginalChange('bruttoBetrag', parseFloat(e.target.value))}
                     onBlur={handleSaveOriginal}
-                    className={`${INPUT_CLASS} font-bold`}
+                    className={`${INPUT_CLASS} font-medium`}
                   />
                 </div>
                 <div>
@@ -281,7 +276,7 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
                 </div>
               </div>
 
-              <div className="mt-4 pt-4 border-t border-slate-100">
+              <div className="mt-4 pt-4 border-t border-gray-100">
                 <label className={LABEL_CLASS}>Bemerkung</label>
                 <textarea
                   value={originalData.beschreibung || ''}
@@ -296,12 +291,11 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
           {/* Right: Duplicate */}
           <div className="flex-1 flex flex-col min-w-0">
             <div className="px-4 py-2 bg-red-50 border-b border-red-100 flex items-center justify-between">
-              <span className="font-semibold text-red-700 text-sm">Duplikat</span>
+              <span className="font-medium text-red-700 text-sm">Duplikat</span>
               <span className="text-xs text-red-500">{duplicate.duplicateReason}</span>
             </div>
 
-            {/* Preview */}
-            <div className="h-1/2 bg-slate-100 relative">
+            <div className="h-1/2 bg-gray-50 relative">
               {getViewUrl(duplicate) && (
                 <PdfViewer
                   url={getViewUrl(duplicate)}
@@ -310,9 +304,8 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
               )}
             </div>
 
-            {/* Data */}
             <div className="h-1/2 overflow-y-auto p-4 bg-white">
-              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                   <polyline points="14 2 14 8 20 8"/>
@@ -320,7 +313,7 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
                 Buchungsdaten
               </h3>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={LABEL_CLASS}>Datum</label>
                   <input
@@ -346,7 +339,7 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
                     value={duplicateData.lieferantName || ''}
                     onChange={(e) => handleDuplicateChange('lieferantName', e.target.value)}
                     onBlur={handleSaveDuplicate}
-                    className={`${INPUT_CLASS} font-bold`}
+                    className={`${INPUT_CLASS} font-medium`}
                   />
                 </div>
                 <div>
@@ -366,7 +359,7 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
                     value={duplicateData.bruttoBetrag || ''}
                     onChange={(e) => handleDuplicateChange('bruttoBetrag', parseFloat(e.target.value))}
                     onBlur={handleSaveDuplicate}
-                    className={`${INPUT_CLASS} font-bold`}
+                    className={`${INPUT_CLASS} font-medium`}
                   />
                 </div>
                 <div>
@@ -389,7 +382,7 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
                 </div>
               </div>
 
-              <div className="mt-4 pt-4 border-t border-slate-100">
+              <div className="mt-4 pt-4 border-t border-gray-100">
                 <label className={LABEL_CLASS}>Bemerkung</label>
                 <textarea
                   value={duplicateData.beschreibung || ''}
@@ -403,12 +396,12 @@ export const DuplicateCompareModal: React.FC<DuplicateCompareModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+        <div className="px-6 py-3 bg-white border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
           <div>
-            Änderungen werden automatisch gespeichert (auf Blur)
+            Aenderungen werden automatisch gespeichert (auf Blur)
           </div>
           <div className="flex items-center gap-4">
-            <span>Esc: Schließen</span>
+            <span>Esc: Schliessen</span>
           </div>
         </div>
       </div>

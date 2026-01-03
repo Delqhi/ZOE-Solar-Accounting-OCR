@@ -23,8 +23,8 @@ interface DatabaseGridProps {
   onFilterMonthChange: (val: string) => void;
 }
 
-export const DatabaseGrid: React.FC<DatabaseGridProps> = ({ 
-  documents, 
+export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
+  documents,
   onSelectDocument,
   onExportSQL,
   onMerge,
@@ -96,7 +96,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
   // --- EÜR Calculation ---
   const euerData = useMemo(() => {
       const groups: Record<string, { id: string, label: string, amount: number, count: number }> = {};
-      
+
       sortedDocs.forEach(doc => {
           if (doc.status === DocumentStatus.DUPLICATE) return;
           const d = doc.data;
@@ -105,20 +105,20 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
           const id = d.kontierungskonto || d.sollKonto || 'sonstiges';
           const label = d.kontogruppe || (d.kontierungskonto ? d.kontierungskonto.toUpperCase() : 'Sonstiges');
           const net = d.nettoBetrag || 0;
-          
+
           if (!groups[id]) {
-              groups[id] = { 
-                  id, 
-                  label, 
-                  amount: 0, 
-                  count: 0 
+              groups[id] = {
+                  id,
+                  label,
+                  amount: 0,
+                  count: 0
               };
           }
           groups[id].amount += net;
           groups[id].count += 1;
       });
 
-      return Object.values(groups).sort((a, b) => b.amount - a.amount); 
+      return Object.values(groups).sort((a, b) => b.amount - a.amount);
   }, [sortedDocs]);
 
   // --- UStVA Calculation ---
@@ -127,7 +127,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
       let tax19 = 0;
       let base7 = 0;
       let tax7 = 0;
-      let base0 = 0; 
+      let base0 = 0;
       let reverseChargeBase = 0;
 
       sortedDocs.forEach(doc => {
@@ -140,11 +140,11 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
 
           if ((d.mwstBetrag19 || 0) > 0) base19 += (d.mwstBetrag19 || 0) / 0.19;
           if ((d.mwstBetrag7 || 0) > 0) base7 += (d.mwstBetrag7 || 0) / 0.07;
-          
+
           const taxedNet19 = (d.mwstBetrag19 || 0) / 0.19;
           const taxedNet7 = (d.mwstBetrag7 || 0) / 0.07;
           const totalTaxedNet = taxedNet19 + taxedNet7;
-          
+
           let remainderNet = (d.nettoBetrag || 0) - totalTaxedNet;
           if (remainderNet < 0.05 && remainderNet > -0.05) remainderNet = 0;
 
@@ -359,7 +359,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
     const q = filterQuarter === 'all' ? 'all' : filterQuarter;
     const m = filterMonth === 'all' ? 'all' : filterMonth;
     const filterTag = `${y}_${q}_${m}`;
-    
+
     doc.setFontSize(18);
     doc.text(`ZOE Solar - ${title}`, 14, 20);
     doc.setFontSize(10);
@@ -727,12 +727,12 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
 
   const SortIcon = ({ field }: { field: string }) => {
     if (sortField !== field) return <span className="text-gray-300 ml-1 text-[10px]">▼</span>;
-    return <span className="text-gray-800 ml-1 text-[10px]">{sortDirection === 'asc' ? '▲' : '▼'}</span>;
+    return <span className="text-gray-900 ml-1 text-[10px]">{sortDirection === 'asc' ? '▲' : '▼'}</span>;
   };
 
   const TH = ({ label, field, className = '', style = {} }: { label: string, field: string, className?: string, style?: React.CSSProperties }) => (
-    <th 
-      className={`px-4 py-3 border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors select-none whitespace-nowrap ${className}`}
+    <th
+      className={`px-4 py-3 border-b border-gray-200 bg-white text-left text-[11px] font-semibold text-gray-600 cursor-pointer hover:text-gray-900 transition-colors duration-150 select-none whitespace-nowrap ${className}`}
       style={style}
       onClick={() => handleSort(field)}
     >
@@ -745,23 +745,23 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
   const renderStandardList = () => (
     <div className="relative w-full h-full overflow-auto">
       <table className="min-w-max text-left text-sm border-collapse">
-        <thead className="bg-gray-50 z-20">
+        <thead className="bg-white z-20">
           <tr>
-            <th className="px-2 py-3 border-b border-gray-200 bg-gray-50 w-8 sticky left-0 z-30"></th>
+            <th className="px-2 py-3 border-b border-gray-200 bg-white w-8 sticky left-0 z-30"></th>
             {/* Sticky Columns for essential ID data */}
-            <TH label="Datum" field="data.belegDatum" className="sticky left-8 bg-gray-50 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]" />
-            <TH label="ZOE-Nr." field="data.eigeneBelegNummer" className="sticky left-[132px] bg-gray-50 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]" />
-            <TH label="Lieferant" field="data.lieferantName" className="sticky left-[232px] bg-gray-50 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] border-r border-gray-200" />
-            
+            <TH label="Datum" field="data.belegDatum" className="sticky left-8 bg-white z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]" />
+            <TH label="ZOE-Nr." field="data.eigeneBelegNummer" className="sticky left-[132px] bg-white z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]" />
+            <TH label="Lieferant" field="data.lieferantName" className="sticky left-[232px] bg-white z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] border-r border-gray-200" />
+
             {/* Scrollable Columns for Data Richness */}
             <TH label="Original-Nr." field="data.belegNummerLieferant" />
-            
+
             <TH label="Netto" field="data.nettoBetrag" className="text-right" />
             <TH label="Brutto" field="data.bruttoBetrag" className="text-right" />
-            
+
             <TH label="Soll (SKR03)" field="data.sollKonto" />
             <TH label="Haben" field="data.habenKonto" />
-            
+
             <TH label="Konto" field="data.kontierungskonto" />
             <TH label="Kategorie" field="data.steuerkategorie" />
 
@@ -794,10 +794,10 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
               const isBlocked = isDuplicate || isError || isReview;
               const isDragTarget = dragTarget === doc.id;
               const isExpanded = expandedRowIds.has(doc.id);
-              
+
               return (
                 <React.Fragment key={doc.id}>
-                <tr 
+                <tr
                 draggable={!isBlocked}
                 onDragStart={(e) => {
                     if (isBlocked) {
@@ -826,38 +826,38 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                     setDragTarget(null);
                 }}
                 onClick={() => onSelectDocument(doc)}
-                className={`cursor-pointer transition-colors border-l-2 ${
-                    isDragTarget 
-                        ? 'bg-blue-50 ring-2 ring-inset ring-blue-500 z-20 relative' 
-                        : isDuplicate 
-                            ? 'bg-red-50/30 hover:bg-red-50 border-red-400' 
+                className={`cursor-pointer transition-colors duration-150 border-l-2 ${
+                    isDragTarget
+                        ? 'bg-gray-100 ring-2 ring-inset ring-gray-400 z-20 relative'
+                        : isDuplicate
+                            ? 'hover:bg-gray-50 border-gray-400'
                             : isError
-                                ? 'bg-rose-50/40 hover:bg-rose-50 border-rose-400'
+                                ? 'hover:bg-gray-50 border-gray-400'
                                 : isReview
-                                    ? 'bg-amber-50/40 hover:bg-amber-50 border-amber-300'
+                                    ? 'hover:bg-gray-50 border-gray-300'
                                     : 'hover:bg-gray-50 border-transparent'
                 }`}
                 >
                 <td className="px-2 py-2.5 bg-white border-r border-gray-100 sticky left-0 z-20 text-center" onClick={(e) => toggleExpandRow(e, doc.id)}>
-                    <div className={`p-1 rounded hover:bg-gray-100 transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                    <div className={`p-1 hover:bg-gray-100 transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`}>
                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
                 </td>
                 {/* Sticky Cells Matching Headers */}
-                <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap font-mono text-xs sticky left-8 bg-white border-r border-gray-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] group-hover:bg-gray-50">
+                <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap font-mono text-xs sticky left-8 bg-white border-r border-gray-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] group-hover:bg-gray-50 transition-colors duration-150">
                     {doc.data?.belegDatum}
                 </td>
-                <td className="px-4 py-2.5 sticky left-[132px] bg-white border-r border-gray-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] group-hover:bg-gray-50">
-                     <span className={`font-mono text-xs font-medium text-blue-600`}>
+                <td className="px-4 py-2.5 sticky left-[132px] bg-white border-r border-gray-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] group-hover:bg-gray-50 transition-colors duration-150">
+                     <span className={`font-mono text-xs font-medium text-gray-900`}>
                         {doc.data?.eigeneBelegNummer}
                     </span>
                     {(isError || isReview) && (
-                        <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isError ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                        <span className={`ml-2 inline-flex items-center px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${isError ? 'bg-gray-100 text-gray-900' : 'bg-gray-100 text-gray-900'}`}>
                             {isError ? 'Fehler' : 'Prüfen'}
                         </span>
                     )}
                 </td>
-                <td className="px-4 py-2.5 text-gray-900 font-medium sticky left-[232px] bg-white border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] group-hover:bg-gray-50 max-w-[200px] truncate">
+                <td className="px-4 py-2.5 text-gray-900 font-medium sticky left-[232px] bg-white border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] group-hover:bg-gray-50 transition-colors duration-150 max-w-[200px] truncate">
                     {doc.data?.lieferantName || doc.fileName}
                 </td>
 
@@ -865,7 +865,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                 <td className="px-4 py-2.5 font-mono text-xs text-gray-500 whitespace-nowrap">
                     {doc.data?.belegNummerLieferant || '-'}
                 </td>
-               
+
                 {/* Financials */}
                 <td className="px-4 py-2.5 text-right font-mono text-gray-500">
                     {(doc.data?.nettoBetrag || 0).toLocaleString('de-DE', {minimumFractionDigits: 2})}
@@ -873,7 +873,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                 <td className="px-4 py-2.5 text-right font-mono text-gray-900 font-medium">
                     {(doc.data?.bruttoBetrag || 0).toLocaleString('de-DE', {minimumFractionDigits: 2})}
                 </td>
-                
+
                 {/* SKR03 */}
                 <td className="px-4 py-2.5 text-xs text-gray-700 font-bold font-mono">
                     {doc.data?.sollKonto}
@@ -884,7 +884,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
 
                 {/* Meta */}
                 <td className="px-4 py-2.5 text-xs text-gray-600">
-                    <span className="bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200 whitespace-nowrap">
+                    <span className="px-2 py-0.5 border border-gray-200 whitespace-nowrap">
                         {doc.data?.kontierungskonto}
                     </span>
                 </td>
@@ -946,15 +946,15 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                     {doc.status}
                 </td>
                 </tr>
-                
+
                 {/* Nested Line Items Row */}
                 {isExpanded && (
                     <tr className="bg-gray-50/50 shadow-inner">
-                        <td colSpan={2} className="sticky left-0 bg-gray-50 border-r border-gray-200"></td>
+                        <td colSpan={2} className="sticky left-0 bg-white border-r border-gray-200"></td>
                         <td colSpan={24} className="p-4">
-                             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-w-2xl">
+                             <div className="bg-white border border-gray-200 overflow-hidden max-w-2xl">
                                  <table className="w-full text-xs">
-                                     <thead className="bg-gray-100 text-gray-500 font-semibold border-b border-gray-200">
+                                     <thead className="bg-gray-50 text-gray-500 font-semibold border-b border-gray-200">
                                          <tr>
                                              <th className="px-3 py-2 text-left">Beschreibung</th>
                                              <th className="px-3 py-2 text-right w-24">Betrag</th>
@@ -980,7 +980,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
               );
           })}
         </tbody>
-        <tfoot className="bg-gray-50 border-t border-gray-200 z-20">
+        <tfoot className="bg-white border-t border-gray-200 z-20">
             <tr>
                 <td colSpan={26} className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500">
                     Gesamt Brutto: <span className="font-mono text-gray-900">{totals.brutto.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</span>
@@ -993,15 +993,15 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
 
   const renderEuerView = () => (
     <div className="max-w-5xl mx-auto p-8">
-      <div className="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
-        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+      <div className="bg-white border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-white px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h3 className="font-semibold text-gray-900">Einnahmenüberschussrechnung (Ausgaben)</h3>
             <div className="text-sm text-gray-500">
-                Gesamt Netto: <span className="font-mono font-bold text-gray-900 ml-2">{totals.netto.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</span>
+                Gesamt Netto: <span className="font-mono font-medium text-gray-900 ml-2">{totals.netto.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</span>
             </div>
         </div>
         <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200 text-[13px]">
+            <thead className="bg-white text-gray-500 font-semibold border-b border-gray-200 text-[13px]">
                 <tr>
                     <th className="px-6 py-3">Kategorie / Konto</th>
                     <th className="px-6 py-3 text-center">Anzahl</th>
@@ -1013,9 +1013,9 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                 {euerData.map((row) => {
                     const percent = totals.netto > 0 ? (row.amount / totals.netto) * 100 : 0;
                     return (
-                        <tr key={row.id} className="hover:bg-gray-50">
+                        <tr key={row.id} className="hover:bg-gray-50 transition-colors duration-150">
                             <td className="px-6 py-3">
-                                <div className="font-medium text-gray-800">{row.label}</div>
+                                <div className="font-medium text-gray-900">{row.label}</div>
                                 <div className="text-xs text-gray-400 font-mono mt-0.5">{row.id}</div>
                             </td>
                             <td className="px-6 py-3 text-center text-gray-600 font-mono">
@@ -1026,9 +1026,9 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                             </td>
                             <td className="px-6 py-3 align-middle">
                                 <div className="flex items-center gap-2">
-                                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                        <div 
-                                            className="h-full bg-blue-500 rounded-full" 
+                                    <div className="flex-1 h-1.5 bg-gray-100 overflow-hidden">
+                                        <div
+                                            className="h-full bg-gray-900"
                                             style={{ width: `${Math.min(percent, 100)}%` }}
                                         ></div>
                                     </div>
@@ -1046,7 +1046,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                     </tr>
                 )}
             </tbody>
-            <tfoot className="bg-gray-50 border-t border-gray-200">
+            <tfoot className="bg-white border-t border-gray-200">
                 <tr>
                     <td className="px-6 py-3 font-semibold text-gray-700">Gesamtsumme</td>
                     <td className="px-6 py-3 text-center font-bold text-gray-700 font-mono">{euerData.reduce((a,b) => a + b.count, 0)}</td>
@@ -1061,12 +1061,12 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
 
   const renderUstvaView = () => (
       <div className="max-w-4xl mx-auto p-8 space-y-8">
-        <div className="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
-             <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+        <div className="bg-white border border-gray-200 shadow-sm overflow-hidden">
+             <div className="bg-white px-6 py-4 border-b border-gray-200">
                 <h3 className="font-semibold text-gray-900">Umsatzsteuervoranmeldung (Vorbereitung)</h3>
             </div>
             <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200 text-[13px]">
+                <thead className="bg-white text-gray-500 font-semibold border-b border-gray-200 text-[13px]">
                     <tr>
                         <th className="px-6 py-3 w-1/2">Position</th>
                         <th className="px-6 py-3 text-right">Bemessungsgrundlage</th>
@@ -1074,28 +1074,28 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-[13px]">
-                     <tr className="hover:bg-gray-50">
-                        <td className="px-6 py-3 text-gray-800">Steuerfreie Umsätze / PV (0%)</td>
+                     <tr className="hover:bg-gray-50 transition-colors duration-150">
+                        <td className="px-6 py-3 text-gray-900">Steuerfreie Umsätze / PV (0%)</td>
                         <td className="px-6 py-3 text-right font-mono">{ustvaData.base0.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</td>
                         <td className="px-6 py-3 text-right font-mono text-gray-400">0,00 €</td>
                      </tr>
-                     <tr className="hover:bg-gray-50">
-                        <td className="px-6 py-3 text-gray-800">IGL / Reverse Charge (§13b)</td>
+                     <tr className="hover:bg-gray-50 transition-colors duration-150">
+                        <td className="px-6 py-3 text-gray-900">IGL / Reverse Charge (§13b)</td>
                         <td className="px-6 py-3 text-right font-mono">{ustvaData.reverseChargeBase.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</td>
                         <td className="px-6 py-3 text-right font-mono text-gray-400">0,00 €</td>
                      </tr>
-                     <tr className="hover:bg-gray-50">
-                        <td className="px-6 py-3 text-gray-800">Vorsteuer 7%</td>
+                     <tr className="hover:bg-gray-50 transition-colors duration-150">
+                        <td className="px-6 py-3 text-gray-900">Vorsteuer 7%</td>
                         <td className="px-6 py-3 text-right font-mono">{ustvaData.base7.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</td>
-                        <td className="px-6 py-3 text-right font-mono text-gray-700">{ustvaData.tax7.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</td>
+                        <td className="px-6 py-3 text-right font-mono text-gray-900">{ustvaData.tax7.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</td>
                      </tr>
-                     <tr className="hover:bg-gray-50">
-                        <td className="px-6 py-3 text-gray-800">Vorsteuer 19%</td>
+                     <tr className="hover:bg-gray-50 transition-colors duration-150">
+                        <td className="px-6 py-3 text-gray-900">Vorsteuer 19%</td>
                         <td className="px-6 py-3 text-right font-mono">{ustvaData.base19.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</td>
-                        <td className="px-6 py-3 text-right font-mono text-gray-700">{ustvaData.tax19.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</td>
+                        <td className="px-6 py-3 text-right font-mono text-gray-900">{ustvaData.tax19.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</td>
                      </tr>
                 </tbody>
-                <tfoot className="bg-gray-50 border-t border-gray-200">
+                <tfoot className="bg-white border-t border-gray-200">
                     <tr>
                         <td className="px-6 py-3 font-semibold text-gray-700">SUMME VORSTEUER (Abziehbar)</td>
                         <td className="px-6 py-3"></td>
@@ -1108,8 +1108,8 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
         </div>
 
         {/* Übermittlung Section */}
-        <div className="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
-            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+        <div className="bg-white border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-white px-6 py-4 border-b border-gray-200">
                 <h3 className="font-semibold text-gray-900">ELSTER XML Export für manuelle Übermittlung</h3>
                 <div className="text-xs text-gray-500 mt-1">
                     Export der UStVA-Daten als XML-Datei für Upload im ELSTER Online Portal.
@@ -1119,7 +1119,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                 <div className="flex gap-3">
                     <button
                         onClick={handleExportUstvaXml}
-                        className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700"
+                        className="bg-gray-900 text-white px-4 py-2 text-sm font-medium hover:bg-gray-800 transition-colors duration-150"
                     >
                         XML Export
                     </button>
@@ -1128,13 +1128,13 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                     <p><strong>Anleitung:</strong></p>
                     <ol className="list-decimal list-inside space-y-1 ml-2">
                         <li>Klicken Sie auf "XML Export" um die XML-Datei herunterzuladen</li>
-                        <li>Öffnen Sie das <a href="https://www.elster.de/portal" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">ELSTER Online Portal</a></li>
+                        <li>Öffnen Sie das <a href="https://www.elster.de/portal" target="_blank" rel="noopener noreferrer" className="text-gray-900 hover:underline">ELSTER Online Portal</a></li>
                         <li>Melden Sie sich mit Ihren ELSTER-Zugangsdaten an</li>
                         <li>Wählen Sie "Umsatzsteuer" → "Umsatzsteuervoranmeldung"</li>
                         <li>Laden Sie die XML-Datei hoch und übermitteln Sie die Voranmeldung</li>
                     </ol>
                 </div>
-                <div className="text-xs text-amber-600 bg-amber-50 p-3 rounded">
+                <div className="text-xs text-gray-600 bg-gray-50 p-3">
                     <strong>Hinweis:</strong> Die XML-Datei enthält keine Signatur. ELSTER Online Portal signiert die Daten automatisch bei der Übermittlung.
                 </div>
             </div>
@@ -1146,13 +1146,13 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
   return (
     <div className="h-full flex flex-col bg-white">
        {/* Filter Toolbar */}
-       <div className="px-6 py-3 border-b border-gray-200 bg-white flex justify-between items-center gap-4">
-            <div className="flex bg-gray-100 p-0.5 rounded-md">
+       <div className="px-6 py-3 border-b border-gray-100 bg-white flex justify-between items-center gap-4">
+            <div className="flex gap-1">
                 {(['list', 'euer', 'ustva'] as ViewType[]).map(t => (
-                    <button 
+                    <button
                         key={t}
                         onClick={() => setViewType(t)}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${viewType === t ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200' : 'text-gray-600 hover:text-gray-900'}`}
+                        className={`px-3 py-1.5 text-xs font-medium transition-all duration-150 ${viewType === t ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}
                     >
                         {t === 'list' ? 'Liste' : t.toUpperCase()}
                     </button>
@@ -1160,19 +1160,19 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
             </div>
 
             <div className="flex gap-2 items-center">
-                 <select 
+                 <select
                         value={filterYear}
                         onChange={(e) => onFilterYearChange(e.target.value)}
-                        className="bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 px-2 py-1.5 outline-none focus:border-blue-500 hover:border-gray-400 transition-colors"
+                        className="bg-white border border-gray-200 text-xs font-medium text-gray-700 px-2 py-1.5 outline-none focus:border-gray-900 hover:border-gray-300 transition-colors duration-150"
                  >
                         <option value="all">Jahr</option>
                         {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                  </select>
-                 
-                 <select 
+
+                 <select
                         value={filterQuarter}
                         onChange={(e) => onFilterQuarterChange(e.target.value)}
-                        className="bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 px-2 py-1.5 outline-none focus:border-blue-500 hover:border-gray-400 transition-colors"
+                        className="bg-white border border-gray-200 text-xs font-medium text-gray-700 px-2 py-1.5 outline-none focus:border-gray-900 hover:border-gray-300 transition-colors duration-150"
                  >
                         <option value="all">Q</option>
                         <option value="Q1">Q1</option>
@@ -1181,10 +1181,10 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                         <option value="Q4">Q4</option>
                  </select>
 
-                 <select 
+                 <select
                         value={filterMonth}
                         onChange={(e) => onFilterMonthChange(e.target.value)}
-                        className="bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-700 px-2 py-1.5 outline-none focus:border-blue-500 hover:border-gray-400 transition-colors"
+                        className="bg-white border border-gray-200 text-xs font-medium text-gray-700 px-2 py-1.5 outline-none focus:border-gray-900 hover:border-gray-300 transition-colors duration-150"
                  >
                         <option value="all">M</option>
                         {Array.from({length: 12}, (_, i) => i + 1).map(m => (
@@ -1194,21 +1194,21 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
 
                  <div className="h-4 w-px bg-gray-200 mx-1"></div>
 
-                 <button onClick={handleExportPDF} className="p-1.5 text-gray-500 hover:text-gray-900 border border-gray-200 rounded hover:bg-gray-50 transition-all shadow-sm">
+                 <button onClick={handleExportPDF} className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all duration-150">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                  </button>
-                      <button onClick={handleExportCSV} className="p-1.5 text-gray-500 hover:text-gray-900 border border-gray-200 rounded hover:bg-gray-50 transition-all shadow-sm" title="CSV Export">
+                      <button onClick={handleExportCSV} className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all duration-150" title="CSV Export">
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M8 13h8"></path><path d="M8 17h8"></path></svg>
                       </button>
-                      <button onClick={handleExportDATEV} className="px-2 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 border border-gray-200 rounded hover:bg-gray-50 transition-all shadow-sm" title="DATEV Export (EXTF Buchungsstapel)">
+                      <button onClick={handleExportDATEV} className="px-2 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all duration-150" title="DATEV Export (EXTF Buchungsstapel)">
                           DATEV
                       </button>
                       {viewType === 'ustva' && (
-                          <button onClick={handleExportUstvaXml} className="px-2 py-1.5 text-xs font-semibold text-blue-600 hover:text-blue-900 border border-blue-200 rounded hover:bg-blue-50 transition-all shadow-sm" title="ELSTER XML Export">
+                          <button onClick={handleExportUstvaXml} className="px-2 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all duration-150" title="ELSTER XML Export">
                               XML
                           </button>
                       )}
-                 <button onClick={onExportSQL} className="p-1.5 text-gray-500 hover:text-gray-900 border border-gray-200 rounded hover:bg-gray-50 transition-all shadow-sm">
+                 <button onClick={onExportSQL} className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all duration-150">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                  </button>
             </div>

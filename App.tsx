@@ -68,30 +68,23 @@ const classifyOcrOutcome = (data: ExtractedData): { status: DocumentStatus; erro
     return { status: DocumentStatus.COMPLETED, error: undefined };
 };
 
-// --- AGGRESSIVE SEMANTIC DUPLICATE DETECTION V2 ---
 const findSemanticDuplicate = (data: Partial<ExtractedData>, existingDocs: DocumentRecord[]): DuplicateMatch | undefined => {
     if (!data.bruttoBetrag && !data.belegNummerLieferant) return undefined;
-    
-    // Helper to normalize strings (remove spaces, special chars, lowercase)
-    // "Re-Nr: 220" -> "220", "22O" -> "220"
+
     const normalize = (s: string | undefined) => s ? s.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-    
+
     const newInvoiceNum = normalize(data.belegNummerLieferant);
     const newAmount = data.bruttoBetrag;
     const newDate = data.belegDatum;
     const newVendor = normalize(data.lieferantName);
 
     for (const doc of existingDocs) {
-        // Skip invalid docs or the doc itself (if we had IDs here, but this runs before ID assignment in some flows)
         if (!doc.data || doc.status === DocumentStatus.ERROR || doc.status === DocumentStatus.DUPLICATE) continue;
-        
+
         const existingInvNum = normalize(doc.data.belegNummerLieferant);
         const existingAmount = doc.data.bruttoBetrag;
         const existingDate = doc.data.belegDatum;
 
-        // --- RULE 1: HARD MATCH (Invoice Number + Amount) ---
-        // If Invoice Number matches (at least 2 chars, e.g. "220") AND Amount matches exactly (0.10€ tolerance)
-        // THIS IS THE STRONGEST SIGNAL.
         if (newInvoiceNum.length >= 2 && newInvoiceNum === existingInvNum) {
             if (newAmount !== undefined && existingAmount !== undefined) {
                 if (Math.abs(newAmount - existingAmount) < 0.1) {
@@ -100,36 +93,27 @@ const findSemanticDuplicate = (data: Partial<ExtractedData>, existingDocs: Docum
             }
         }
 
-        // --- RULE 2: HARD MATCH (Invoice Number + Date) ---
-        // If Amount is slightly different (OCR error) but Number and Date match exactly.
         if (newInvoiceNum.length >= 3 && newInvoiceNum === existingInvNum) {
             if (newDate && existingDate && newDate === existingDate) {
                 return { doc, reason: `Belegnummer (${doc.data.belegNummerLieferant}) und Datum identisch.`, confidence: 0.9 };
             }
         }
 
-        // --- RULE 3: SCORING (Fuzzy Match) ---
-        // Only falls back to this if Hard Rules didn't trigger
         let score = 0;
 
-        // Amount Match
         if (newAmount !== undefined && existingAmount !== undefined) {
             if (Math.abs(newAmount - existingAmount) < 0.05) score += 40;
         }
 
-        // Date Match
         if (newDate && existingDate && newDate === existingDate) score += 30;
 
-        // Vendor Match (Fuzzy)
         const existingVendor = normalize(doc.data.lieferantName);
         if (newVendor && existingVendor) {
             if (newVendor.includes(existingVendor) || existingVendor.includes(newVendor)) score += 20;
         }
 
-        // Partial Invoice Number Match (if long)
         if (newInvoiceNum.length > 4 && existingInvNum.includes(newInvoiceNum)) score += 20;
 
-        // If Score is high enough, flag it
         if (score >= 70) {
             return { doc, reason: "Hohe Ähnlichkeit bei Datum, Betrag und Lieferant.", confidence: Math.min(0.89, score / 100) };
         }
@@ -157,23 +141,19 @@ export default function App() {
   const [filterYear, setFilterYear] = useState<string>('all');
   const [filterQuarter, setFilterQuarter] = useState<string>('all');
   const [filterMonth, setFilterMonth] = useState<string>('all');
-  
-  // Drag State for Sidebar
-  const [sidebarDragTarget, setSidebarDragTarget] = useState<string | null>(null);
 
-  // Sidebar Resizing State
-  const [sidebarWidth, setSidebarWidth] = useState(300);
+  const [sidebarDragTarget, setSidebarDragTarget] = useState<string | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isResizing = useRef(false);
 
-  // Duplicate Compare Modal State
   const [compareDoc, setCompareDoc] = useState<DocumentRecord | null>(null);
   const [originalDoc, setOriginalDoc] = useState<DocumentRecord | null>(null);
 
   useEffect(() => {
     const initData = async () => {
       try {
-        // Check if Supabase is configured
         if (!supabaseService.isSupabaseConfigured()) {
           setNotification('Supabase ist nicht konfiguriert. Bitte .env Datei prüfen.');
           return;
@@ -214,7 +194,7 @@ export default function App() {
     const doDrag = (mouseMoveEvent: MouseEvent) => {
         if (!isResizing.current) return;
         const newWidth = startWidth + (mouseMoveEvent.clientX - startX);
-        if (newWidth > 220 && newWidth < 800) setSidebarWidth(newWidth);
+        if (newWidth > 200 && newWidth < 600) setSidebarWidth(newWidth);
     };
     const stopDrag = () => {
         isResizing.current = false;
@@ -255,7 +235,6 @@ export default function App() {
 
     const currentSettings = settings || await supabaseService.getSettings();
     const processedBatch: DocumentRecord[] = [];
-    // Use functional state access to get the current documents
     const currentDocsSnapshotRef: { current: DocumentRecord[] } = { current: [] };
     setDocuments(prev => {
         currentDocsSnapshotRef.current = [...prev];
@@ -267,9 +246,9 @@ export default function App() {
         const isExactDuplicate = currentDocsSnapshotRef.current.some(d => d.id !== item.id && d.fileHash === item.hash);
         if (isExactDuplicate) {
                          const original = currentDocsSnapshotRef.current.find(d => d.fileHash === item.hash);
-             return { 
-                 type: 'DOC', 
-                                 doc: { 
+             return {
+                 type: 'DOC',
+                                 doc: {
                                      id: item.id,
                                      status: DocumentStatus.DUPLICATE,
                                      error: undefined,
@@ -277,21 +256,17 @@ export default function App() {
                                      duplicateReason: "Datei identisch (Hash)",
                                      duplicateOfId: original?.id,
                                      duplicateConfidence: 1
-                                 } 
+                                 }
              };
         }
 
         try {
             const extractedRaw = await analyzeDocumentWithGemini(item.base64, item.file.type);
             const extracted = normalizeExtractedData(extractedRaw);
-            
-            // Check for Semantic Duplicate using Extracted Data
+
             const semanticDup = findSemanticDuplicate(extracted, currentDocsSnapshotRef.current);
-            
+
             if (semanticDup && semanticDup.doc.id !== item.id) {
-                 // OPTION A: Auto-Merge if it was a file upload that matches an existing one perfectly?
-                 // Current logic: Create a NEW doc entry but mark as DUPLICATE so user sees it.
-                 // This is safer than silently merging.
                  return {
                      type: 'DOC',
                      doc: {
@@ -305,7 +280,6 @@ export default function App() {
                  };
             }
 
-            // --- Private Document Detection ---
             const privateCheck = detectPrivateDocument(extracted);
             if (privateCheck.isPrivate && privateCheck.detectedVendor) {
                 return {
@@ -323,9 +297,9 @@ export default function App() {
             const outcome = classifyOcrOutcome(extracted);
             return { type: 'DOC', data: extracted, id: item.id, outcome };
         } catch (e) {
-            return { 
-                type: 'DOC', 
-                doc: { id: item.id, status: DocumentStatus.ERROR, error: "KI Analyse fehlgeschlagen", data: null, duplicateReason: undefined } 
+            return {
+                type: 'DOC',
+                doc: { id: item.id, status: DocumentStatus.ERROR, error: "KI Analyse fehlgeschlagen", data: null, duplicateReason: undefined }
             };
         }
     });
@@ -333,11 +307,9 @@ export default function App() {
     const results = await Promise.all(processingPromises);
 
     for (const res of results) {
-        // --- Handle Private Documents ---
         if (res.type === 'PRIVATE_DOC') {
             const privateRes = res as any;
             try {
-                // Upload to belege_privat table
                 await supabaseService.savePrivateDocument(
                     privateRes.id,
                     privateRes.fileName,
@@ -347,17 +319,13 @@ export default function App() {
                     privateRes.reason
                 );
 
-                // Show notification to user
                 setPrivateDocNotification({
                     vendor: privateRes.vendor,
                     amount: privateRes.data?.bruttoBetrag || 0,
                     reason: privateRes.reason
                 });
-
-                // Don't add to processedBatch (won't show in UI)
             } catch (e) {
                 console.error('Failed to save private document:', e);
-                // Fallback: save as normal document with PRIVATE status
                 const fallbackDoc: DocumentRecord = {
                     id: privateRes.id,
                     fileName: privateRes.fileName,
@@ -373,8 +341,6 @@ export default function App() {
         }
 
         if (res.type === 'MERGE') {
-             // Logic kept for potential future use, currently findSemanticDuplicate mainly flags as DUPLICATE
-             // Use type assertion because currently no path returns MERGE, so TS infers only DOC types
              const mergeRes = res as any;
              const targetDoc = currentDocsSnapshotRef.current.find(d => d.id === mergeRes.targetId);
              if (targetDoc) {
@@ -390,34 +356,30 @@ export default function App() {
             let finalDoc: DocumentRecord | undefined;
 
             if ('doc' in res && res.doc) {
-                // It's either an Error or a Duplicate
                 const resultDoc = res.doc;
                 const placeholder = newDocs.find(d => d.id === resultDoc.id);
                 if (!placeholder) continue;
-                
-                // If it's a duplicate, we still save the extracted data so the user can verify WHY it's a duplicate
+
                 finalDoc = { ...placeholder, ...resultDoc } as DocumentRecord;
 
                 if (finalDoc.status === DocumentStatus.DUPLICATE && finalDoc.data) {
-                     // Apply rules even for duplicates so they look nice in the UI
                      const zoeId = generateZoeInvoiceId(finalDoc.data.belegDatum || '', currentDocsSnapshotRef.current);
                      finalDoc.data.eigeneBelegNummer = zoeId;
                 }
 
             } else if ('data' in res && res.data && res.id) {
-                // Success Case
                 const { id, data } = res as any;
                 const placeholder = newDocs.find(d => d.id === id);
                 if (!placeholder) continue;
 
                 const zoeId = generateZoeInvoiceId(data.belegDatum || '', currentDocsSnapshotRef.current);
                 let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
-                
+
                 if (data.lieferantName) {
                     const rule = await supabaseService.getVendorRule(data.lieferantName);
                     if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
                 }
-                
+
                 const normalized = normalizeExtractedData(data);
                 const outcome = (res as any).outcome || classifyOcrOutcome(normalized);
                 const finalData = applyAccountingRules(
@@ -428,9 +390,9 @@ export default function App() {
                 );
 
                 finalDoc = { ...placeholder, status: outcome.status, data: finalData, error: outcome.error };
-                currentDocsSnapshotRef.current.push(finalDoc); 
+                currentDocsSnapshotRef.current.push(finalDoc);
             }
-            
+
             if (finalDoc) {
                 processedBatch.push(finalDoc);
                 await supabaseService.saveDocument(finalDoc);
@@ -451,7 +413,7 @@ export default function App() {
     });
 
     setIsProcessing(false);
-    
+
     if (autoMergedCount > 0) {
         setNotification(`${autoMergedCount} Duplikat(e) automatisch zusammengeführt.`);
     }
@@ -479,7 +441,6 @@ export default function App() {
     const targetDoc = documents.find(d => d.id === targetId);
     if (!sourceDoc || !targetDoc) return;
 
-    // D2: Safety checks - don't merge duplicates
     if (sourceDoc.status === DocumentStatus.DUPLICATE || targetDoc.status === DocumentStatus.DUPLICATE) {
         setNotification('Merge abgebrochen: Duplikate können nicht als Quelle/Ziel genutzt werden.');
         return;
@@ -497,31 +458,29 @@ export default function App() {
 
     if (!confirm(`Möchten Sie "${sourceDoc.fileName}" in "${targetDoc.fileName}" integrieren?`)) return;
 
-    // Preserve the source document as an attachment
     const newAttachment: Attachment = {
-        id: crypto.randomUUID(), 
-        url: sourceDoc.previewUrl || '', 
-        type: sourceDoc.fileType, 
+        id: crypto.randomUUID(),
+        url: sourceDoc.previewUrl || '',
+        type: sourceDoc.fileType,
         name: sourceDoc.fileName
     };
-    
+
     const updatedTarget: DocumentRecord = {
         ...targetDoc,
-        // Combine existing attachments from target, the new source file, and any attachments the source already had
         attachments: [
-            ...(targetDoc.attachments || []), 
-            newAttachment, 
+            ...(targetDoc.attachments || []),
+            newAttachment,
             ...(sourceDoc.attachments || [])
         ]
     };
 
     await supabaseService.saveDocument(updatedTarget);
     await supabaseService.deleteDocument(sourceId);
-    
+
     setDocuments(prev => prev.filter(d => d.id !== sourceId).map(d => d.id === targetId ? updatedTarget : d));
-    
+
     setNotification('Belege erfolgreich zusammengeführt.');
-    
+
     if (selectedDocId === sourceId) setSelectedDocId(targetId);
   };
 
@@ -581,7 +540,7 @@ export default function App() {
       if (searchQuery) {
         const term = searchQuery.toLowerCase();
         const d = doc.data;
-        if (!doc.fileName.toLowerCase().includes(term) && !d?.lieferantName?.toLowerCase().includes(term) && 
+        if (!doc.fileName.toLowerCase().includes(term) && !d?.lieferantName?.toLowerCase().includes(term) &&
             !d?.eigeneBelegNummer?.toLowerCase().includes(term) && !d?.bruttoBetrag?.toString().includes(term)) return false;
       }
       const dateStr = doc.data?.belegDatum || doc.uploadDate;
@@ -640,9 +599,9 @@ export default function App() {
               a.click();
           };
 
-          return <DatabaseGrid 
-              documents={filteredDocuments} 
-              onSelectDocument={(d) => { setSelectedDocId(d.id); setViewMode('document'); }} 
+          return <DatabaseGrid
+              documents={filteredDocuments}
+              onSelectDocument={(d) => { setSelectedDocId(d.id); setViewMode('document'); }}
               onExportSQL={handleExportSQLWithPreflight}
               onMerge={handleMergeDocuments}
               settings={settings}
@@ -654,33 +613,26 @@ export default function App() {
       }
       if (selectedDocId) {
           const doc = documents.find(d => d.id === selectedDocId);
-          if (doc) return <DocumentDetail 
-              document={doc} allDocuments={documents} taxCategories={[]} onSave={handleSaveDocument} onDelete={handleDeleteDocument} 
+          if (doc) return <DocumentDetail
+              document={doc} allDocuments={documents} taxCategories={[]} onSave={handleSaveDocument} onDelete={handleDeleteDocument}
               onRetryOCR={handleRetryOCR} onSelectDocument={(d) => setSelectedDocId(d.id)} onClose={() => setSelectedDocId(null)} onMerge={handleMergeDocuments}
           />;
       }
       return (
-          <div className="h-full flex flex-col items-center justify-center p-6 md:p-8 bg-white/50 relative">
-              {/* Modern Background Decor */}
-              <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                   <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/10 rounded-full blur-[100px]"></div>
-                   <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-400/10 rounded-full blur-[100px]"></div>
-              </div>
-
+          <div className="h-full flex flex-col items-center justify-center p-8 relative">
               <div className="max-w-xl w-full z-10">
-                  <h2 className="text-2xl md:text-3xl font-bold text-center mb-8 text-slate-800 tracking-tight">
-                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">ZOE Solar</span> Accounting
+                  <h2 className="text-2xl md:text-3xl font-semibold text-center mb-8 text-[#111] tracking-tight">
+                      ZOE <span className="font-light">Solar</span> Accounting
                   </h2>
                   <UploadArea onFilesSelected={handleFilesSelect} isProcessing={isProcessing} />
-                  
-                  {/* Quick stats for mobile on empty state */}
-                  <div className="mt-8 flex justify-center gap-6 text-slate-400 text-xs md:hidden">
+
+                  <div className="mt-8 flex justify-center gap-8 text-[13px] text-[#666] md:hidden">
                       <div className="text-center">
-                          <div className="font-bold text-slate-600 text-lg">{documents.length}</div>
+                          <div className="font-medium text-[#111] text-base">{documents.length}</div>
                           <div>Belege</div>
                       </div>
                       <div className="text-center">
-                          <div className="font-bold text-slate-600 text-lg">{availableYears[0] || new Date().getFullYear()}</div>
+                          <div className="font-medium text-[#111] text-base">{availableYears[0] || new Date().getFullYear()}</div>
                           <div>Aktuelles Jahr</div>
                       </div>
                   </div>
@@ -689,49 +641,51 @@ export default function App() {
       );
   };
 
-  const SidebarItem = ({ active, label, icon, onClick }: { active: boolean, label: string, icon: React.ReactNode, onClick: () => void }) => (
-      <button 
-        onClick={onClick} 
-        className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-3 transition-all ${
-            active 
-                ? 'bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-100' 
-                : 'text-slate-600 hover:bg-slate-100'
+  const SidebarItem = ({ active, label, icon, onClick, collapsed }: { active: boolean, label: string, icon: React.ReactNode, onClick: () => void, collapsed?: boolean }) => (
+      <button
+        onClick={onClick}
+        className={`w-full text-left px-3 py-2.5 text-sm font-medium rounded-md flex items-center gap-3 transition-all duration-200 ease-out ${
+            active
+                ? 'bg-[#111] text-white'
+                : 'text-[#888] hover:text-white hover:bg-[#222]'
         }`}
       >
-        <span className={`${active ? 'text-blue-600' : 'text-slate-400'}`}>{icon}</span>
-        {label}
+        <span className={`flex-shrink-0 ${active ? 'text-white' : 'text-[#666]'}`}>{icon}</span>
+        {!collapsed && <span className="truncate">{label}</span>}
       </button>
   );
 
   return (
-    <div className="h-[100dvh] flex bg-white text-slate-900 font-sans text-sm antialiased relative overflow-hidden">
-      
-      {/* Toast Notification */}
+    <div className="h-[100dvh] flex bg-white text-[#111] font-sans text-sm antialiased relative overflow-hidden">
+
+      {/* Toast Notification - Vercel Style */}
       {notification && (
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-900/90 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
-              <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-              <span className="font-medium">{notification}</span>
+          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-[#000] text-white px-4 py-2.5 rounded-lg flex items-center gap-3 shadow-xl animate-in fade-in slide-in-from-top-2 duration-300">
+              <svg className="w-4 h-4 text-[#10b981]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+              <span className="text-sm font-medium">{notification}</span>
           </div>
       )}
 
       {/* Private Document Toast */}
       {privateDocNotification && (
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[60] bg-amber-50/90 backdrop-blur-md border border-amber-200 text-amber-900 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300 max-w-md">
-              <svg className="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-white border border-[#e5e5e5] text-[#111] px-4 py-3 rounded-lg flex items-center gap-3 shadow-lg animate-in fade-in slide-in-from-top-2 duration-300 max-w-sm">
+              <svg className="w-5 h-5 text-[#f59e0b] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
               </svg>
               <div className="flex flex-col min-w-0">
-                  <span className="font-medium">Privatbeleg erkannt</span>
-                  <span className="text-xs opacity-75 truncate">
+                  <span className="font-medium text-sm">Privatbeleg erkannt</span>
+                  <span className="text-xs text-[#666] truncate">
                     {privateDocNotification.vendor} - {privateDocNotification.amount.toFixed(2)} EUR
                   </span>
-                  <span className="text-[10px] opacity-60 truncate">
+                  <span className="text-xs text-[#999] truncate">
                     {privateDocNotification.reason}
                   </span>
               </div>
               <button
                 onClick={() => setPrivateDocNotification(null)}
-                className="ml-2 text-amber-600 hover:text-amber-800 flex-shrink-0"
+                className="ml-2 text-[#999] hover:text-[#111] transition-colors"
               >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
@@ -740,65 +694,72 @@ export default function App() {
           </div>
       )}
 
-      {/* --- DESKTOP SIDEBAR (Hidden on Mobile) --- */}
-      <aside 
+      {/* Desktop Sidebar */}
+      <aside
         ref={sidebarRef}
-        style={{ width: sidebarWidth }}
-        className="hidden md:flex bg-slate-50/50 border-r border-slate-200/60 flex-col z-20 flex-shrink-0 relative group backdrop-blur-xl"
+        style={{ width: sidebarCollapsed ? 72 : sidebarWidth }}
+        className="hidden md:flex bg-black flex-col z-20 flex-shrink-0 relative transition-all duration-300 ease-out"
       >
-          <div 
-            className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue-500/50 z-50 transition-colors"
+          <div
+            className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-white/20 z-50 transition-colors ${sidebarCollapsed ? 'hidden' : ''}`}
             onMouseDown={startResizing}
           ></div>
 
-          <div className="h-16 flex items-center px-5 border-b border-slate-200/60 flex-none">
-              <div className="font-bold text-lg flex items-center gap-2 text-slate-800 tracking-tight">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
-                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          <div className="h-16 flex items-center px-4 border-b border-white/10 flex-none">
+              <div className="font-bold text-lg flex items-center gap-3 text-white tracking-tight">
+                  <div className="w-8 h-8 bg-white rounded flex items-center justify-center transition-transform duration-200 hover:scale-105">
+                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5">
+                         <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                     </svg>
                   </div>
-                  <span>ZOE</span>
+                  {!sidebarCollapsed && <span className="transition-opacity duration-200">ZOE</span>}
               </div>
           </div>
 
-          <div className="p-4 space-y-4 border-b border-slate-200/60">
-             <div className="flex flex-col gap-1">
-                 <SidebarItem 
-                    active={viewMode === 'document'} 
-                    label="Belege" 
+          <div className={`p-4 space-y-3 border-b border-white/10 ${sidebarCollapsed ? 'px-3' : ''}`}>
+             <div className={`flex flex-col gap-1 ${sidebarCollapsed ? 'items-center' : ''}`}>
+                 <SidebarItem
+                    active={viewMode === 'document'}
+                    label="Belege"
                     icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>}
-                    onClick={() => { setSelectedDocId(null); setViewMode('document'); }} 
+                    onClick={() => { setSelectedDocId(null); setViewMode('document'); }}
+                    collapsed={sidebarCollapsed}
                 />
-                 <SidebarItem 
-                    active={viewMode === 'database'} 
-                    label="Berichte" 
+                 <SidebarItem
+                    active={viewMode === 'database'}
+                    label="Berichte"
                     icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>}
-                    onClick={() => { setSelectedDocId(null); setViewMode('database'); }} 
+                    onClick={() => { setSelectedDocId(null); setViewMode('database'); }}
+                    collapsed={sidebarCollapsed}
                  />
              </div>
 
-             <div className="relative group">
-                 <svg className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                 <input 
-                    className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm" 
-                    placeholder="Suchen..." 
-                    value={searchQuery} 
-                    onChange={e => setSearchQuery(e.target.value)} 
+             {!sidebarCollapsed && (
+             <div className="relative">
+                 <svg className="absolute left-3 top-2.5 text-[#666] w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                 <input
+                    className="w-full bg-[#111] border border-[#333] rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:border-[#555] transition-all text-white placeholder-[#666]"
+                    placeholder="Suchen..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
                  />
              </div>
-             
+             )}
+
+             {!sidebarCollapsed && (
              <div className="flex gap-2">
-                 <select 
+                 <select
                     value={filterYear}
                     onChange={(e) => setFilterYear(e.target.value)}
-                    className="bg-white border border-slate-200 rounded-lg text-xs py-1.5 px-2 flex-1 outline-none focus:border-blue-500 cursor-pointer text-slate-600 font-medium"
+                    className="bg-[#111] border border-[#333] rounded-lg text-xs py-1.5 px-2 flex-1 outline-none focus:border-[#555] cursor-pointer text-[#888] font-medium appearance-none"
                  >
                     <option value="all">Jahr</option>
                     {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                  </select>
-                 <select 
+                 <select
                     value={filterMonth}
                     onChange={(e) => setFilterMonth(e.target.value)}
-                    className="bg-white border border-slate-200 rounded-lg text-xs py-1.5 px-2 w-16 outline-none focus:border-blue-500 cursor-pointer text-slate-600 font-medium"
+                    className="bg-[#111] border border-[#333] rounded-lg text-xs py-1.5 px-2 w-16 outline-none focus:border-[#555] cursor-pointer text-[#888] font-medium appearance-none"
                  >
                     <option value="all">Mon</option>
                     {Array.from({length: 12}, (_, i) => i + 1).map(m => (
@@ -806,13 +767,16 @@ export default function App() {
                     ))}
                  </select>
              </div>
+             )}
           </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar">
-             <div className="flex flex-col p-2 gap-1">
-                <div className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+             <div className={`flex flex-col p-2 gap-1 ${sidebarCollapsed ? 'items-center' : ''}`}>
+                {!sidebarCollapsed && (
+                <div className="px-3 py-2 text-[10px] font-medium text-[#666] uppercase tracking-wider">
                     Neueste ({filteredDocuments.length})
                 </div>
+                )}
                 {filteredDocuments.map(doc => {
                     const isActive = selectedDocId === doc.id;
                     const isDragTarget = sidebarDragTarget === doc.id;
@@ -821,9 +785,9 @@ export default function App() {
                     const isReview = doc.status === DocumentStatus.REVIEW_NEEDED;
                     const isBlocked = isDup || isErr || isReview;
                     const displayId = doc.data?.eigeneBelegNummer || doc.id.substring(0, 8);
-                    
+
                     return (
-                        <div 
+                        <div
                             key={doc.id}
                             draggable={!isBlocked}
                             title={isDup ? `Duplikat: ${doc.duplicateReason}` : (isErr || isReview) ? (doc.error || doc.data?.ocr_rationale || '') : ''}
@@ -847,21 +811,23 @@ export default function App() {
                                 e.preventDefault();
                                 setSidebarDragTarget(null);
                                 if (isBlocked) return;
-                                
+
                                 const sourceId = e.dataTransfer.getData('text/plain');
                                 if (sourceId && sourceId !== doc.id) {
                                     handleMergeDocuments(sourceId, doc.id);
                                 }
                             }}
                             className={`
-                                flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all relative
-                                ${isActive ? 'bg-white shadow-md shadow-blue-500/5 text-blue-700 ring-1 ring-blue-100' : 'text-slate-600 hover:bg-slate-100/80'}
-                                ${isDragTarget ? 'ring-2 ring-blue-500 bg-blue-50' : ''}
-                                ${isDup && !isActive ? 'bg-red-50 text-red-600' : ''}
-                                ${(isDup || isErr || isReview) ? 'opacity-80' : ''}
+                                flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 ease-out
+                                ${isActive ? 'bg-[#222] text-white' : 'text-[#888] hover:text-white hover:bg-[#222]'}
+                                ${isDragTarget ? 'ring-1 ring-white/30 bg-[#222]' : ''}
+                                ${isDup && !isActive ? 'text-[#f87171]' : ''}
+                                ${(isDup || isErr || isReview) ? 'opacity-70' : ''}
+                                ${sidebarCollapsed ? 'justify-center' : ''}
                             `}
                         >
-                            <div className={`w-2 h-2 rounded-full flex-none ${isDup ? 'bg-red-500' : isErr ? 'bg-rose-500' : isReview ? 'bg-amber-500' : (isActive ? 'bg-blue-500' : 'bg-slate-300')}`}></div>
+                            <div className={`w-2 h-2 rounded-full flex-none ${isDup ? 'bg-[#ef4444]' : isErr ? 'bg-[#f43f5e]' : isReview ? 'bg-[#f59e0b]' : (isActive ? 'bg-white' : 'bg-[#444]')}`}></div>
+                            {!sidebarCollapsed && (
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-baseline">
                                     <span className="font-mono font-medium text-xs truncate opacity-90">{displayId}</span>
@@ -873,8 +839,8 @@ export default function App() {
                                     {doc.data?.lieferantName || doc.fileName}
                                 </div>
                             </div>
-                            {/* Compare button for duplicates */}
-                            {isDup && (
+                            )}
+                            {!sidebarCollapsed && isDup && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -883,7 +849,7 @@ export default function App() {
                                             handleCompareDuplicates(original, doc);
                                         }
                                     }}
-                                    className="p-1 text-red-500 hover:bg-red-100 rounded transition-colors"
+                                    className="p-1 text-[#ef4444] hover:bg-[#333] rounded transition-colors"
                                     title="Mit Original vergleichen"
                                 >
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -900,49 +866,74 @@ export default function App() {
              </div>
           </div>
 
-          <div className="p-4 border-t border-slate-200/60 bg-slate-50/30">
-               <SidebarItem 
-                 active={viewMode === 'settings'} 
-                 label="Einstellungen" 
+          <div className={`p-4 border-t border-white/10 ${sidebarCollapsed ? 'px-3' : ''}`}>
+               <SidebarItem
+                 active={viewMode === 'settings'}
+                 label="Einstellungen"
                  icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2-2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>}
-                 onClick={() => { setSelectedDocId(null); setViewMode('settings'); }} 
+                 onClick={() => { setSelectedDocId(null); setViewMode('settings'); }}
+                 collapsed={sidebarCollapsed}
                />
           </div>
+
+          {/* Sidebar Collapse Toggle */}
+          {!sidebarCollapsed && (
+              <button
+                  onClick={() => setSidebarCollapsed(true)}
+                  className="absolute -right-3 top-20 w-6 h-6 bg-[#222] border border-[#333] rounded-full flex items-center justify-center text-[#666] hover:text-white hover:bg-[#333] transition-all duration-200"
+              >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M15 18l-6-6 6-6"/>
+                  </svg>
+              </button>
+          )}
       </aside>
 
-      {/* --- MOBILE BOTTOM NAVIGATION (Visible only on Mobile) --- */}
-      <nav className="md:hidden fixed bottom-6 left-4 right-4 h-16 bg-white/80 backdrop-blur-2xl border border-white/20 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-2xl z-50 flex items-center justify-around px-2">
-          <button 
+      {/* Collapsed Sidebar Toggle (when collapsed) */}
+      {sidebarCollapsed && (
+          <button
+              onClick={() => setSidebarCollapsed(false)}
+              className="hidden md:flex fixed left-4 top-6 w-10 h-10 bg-black border border-[#333] rounded-lg items-center justify-center text-[#888] hover:text-white hover:bg-[#222] transition-all duration-200 z-30"
+          >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 18l6-6-6-6"/>
+              </svg>
+          </button>
+      )}
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="md:hidden fixed bottom-6 left-4 right-4 h-14 bg-black rounded-2xl z-50 flex items-center justify-around px-4">
+          <button
              onClick={() => { setSelectedDocId(null); setViewMode('document'); }}
-             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${viewMode === 'document' && !selectedDocId ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
+             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-200 ${viewMode === 'document' && !selectedDocId ? 'text-white' : 'text-[#666]'}`}
           >
-             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
           </button>
-          
-          <button 
+
+          <button
              onClick={() => { if(documents.length > 0) setSelectedDocId(documents[0].id); else setViewMode('document'); }}
-             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${selectedDocId ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
+             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-200 ${selectedDocId ? 'text-white' : 'text-[#666]'}`}
           >
-             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           </button>
 
-          <button 
+          <button
              onClick={() => { setSelectedDocId(null); setViewMode('database'); }}
-             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${viewMode === 'database' ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
+             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-200 ${viewMode === 'database' ? 'text-white' : 'text-[#666]'}`}
           >
-             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           </button>
 
-          <button 
+          <button
              onClick={() => { setSelectedDocId(null); setViewMode('settings'); }}
-             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${viewMode === 'settings' ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
+             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-200 ${viewMode === 'settings' ? 'text-white' : 'text-[#666]'}`}
           >
-             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2-2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2-2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
       </nav>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col relative overflow-hidden bg-white/50 min-w-0 md:mb-0 mb-20">
+      <main className="flex-1 flex flex-col relative overflow-hidden bg-white min-w-0 md:mb-0 mb-24">
           {renderContent()}
       </main>
 

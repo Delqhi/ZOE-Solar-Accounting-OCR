@@ -87,7 +87,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   const SortIcon: React.FC<{ field: string }> = ({ field }) => {
     if (sortField !== field) {
       return (
-        <svg className="w-3 h-3 text-slate-300 ml-1 opacity-0 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-3 h-3 text-gray-300 ml-1 opacity-0 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
         </svg>
       );
@@ -100,16 +100,16 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white md:rounded-tl-2xl overflow-hidden shadow-sm border-l border-t border-slate-100">
+    <div className="flex flex-col h-full bg-white border-l border-gray-100 overflow-hidden">
       {/* Header Bar */}
-      <div className="bg-white border-b border-slate-100 px-6 py-4 flex justify-between items-center flex-none sticky top-0 z-20">
+      <div className="bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center flex-none sticky top-0 z-20">
         <div className="flex items-center gap-3">
-          <h2 className="font-bold text-slate-800 text-sm md:text-base">Übersicht</h2>
-          <span className="bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full text-xs font-bold">{stats.count}</span>
+          <h2 className="font-bold text-gray-900 text-sm md:text-base">Übersicht</h2>
+          <span className="bg-gray-100 text-gray-600 px-2.5 py-0.5 text-xs font-medium">{stats.count}</span>
         </div>
-        <div className="text-xs md:text-sm text-slate-500 flex items-center gap-2">
+        <div className="text-xs md:text-sm text-gray-500 flex items-center gap-2">
           <span className="hidden md:inline">Gesamtvolumen:</span>
-          <span className="font-mono font-bold text-slate-900 bg-slate-50 px-2 py-1 rounded-lg">
+          <span className="font-mono font-medium text-gray-900 bg-gray-50 px-2 py-1">
             {stats.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
           </span>
         </div>
@@ -118,18 +118,18 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       {/* Table Container - Responsive Scroll */}
       <div className="flex-1 overflow-auto custom-scrollbar">
         <table className="w-full text-left text-sm border-collapse min-w-[700px] md:min-w-full">
-          <thead className="bg-slate-50/80 backdrop-blur text-slate-500 font-semibold border-b border-slate-200 sticky top-0 z-10 text-xs uppercase tracking-wide">
+          <thead className="bg-white text-gray-500 font-semibold border-b border-gray-200 sticky top-0 z-10 text-xs uppercase tracking-wide">
             <tr>
               <th className="px-4 py-3 w-10">
                 <input
                   type="checkbox"
                   checked={allSelected}
                   onChange={onToggleAll}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
+                  className="border-gray-300 cursor-pointer w-4 h-4"
                 />
               </th>
               <th
-                className="px-4 py-3 cursor-pointer hover:text-slate-700 transition-colors group"
+                className="px-4 py-3 cursor-pointer hover:text-gray-900 transition-colors duration-150 group"
                 onClick={() => handleSort('date')}
               >
                 <div className="flex items-center">
@@ -138,7 +138,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                 </div>
               </th>
               <th
-                className="px-4 py-3 cursor-pointer hover:text-slate-700 transition-colors group"
+                className="px-4 py-3 cursor-pointer hover:text-gray-900 transition-colors duration-150 group"
                 onClick={() => handleSort('supplier')}
               >
                 <div className="flex items-center">
@@ -147,7 +147,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                 </div>
               </th>
               <th
-                className="px-4 py-3 cursor-pointer hover:text-slate-700 transition-colors group hidden md:table-cell"
+                className="px-4 py-3 cursor-pointer hover:text-gray-900 transition-colors duration-150 group hidden md:table-cell"
                 onClick={() => handleSort('account')}
               >
                 <div className="flex items-center">
@@ -156,7 +156,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                 </div>
               </th>
               <th
-                className="px-4 py-3 text-right cursor-pointer hover:text-slate-700 transition-colors group"
+                className="px-4 py-3 text-right cursor-pointer hover:text-gray-900 transition-colors duration-150 group"
                 onClick={() => handleSort('amount')}
               >
                 <div className="flex items-center justify-end">
@@ -165,7 +165,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                 </div>
               </th>
               <th
-                className="px-4 py-3 w-32 cursor-pointer hover:text-slate-700 transition-colors group"
+                className="px-4 py-3 w-32 cursor-pointer hover:text-gray-900 transition-colors duration-150 group"
                 onClick={() => handleSort('status')}
               >
                 <div className="flex items-center justify-center">
@@ -175,7 +175,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-gray-100">
             {sortedDocuments.map(doc => {
               const isSelected = selectedId === doc.id;
               const isChecked = selectedIds.includes(doc.id);
@@ -186,20 +186,20 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
               const isDragTarget = dragTargetId === doc.id;
               const score = doc.data?.ocr_score || 0;
 
-              // Determine badge styling
-              let badgeConfig = { bg: 'bg-slate-100', text: 'text-slate-600', label: `${score}` };
+              // Determine badge styling - Vercel minimal style
+              let badgeConfig = { bg: 'bg-gray-50', text: 'text-gray-600', label: `${score}` };
               if (isDup) {
-                badgeConfig = { bg: 'bg-red-500', text: 'text-white', label: 'Duplikat' };
+                badgeConfig = { bg: 'bg-gray-900', text: 'text-white', label: 'Duplikat' };
               } else if (isError) {
-                badgeConfig = { bg: 'bg-rose-500', text: 'text-white', label: 'Fehler' };
+                badgeConfig = { bg: 'bg-gray-900', text: 'text-white', label: 'Fehler' };
               } else if (isReview) {
-                badgeConfig = { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Prüfen' };
+                badgeConfig = { bg: 'bg-gray-100', text: 'text-gray-900', label: 'Prüfen' };
               } else if (score >= 9) {
-                badgeConfig = { bg: 'bg-emerald-100', text: 'text-emerald-700', label: `${score}` };
+                badgeConfig = { bg: 'bg-gray-50', text: 'text-gray-600', label: `${score}` };
               } else if (score >= 6) {
-                badgeConfig = { bg: 'bg-yellow-100', text: 'text-yellow-700', label: `${score}` };
+                badgeConfig = { bg: 'bg-gray-50', text: 'text-gray-600', label: `${score}` };
               } else {
-                badgeConfig = { bg: 'bg-orange-100', text: 'text-orange-700', label: `${score}` };
+                badgeConfig = { bg: 'bg-gray-50', text: 'text-gray-600', label: `${score}` };
               }
 
               const rowTitle = isDup
@@ -240,12 +240,12 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                     }
                   }}
                   onClick={() => onSelectDocument(doc)}
-                  className={`group cursor-pointer text-sm transition-all border-l-4
-                    ${isDragTarget ? 'bg-blue-50 ring-2 ring-inset ring-blue-500 z-20 relative' : ''}
-                    ${isSelected && !isDragTarget ? 'bg-blue-50/70' : 'hover:bg-slate-50'}
+                  className={`group cursor-pointer text-sm transition-all duration-150
+                    ${isDragTarget ? 'bg-gray-100 ring-2 ring-inset ring-gray-400 z-20 relative' : ''}
+                    ${isSelected && !isDragTarget ? 'bg-gray-50' : 'hover:bg-gray-50'}
                     ${isDup
-                      ? 'bg-red-50/40 border-l-red-500 hover:bg-red-100/50'
-                      : 'border-l-transparent'}
+                      ? 'border-l-4 border-l-gray-400 hover:bg-gray-100'
+                      : 'border-l-4 border-l-transparent'}
                   `}
                 >
                   <td className="px-4 py-3.5 text-center" onClick={e => e.stopPropagation()}>
@@ -253,39 +253,39 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       type="checkbox"
                       checked={isChecked}
                       onChange={() => onToggleSelect(doc.id)}
-                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
+                      className="border-gray-300 cursor-pointer w-4 h-4"
                     />
                   </td>
                   <td className="px-4 py-3.5 align-middle">
-                    <div className="font-mono font-bold text-slate-700 text-xs">
+                    <div className="font-mono font-medium text-gray-900 text-xs">
                       {doc.data?.eigeneBelegNummer || '---'}
                     </div>
-                    <div className="text-slate-500 text-[11px] font-medium mt-0.5 flex items-center gap-1">
+                    <div className="text-gray-400 text-[11px] font-medium mt-0.5 flex items-center gap-1">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                       {doc.data?.belegDatum || doc.uploadDate.split('T')[0]}
                     </div>
                   </td>
-                  <td className="px-4 py-3.5 font-medium text-slate-800">
+                  <td className="px-4 py-3.5 font-medium text-gray-900">
                     {doc.data?.lieferantName || (
-                      <span className="text-slate-400 italic text-xs">{doc.fileName}</span>
+                      <span className="text-gray-400 italic text-xs">{doc.fileName}</span>
                     )}
-                    <div className="md:hidden text-[10px] text-slate-400 mt-1">{doc.data?.kontierungskonto}</div>
+                    <div className="md:hidden text-[10px] text-gray-400 mt-1">{doc.data?.kontierungskonto}</div>
                   </td>
                   <td className="px-4 py-3.5 hidden md:table-cell">
-                    <span className="inline-flex px-2.5 py-1 rounded-md bg-slate-100 text-xs text-slate-600 font-medium font-mono">
+                    <span className="inline-flex px-2.5 py-1 text-xs text-gray-600 font-mono border border-gray-200">
                       {doc.data?.kontierungskonto || '-'}
                     </span>
                   </td>
-                  <td className="px-4 py-3.5 font-mono text-slate-900 text-right font-bold">
+                  <td className="px-4 py-3.5 font-mono text-gray-900 text-right font-medium">
                     {doc.data?.bruttoBetrag
                       ? doc.data.bruttoBetrag.toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' €'
                       : '-'}
                   </td>
                   <td className="px-4 py-3.5 text-center">
                     <div className="flex items-center justify-center gap-1">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide uppercase ${badgeConfig.bg} ${badgeConfig.text}`}>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-medium tracking-wide ${badgeConfig.bg} ${badgeConfig.text}`}>
                         {(isDup || isError || isReview) && (
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
                             <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
@@ -305,7 +305,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                               onCompareDuplicates(original, doc);
                             }
                           }}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors duration-150"
                           title="Mit Original vergleichen"
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -327,11 +327,11 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
 
       {/* Bulk Action Footer */}
       {selectedIds.length > 0 && (
-        <div className="bg-white border-t border-slate-100 p-4 flex justify-between items-center px-6 sticky bottom-0 z-30 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
-          <span className="text-sm text-slate-600 font-medium">{selectedIds.length} ausgewählt</span>
+        <div className="bg-white border-t border-gray-100 p-4 flex justify-between items-center px-6 sticky bottom-0 z-30 shadow-[0_-5px_20px_rgba(0,0,0,0.03)]">
+          <span className="text-sm text-gray-600 font-medium">{selectedIds.length} ausgewählt</span>
           <button
             onClick={onBulkDelete}
-            className="bg-white border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-50 hover:border-red-300 transition-all shadow-sm"
+            className="bg-gray-900 text-white px-4 py-2 text-sm font-medium hover:bg-gray-800 transition-colors duration-150"
           >
             Löschen
           </button>
