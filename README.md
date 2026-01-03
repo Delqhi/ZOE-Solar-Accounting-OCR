@@ -58,7 +58,7 @@
 git clone https://github.com/DeepthinkAI2025/ZOE-Solar-Accounting-OCR.git
 cd ZOE-Solar-Accounting-OCR
 npm install
-echo "GEMINI_API_KEY=your_key_here" > .env
+echo "VITE_GEMINI_API_KEY=your_key_here" > .env
 npm run dev
 ```
 
@@ -245,10 +245,10 @@ npm run dev
 
 ```env
 # Google Gemini (Primär - Empfohlen)
-GEMINI_API_KEY=AIzaSy...
+VITE_GEMINI_API_KEY=AIzaSy...
 
 # SiliconFlow (Fallback - Optional)
-SILICONFLOW_API_KEY=sk-...
+VITE_SILICONFLOW_API_KEY=sk-...
 ```
 
 > **💡 Tipp:** Gemini API ist kostenlos für bis zu 60 Anfragen pro Tag. Perfect für kleine bis mittlere Unternehmen!
@@ -452,10 +452,10 @@ npm install
 Erstellen Sie eine `.env` Datei im Root-Verzeichnis (oder kopieren Sie `.env.example` nach `.env`):
 ```env
 # Google Gemini API Key (Zwingend erforderlich)
-GEMINI_API_KEY="AIzaSy..."
+VITE_GEMINI_API_KEY="AIzaSy..."
 
 # SiliconFlow API Key (Fallback für Gemini)
-SILICONFLOW_API_KEY="sk-..."
+VITE_SILICONFLOW_API_KEY="sk-..."
 ```
 
 Hinweis: Wenn ein API-Key versehentlich in einem Chat/Issue/Screenshot gelandet ist, sollten Sie ihn beim Anbieter **rotieren** (neuen Key erzeugen, alten deaktivieren) und danach nur den neuen Key lokal in `.env` eintragen.
