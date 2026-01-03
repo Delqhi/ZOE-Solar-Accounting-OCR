@@ -38,7 +38,10 @@ const parseDateToIso = (value: unknown): { iso?: string; hadInput: boolean } => 
     const day = Number(m1[1]);
     const month = Number(m1[2]);
     let year = Number(m1[3]);
-    if (m1[3].length === 2) year = year >= 70 ? 1900 + year : 2000 + year;
+    if (m1[3].length === 2) {
+      // Use 30-year sliding window: 00-29 → 2000-2029, 30-99 → 1930-1999
+      year = year < 30 ? 2000 + year : 1900 + year;
+    }
     return { iso: toIsoDateFromParts(year, month, day), hadInput: true };
   }
 

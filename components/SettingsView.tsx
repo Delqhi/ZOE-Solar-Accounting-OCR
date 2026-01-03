@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { AppSettings, AccountDefinition, DatevConfig, ElsterStammdaten, StartupChecklist, ElsterBesteuerungUst, ElsterRechtsform, SubmissionConfig } from '../types';
+import { AppSettings, AccountDefinition, DatevConfig, ElsterStammdaten, StartupChecklist, ElsterBesteuerungUst, ElsterRechtsform } from '../types';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -12,7 +12,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, on
   const taxes = settings.taxDefinitions || [];
   const [accounts, setAccounts] = useState<AccountDefinition[]>(settings.accountDefinitions || []);
   const [newAccountName, setNewAccountName] = useState('');
-    type SettingsTab = 'system' | 'elster' | 'startup' | 'oci';
+    type SettingsTab = 'system' | 'elster' | 'startup';
     const [activeTab, setActiveTab] = useState<SettingsTab>('system');
 
     const Tip: React.FC<{ text: string; children: React.ReactNode }> = ({ text, children }) => (
@@ -81,14 +81,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, on
         };
     });
 
-    const [submissionConfig, setSubmissionConfig] = useState<SubmissionConfig>(() => ({
-        mode: 'local',
-        localUrl: 'http://localhost:8080',
-        ociUrl: '',
-        apiKey: '',
-        ...(settings.submissionConfig || {}),
-    }));
-
     const buildSettingsSnapshot = (overrides?: Partial<AppSettings>): AppSettings => {
         return {
             ...settings,
@@ -96,7 +88,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, on
             datevConfig,
             elsterStammdaten,
             startupChecklist,
-            submissionConfig,
             ...(overrides || {}),
         };
     };
@@ -150,7 +141,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, on
                { id: 'system', label: 'System' },
                { id: 'elster', label: 'ELSTER' },
                { id: 'startup', label: 'Startup' },
-                             { id: 'oci', label: 'OCI' },
              ] as Array<{ id: SettingsTab; label: string }>).map(t => (
                <button
                  key={t.id}
@@ -614,253 +604,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, on
                                 </>
                             )}
 
-                            {activeTab === 'oci' && (
-                                <>
-                                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                                        <div className="p-4 bg-slate-50 border-b border-slate-200">
-                                            <h3 className="font-bold text-slate-800">🔧 Submission Backend – ELSTER UStVA-Übermittlung</h3>
-                                            <div className="text-xs text-slate-500 mt-1">
-                                                Wählen Sie, ob das Backend lokal (Docker) oder auf einer OCI VM läuft.
-                                            </div>
-                                        </div>
-
-                                        <div className="p-4 space-y-5">
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-2">Modus</label>
-                                                <select
-                                                    value={submissionConfig.mode}
-                                                    onChange={(e) => setSubmissionConfig(prev => ({ ...prev, mode: e.target.value as 'local' | 'oci' }))}
-                                                    className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
-                                                >
-                                                    <option value="local">Lokal (Docker Container)</option>
-                                                    <option value="oci">OCI VM</option>
-                                                </select>
-                                            </div>
-
-                                            {submissionConfig.mode === 'local' && (
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-2">Lokale Backend-URL</label>
-                                                    <input
-                                                        type="text"
-                                                        value={submissionConfig.localUrl || ''}
-                                                        onChange={(e) => setSubmissionConfig(prev => ({ ...prev, localUrl: e.target.value }))}
-                                                        placeholder="http://localhost:8080"
-                                                        className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
-                                                    />
-                                                    <div className="text-xs text-slate-500 mt-1">
-                                                        URL Ihres lokalen Docker-Containers.
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {submissionConfig.mode === 'oci' && (
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-700 mb-2">OCI VM Backend-URL</label>
-                                                    <input
-                                                        type="text"
-                                                        value={submissionConfig.ociUrl || ''}
-                                                        onChange={(e) => setSubmissionConfig(prev => ({ ...prev, ociUrl: e.target.value }))}
-                                                        placeholder="http://92.5.30.252:8080"
-                                                        className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
-                                                    />
-                                                    <div className="text-xs text-slate-500 mt-1">
-                                                        URL Ihrer OCI VM (z.B. http://&lt;VM-IP&gt;:8080).
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-2">API-Key (optional)</label>
-                                                <input
-                                                    type="password"
-                                                    value={submissionConfig.apiKey || ''}
-                                                    onChange={(e) => setSubmissionConfig(prev => ({ ...prev, apiKey: e.target.value }))}
-                                                    placeholder="API-Key für Backend-Authentifizierung"
-                                                    className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
-                                                />
-                                                <div className="text-xs text-slate-500 mt-1">
-                                                    Optionaler API-Key für zusätzliche Sicherheit.
-                                                </div>
-                                            </div>
-
-                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600">
-                                                <div className="font-semibold text-slate-700 mb-1">Hinweis:</div>
-                                                Das Backend führt die ELSTER-Übermittlung mit ERiC aus. Zertifikatsdateien und PIN werden nicht im Browser gespeichert.
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                                        <div className="p-4 bg-slate-50 border-b border-slate-200">
-                                            <h3 className="font-bold text-slate-800">☁️ Oracle Cloud (OCI) – VM Setup Anleitung</h3>
-                                            <div className="text-xs text-slate-500 mt-1">
-                                                Kurzanleitung, um eine Oracle Cloud VM als "Submission Backend" zu betreiben.
-                                            </div>
-                                        </div>
-
-                                        <div className="p-4 space-y-5 text-sm text-slate-700">
-                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600">
-                                                Zielbild: Webapp (Vercel) → HTTPS → OCI‑VM → (Container) Submission‑Service.
-                                                Der Service führt die Übermittlung aus; im Browser läuft keine Zertifikats-/Signatur-Logik.
-                                            </div>
-
-                                            <div>
-                                                <div className="font-semibold text-slate-800 mb-2">1) Oracle Cloud Konto anlegen</div>
-                                                <ol className="list-decimal pl-5 space-y-1">
-                                                    <li>
-                                                        Oracle Free Tier öffnen:{' '}
-                                                        <a
-                                                            className="text-blue-600 hover:underline"
-                                                            href="https://www.oracle.com/cloud/free/"
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                        >
-                                                            oracle.com/cloud/free
-                                                        </a>
-                                                    </li>
-                                                    <li>
-                                                        Registrieren und Free‑Tier aktivieren. Achte auf{' '}
-                                                        <Tip text="Je nach Land/Region verlangt Oracle u.U. eine Kreditkarten-Verifikation (ohne zwangsläufige Kosten, aber abhängig von Oracle).">
-                                                            Verifizierung
-                                                        </Tip>
-                                                        .
-                                                    </li>
-                                                </ol>
-                                            </div>
-
-                                            <div>
-                                                <div className="font-semibold text-slate-800 mb-2">2) Compute‑Instanz (VM) erstellen</div>
-                                                <div className="text-xs text-slate-500 mb-2">
-                                                    Instanz‑Shapes heißen je nach Region unterschiedlich (z.B. „E2 Micro“ oder „Ampere A1 Flex“).
-                                                </div>
-                                                <ol className="list-decimal pl-5 space-y-1">
-                                                    <li>
-                                                        Offizielle Anleitung (Compute instance):{' '}
-                                                        <a
-                                                            className="text-blue-600 hover:underline"
-                                                            href="https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/launchinginstance.htm"
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                        >
-                                                            docs.oracle.com … launchinginstance
-                                                        </a>
-                                                    </li>
-                                                    <li>
-                                                        OS: Linux (Ubuntu). SSH‑Key anlegen und sicher speichern{' '}
-                                                        <Tip text="SSH-Key ist dein Zugang zur VM. Ohne ihn kommst du später u.U. nicht mehr rein.">(
-                                                            SSH‑Key
-                                                        </Tip>
-                                                        ).
-                                                    </li>
-                                                    <li>
-                                                        Netzwerk: Public IPv4 aktivieren (damit dein Backend erreichbar ist).
-                                                    </li>
-                                                </ol>
-                                            </div>
-
-                                            <div>
-                                                <div className="font-semibold text-slate-800 mb-2">3) Firewall/Security List (Ports)</div>
-                                                <ol className="list-decimal pl-5 space-y-1">
-                                                    <li>
-                                                        Stelle sicher, dass eingehend mindestens{' '}
-                                                        <Tip text="Port 443 (HTTPS) ist der Standard, wenn Vercel/Browser dein Backend sicher aufrufen soll.">443/HTTPS</Tip>
-                                                        {' '}erlaubt ist. Optional: 80/HTTP (nur für Redirect/ACME).
-                                                    </li>
-                                                    <li>
-                                                        OCI Doku zu Security Lists:{' '}
-                                                        <a
-                                                            className="text-blue-600 hover:underline"
-                                                            href="https://docs.oracle.com/en-us/iaas/Content/Network/Concepts/securitylists.htm"
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                        >
-                                                            docs.oracle.com … securitylists
-                                                        </a>
-                                                    </li>
-                                                </ol>
-                                            </div>
-
-                                            <div>
-                                                <div className="font-semibold text-slate-800 mb-2">4) Backend auf der VM betreiben (high level)</div>
-                                                <div className="text-xs text-slate-500 mb-2">
-                                                    Minimal: Docker installieren, Service als Container laufen lassen, TLS terminieren (z.B. Reverse Proxy).
-                                                </div>
-                                                <ol className="list-decimal pl-5 space-y-1">
-                                                    <li>
-                                                        Docker/Compose installieren{' '}
-                                                        <Tip text="Konkrete Befehle hängen vom gewählten Linux-Image ab (Ubuntu, Oracle Linux, etc.).">(je nach OS)</Tip>
-                                                        .
-                                                    </li>
-                                                    <li>
-                                                        Service starten (z.B. `docker compose up -d`).
-                                                    </li>
-                                                    <li>
-                                                        HTTPS: nutze ein Zertifikat (z.B. Let’s Encrypt) oder einen vorgeschalteten Proxy.
-                                                    </li>
-                                                </ol>
-                                            </div>
-
-                                            <div>
-                                                <div className="font-semibold text-slate-800 mb-2">Empfohlene Minimal‑Architektur (robust &amp; einfach)</div>
-                                                <div className="text-xs text-slate-500 mb-2">
-                                                    Fokus: stabiler Betrieb auf einer kleinen VM, ohne Serverless‑Limits.
-                                                </div>
-                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600 space-y-2">
-                                                    <div>
-                                                        <span className="font-semibold text-slate-700">Bausteine:</span>{' '}
-                                                        Reverse Proxy (TLS) → App‑Container (Submission‑Service).
-                                                    </div>
-                                                    <div>
-                                                        <span className="font-semibold text-slate-700">Reverse Proxy:</span>{' '}
-                                                        Terminiert HTTPS auf{' '}
-                                                        <Tip text="In der Praxis nutzt man i.d.R. einen Reverse Proxy für TLS, Routing und Rate-Limits.">443</Tip>
-                                                        . Optional leitet er 80 → 443 um.
-                                                    </div>
-                                                    <div>
-                                                        <span className="font-semibold text-slate-700">Container‑Betrieb:</span>{' '}
-                                                        `docker compose` startet 1–2 Services (Proxy + App). Updates erfolgen per `docker pull` + Restart.
-                                                    </div>
-                                                    <div>
-                                                        <span className="font-semibold text-slate-700">Healthcheck:</span>{' '}
-                                                        Eine Route wie <Tip text="Ein Health‑Endpoint hilft beim Monitoring und beim schnellen Debugging.">/health</Tip>
-                                                        liefert „ok“, damit du Ausfälle erkennst.
-                                                    </div>
-                                                    <div>
-                                                        <span className="font-semibold text-slate-700">Sicherheit (Minimum):</span>{' '}
-                                                        Nur HTTPS, API‑Key für Requests, Logs ohne Secrets, VM regelmäßig patchen.
-                                                    </div>
-                                                </div>
-
-                                                <div className="text-xs text-slate-500 mt-2">
-                                                    Links (allgemein):{' '}
-                                                    <a
-                                                        className="text-blue-600 hover:underline"
-                                                        href="https://letsencrypt.org/getting-started/"
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                    >
-                                                        Let’s Encrypt
-                                                    </a>
-                                                    {' '}·{' '}
-                                                    <a
-                                                        className="text-blue-600 hover:underline"
-                                                        href="https://docs.docker.com/compose/"
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                    >
-                                                        Docker Compose
-                                                    </a>
-                                                </div>
-                                            </div>
-
-                                            <div className="text-xs text-slate-500">
-                                                Tipp: Wenn du Zertifikatsdatei + PIN für ELSTER nutzt, behandle das wie ein Secret.
-                                                Nicht loggen, nicht unverschlüsselt speichern, und nur über HTTPS übertragen.
-                                            </div>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
           </div>
       </div>
     </div>

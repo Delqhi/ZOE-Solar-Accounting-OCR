@@ -4,7 +4,8 @@ export enum DocumentStatus {
   REVIEW_NEEDED = 'REVIEW_NEEDED',
   COMPLETED = 'COMPLETED',
   ERROR = 'ERROR',
-  DUPLICATE = 'DUPLICATE'
+  DUPLICATE = 'DUPLICATE',
+  PRIVATE = 'PRIVATE' // Document moved to belege_privat table
 }
 
 export interface LineItem {
@@ -186,13 +187,6 @@ export interface StartupChecklist {
   elsterStammdatenKonfiguriert: boolean;
 }
 
-export interface SubmissionConfig {
-  mode: 'local' | 'oci';
-  localUrl?: string; // For local Docker
-  ociUrl?: string;   // For OCI VM
-  apiKey?: string;   // Optional API key
-}
-
 export interface AppSettings {
   id: string;
   // New Configs
@@ -208,9 +202,6 @@ export interface AppSettings {
   // Onboarding
   startupChecklist?: StartupChecklist;
 
-  // Submission Backend
-  submissionConfig?: SubmissionConfig;
-  
   // Legacy
   accountGroups: AccountGroupDefinition[]; 
   ocrConfig: OCRConfig;
