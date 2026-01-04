@@ -17,6 +17,7 @@
     "@supabase/supabase-js": "^2.89.0",
     "@tailwindcss/postcss": "^4.1.18",
     "autoprefixer": "^10.4.23",
+    "idb": "^8.0.3",
     "jspdf": "2.5.1",
     "jspdf-autotable": "3.8.1",
     "pdfjs-dist": "3.11.174",
