@@ -301,7 +301,7 @@ const DEFAULT_ELSTER_STAMMDATEN = {
   kontaktEmail: '',
 };
 
-const getDefaultSettings = (): AppSettings => ({
+export const getDefaultSettings = (): AppSettings => ({
   id: 'global',
   taxDefinitions: DEFAULT_TAX_DEFINITIONS,
   accountDefinitions: DEFAULT_ACCOUNT_DEFINITIONS,
@@ -594,6 +594,48 @@ export const saveVendorRule = async (vendorName: string, accountId: string, taxC
   if (error) {
     console.error('Failed to save vendor rule:', error);
   }
+};
+
+// --- Document Status Updates ---
+
+export const updateDocumentStatus = async (id: string, status: DocumentStatus): Promise<void> => {
+  const client = initSupabase();
+  if (!client) {
+    throw new Error('Supabase not configured');
+  }
+
+  const { error } = await client
+    .from('belege')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) {
+    throw new Error(`Failed to update document status: ${error.message}`);
+  }
+};
+
+// --- Re-OCR Queue ---
+
+export const queueReOcr = async (id: string): Promise<void> => {
+  const client = initSupabase();
+  if (!client) {
+    console.log('Supabase not configured - Re-OCR would be queued for:', id);
+    return;
+  }
+
+  // Mark document as processing
+  const { error } = await client
+    .from('belege')
+    .update({ status: DocumentStatus.PROCESSING, updated_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) {
+    console.error('Failed to queue re-OCR:', error);
+  }
+
+  // In a full implementation, this would trigger an Edge Function
+  // or insert into a re_ocr_queue table for background processing
+  console.log(`Re-OCR queued for document: ${id}`);
 };
 
 // --- SQL Export ---

@@ -62,16 +62,29 @@ export const useDocuments = (): UseDocumentsReturn => {
     setDocuments(prev => prev.map(d =>
       ids.includes(d.id) ? { ...d, status: DocumentStatus.COMPLETED } : d
     ));
-    // In a real app, this would call an API to bulk update
-    // For now, we just update local state
+    // API calls to update status in database
+    for (const id of ids) {
+      try {
+        await supabaseService.updateDocumentStatus(id, DocumentStatus.COMPLETED);
+      } catch (e) {
+        console.error('Failed to mark document as reviewed:', id, e);
+      }
+    }
   }, []);
 
   const reRunOcr = useCallback(async (ids: string[]) => {
-    // Set documents to processing state
+    // Optimistic update - set documents to processing state
     setDocuments(prev => prev.map(d =>
       ids.includes(d.id) ? { ...d, status: DocumentStatus.PROCESSING } : d
     ));
-    // In a real app, this would trigger re-OCR for selected documents
+    // Queue re-OCR jobs for each document
+    for (const id of ids) {
+      try {
+        await supabaseService.queueReOcr(id);
+      } catch (e) {
+        console.error('Failed to queue re-OCR:', id, e);
+      }
+    }
   }, []);
 
   return {
