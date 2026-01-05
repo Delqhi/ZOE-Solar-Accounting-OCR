@@ -4,12 +4,14 @@ export enum DocumentStatus {
   REVIEW_NEEDED = 'REVIEW_NEEDED',
   COMPLETED = 'COMPLETED',
   ERROR = 'ERROR',
-  DUPLICATE = 'DUPLICATE'
+  DUPLICATE = 'DUPLICATE',
+  PRIVATE = 'PRIVATE'
 }
 
 export interface LineItem {
   description: string;
   amount?: number;
+  quantity?: number;
 }
 
 export interface TaxCategoryDefinition {
@@ -82,13 +84,16 @@ export interface ExtractedData {
   beschreibung: string;
   textContent?: string;
 
+  // Quantity (for line items)
+  quantity: number;
+
   // AI Quality & OCR Score
   qualityScore?: number; // Legacy
   ocr_score?: number;    // New System 0-10
   ocr_rationale?: string; // New System explanation
-  
+
   // Memory System
-  ruleApplied?: boolean; 
+  ruleApplied?: boolean;
 }
 
 export interface Attachment {
@@ -100,6 +105,7 @@ export interface Attachment {
 
 export interface DocumentRecord {
   id: string;
+  zoeId?: string;
   fileName: string;
   fileType: string;
   uploadDate: string;
@@ -238,8 +244,8 @@ export interface DatevConfig {
 }
 
 export interface VendorRule {
-  vendorName: string;      
-  accountGroupName: string; // Legacy
+  vendorName: string;
+  accountGroupName?: string; // Legacy
   accountId?: string;       // New
   taxCategoryValue?: string; // New
   lastUpdated: string;
@@ -249,4 +255,34 @@ export interface VendorRule {
 // OCR Provider Interface for interchangeability
 export interface OcrProvider {
   analyzeDocument(base64Data: string, mimeType: string): Promise<Partial<ExtractedData>>;
+}
+
+// ==================== Context Types ====================
+
+export interface AppState {
+  documents: DocumentRecord[];
+  settings: AppSettings;
+  loading: boolean;
+  error: string | null;
+  selectedDocumentId: string | null;
+  filters: {
+    year: string;
+    quarter: string;
+    month: string;
+    status: string;
+    vendor: string;
+  };
+}
+
+export interface AppContextType {
+  state: AppState;
+  addDocument: (doc: DocumentRecord) => Promise<void>;
+  updateDocument: (doc: DocumentRecord) => Promise<void>;
+  deleteDocument: (id: string) => Promise<void>;
+  updateSettings: (settings: Partial<AppSettings>) => Promise<void>;
+  selectDocument: (id: string | null) => void;
+  updateFilters: (filters: Partial<AppState['filters']>) => void;
+  clearFilters: () => void;
+  retryOCR: (doc: DocumentRecord) => Promise<void>;
+  mergeDocuments: (sourceId: string, targetId: string) => Promise<void>;
 }

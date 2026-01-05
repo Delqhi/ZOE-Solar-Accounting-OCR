@@ -226,6 +226,11 @@ export const belegeService = {
       throw error;
     }
 
+    // Update line items if present
+    if (data.lineItems !== undefined) {
+      await this.updatePositionen(id, data.lineItems);
+    }
+
     return beleg as Beleg;
   },
 
@@ -314,13 +319,13 @@ export const belegeService = {
     const positionData = positionen.map((pos, index) => ({
       beleg_id: belegId,
       position_index: index,
-      beschreibung: pos.beschreibung || null,
-      menge: pos.menge || null,
-      einzelpreis: pos.einzelpreis || null,
-      gesamtbetrag: pos.gesamtbetrag || null,
-      mwst_satz: pos.mwstSatz || null,
-      konto: pos.konto || null,
-      steuerkategorie: pos.steuerkategorie || null,
+      beschreibung: pos.description || null,
+      menge: pos.quantity || null,
+      einzelpreis: null,
+      gesamtbetrag: pos.amount || null,
+      mwst_satz: null,
+      konto: null,
+      steuerkategorie: null,
     }));
 
     const { error } = await supabase

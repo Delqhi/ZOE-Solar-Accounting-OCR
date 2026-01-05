@@ -43,7 +43,7 @@ export const TableRow: React.FC<TableRowProps> = ({
 
       {/* ZOE ID */}
       <td className="p-2">
-        <div className="font-mono text-xs text-gray-600">{document.zoeId || '-'}</div>
+        <div className="font-mono text-xs text-gray-600">{document.data?.eigeneBelegNummer || '-'}</div>
       </td>
 
       {/* Date */}
@@ -62,10 +62,10 @@ export const TableRow: React.FC<TableRowProps> = ({
       {/* Amounts */}
       <td className="p-2 text-right">
         <div className="text-sm text-gray-900 font-mono">
-          {document.data?.amountBrutto?.toFixed(2)} €
+          {document.data?.bruttoBetrag?.toFixed(2)} €
         </div>
         <div className="text-xs text-gray-500">
-          N: {document.data?.amountNetto?.toFixed(2)} · M: {document.data?.amountMwSt?.toFixed(2)}
+          N: {document.data?.nettoBetrag?.toFixed(2)} · M: {document.data?.mwstBetrag19?.toFixed(2)}
         </div>
       </td>
 

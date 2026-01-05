@@ -14,11 +14,11 @@ import { AppProvider } from './context/AppContext';
 // Services & Monitoring
 import { performSecurityCheck } from './middleware/security';
 import { monitoringService } from './services/monitoringService';
-import { loadEnvConfig, logConfigSummary, isFeatureEnabled } from './config/env';
+import { loadEnvConfig, logConfigSummary, isFeatureEnabled, getEnvironmentConfig } from './config/env';
 import { analytics } from './lib/analytics';
 
 // Styles
-import './index.css';
+import './styles/global.css';
 
 // Components (lazy loaded for performance)
 const App = React.lazy(() => import('./App'));
@@ -34,6 +34,7 @@ logConfigSummary();
 
 // Load environment config
 const envConfig = loadEnvConfig();
+const envMeta = getEnvironmentConfig();
 
 // Setup performance monitoring
 const originalFetch = window.fetch;
@@ -69,7 +70,7 @@ function Root() {
     // Track app load
     analytics.track('app_loaded', {
       version: envConfig.appVersion,
-      environment: envConfig.environment,
+      environment: envMeta.environment,
     });
 
     // Track user agent

@@ -2,18 +2,18 @@
  * Custom Hook: Document Editor State Management
  * Extracts editing logic from DetailModal
  */
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { DocumentRecord, ExtractedData, LineItem, Attachment, AppSettings } from '../../../types';
 import { getSettings } from '../../../services/storageService';
 import { isPresent, getErrorNextSteps } from '../../../services/validation';
 
-interface UseDocumentEditorProps {
+export interface UseDocumentEditorProps {
   document: DocumentRecord;
   allDocuments: DocumentRecord[];
   onSave: (doc: DocumentRecord) => Promise<void> | void;
 }
 
-interface UseDocumentEditorReturn {
+export interface UseDocumentEditorReturn {
   formData: Partial<ExtractedData>;
   settings: AppSettings | null;
   activeFileIndex: number;

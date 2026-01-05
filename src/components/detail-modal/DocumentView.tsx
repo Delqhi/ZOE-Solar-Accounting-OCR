@@ -1,6 +1,6 @@
 import React from 'react';
 import { DocumentRecord, Attachment } from '../../types';
-import { PdfViewer } from '../PdfViewer';
+import { PdfViewer } from './PdfViewer';
 
 interface DocumentViewProps {
   viewUrl: string | null;
@@ -64,7 +64,7 @@ export const DocumentView: React.FC<DocumentViewProps> = ({
       <div className="flex-1 bg-gray-100 flex items-center justify-center overflow-auto">
         {viewUrl ? (
           viewType === 'application/pdf' ? (
-            <PdfViewer fileUrl={viewUrl} className="w-full h-full" />
+            <PdfViewer url={viewUrl} />
           ) : (
             <img
               src={viewUrl}

@@ -1,0 +1,46 @@
+/** Extracted Data Normalization - Placeholder */
+
+import { ExtractedData } from '../types';
+
+export function normalizeExtractedData(data: Partial<ExtractedData>): ExtractedData {
+  return {
+    documentType: data.documentType || '',
+    belegDatum: data.belegDatum || '',
+    belegNummerLieferant: data.belegNummerLieferant || '',
+    lieferantName: data.lieferantName || '',
+    lieferantAdresse: data.lieferantAdresse || '',
+    steuernummer: data.steuernummer || '',
+    nettoBetrag: data.nettoBetrag || 0,
+    mwstSatz0: data.mwstSatz0 || 0,
+    mwstBetrag0: data.mwstBetrag0 || 0,
+    mwstSatz7: data.mwstSatz7 || 0,
+    mwstBetrag7: data.mwstBetrag7 || 0,
+    mwstSatz19: data.mwstSatz19 || 0,
+    mwstBetrag19: data.mwstBetrag19 || 0,
+    bruttoBetrag: data.bruttoBetrag || 0,
+    zahlungsmethode: data.zahlungsmethode || '',
+    lineItems: data.lineItems || [],
+    kontierungskonto: data.kontierungskonto,
+    steuerkategorie: data.steuerkategorie,
+    kontierungBegruendung: data.kontierungBegruendung,
+    kontogruppe: data.kontogruppe || '',
+    konto_skr03: data.konto_skr03 || '',
+    ust_typ: data.ust_typ || '',
+    sollKonto: data.sollKonto || '',
+    habenKonto: data.habenKonto || '',
+    steuerKategorie: data.steuerKategorie || '',
+    eigeneBelegNummer: data.eigeneBelegNummer || '',
+    zahlungsDatum: data.zahlungsDatum || '',
+    zahlungsStatus: data.zahlungsStatus || '',
+    aufbewahrungsOrt: data.aufbewahrungsOrt || '',
+    rechnungsEmpfaenger: data.rechnungsEmpfaenger || '',
+    kleinbetrag: data.kleinbetrag || false,
+    vorsteuerabzug: data.vorsteuerabzug || false,
+    reverseCharge: data.reverseCharge || false,
+    privatanteil: data.privatanteil || false,
+    beschreibung: data.beschreibung || '',
+    ocr_score: data.ocr_score,
+    ocr_rationale: data.ocr_rationale,
+    quantity: data.quantity || 1,
+  };
+}

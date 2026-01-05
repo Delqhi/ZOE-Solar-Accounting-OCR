@@ -107,9 +107,8 @@ export function escapeXml(text: string): string {
     .replace(/</g, '<')
     .replace(/>/g, '>')
     .replace(/"/g, '"')
-    .replace(/'/g, ''');
+    .replace(/'/g, "'");
 }
-
 /**
  * Validates file upload for security
  */

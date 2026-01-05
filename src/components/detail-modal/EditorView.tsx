@@ -42,8 +42,8 @@ export const EditorView: React.FC<EditorViewProps> = ({
     : taxes;
 
   // Calculate sum validation
-  const sumValid = formData.amountNetto && formData.amountMwSt && formData.amountBrutto
-    ? validateSumCheck(formData.amountNetto, formData.amountMwSt, formData.amountBrutto)
+  const sumValid = formData.nettoBetrag && formData.mwstBetrag19 && formData.bruttoBetrag
+    ? validateSumCheck(formData.nettoBetrag, formData.mwstBetrag19, formData.bruttoBetrag)
     : true;
 
   return (
@@ -89,8 +89,8 @@ export const EditorView: React.FC<EditorViewProps> = ({
               ref={bruttoBetragRef}
               type="number"
               step="0.01"
-              value={formData.amountNetto || ''}
-              onChange={(e) => onChange('amountNetto', parseFloat(e.target.value))}
+              value={formData.nettoBetrag || ''}
+              onChange={(e) => onChange('nettoBetrag', parseFloat(e.target.value))}
               onBlur={onBlur}
               className={INPUT_CLASS}
             />
@@ -100,8 +100,8 @@ export const EditorView: React.FC<EditorViewProps> = ({
             <input
               type="number"
               step="0.01"
-              value={formData.amountMwSt || ''}
-              onChange={(e) => onChange('amountMwSt', parseFloat(e.target.value))}
+              value={formData.mwstBetrag19 || ''}
+              onChange={(e) => onChange('mwstBetrag19', parseFloat(e.target.value))}
               onBlur={onBlur}
               className={INPUT_CLASS}
             />
@@ -111,8 +111,8 @@ export const EditorView: React.FC<EditorViewProps> = ({
             <input
               type="number"
               step="0.01"
-              value={formData.amountBrutto || ''}
-              onChange={(e) => onChange('amountBrutto', parseFloat(e.target.value))}
+              value={formData.bruttoBetrag || ''}
+              onChange={(e) => onChange('bruttoBetrag', parseFloat(e.target.value))}
               onBlur={onBlur}
               className={INPUT_CLASS}
             />
@@ -215,23 +215,12 @@ export const EditorView: React.FC<EditorViewProps> = ({
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
-            checked={formData.isPrivate || false}
-            onChange={(e) => onCheckboxChange('isPrivate', e.target.checked)}
+            checked={formData.privatanteil || false}
+            onChange={(e) => onCheckboxChange('privatanteil', e.target.checked)}
             onBlur={onBlur}
             className="rounded border-gray-300"
           />
           Privatbeleg
-        </label>
-
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={formData.requiresReview || false}
-            onChange={(e) => onCheckboxChange('requiresReview', e.target.checked)}
-            onBlur={onBlur}
-            className="rounded border-gray-300"
-          />
-          Prüfung erforderlich
         </label>
       </div>
 
@@ -241,8 +230,8 @@ export const EditorView: React.FC<EditorViewProps> = ({
           <label className={LABEL_CLASS}>Verwendungszweck</label>
           <input
             type="text"
-            value={formData.description || ''}
-            onChange={(e) => onChange('description', e.target.value)}
+            value={formData.beschreibung || ''}
+            onChange={(e) => onChange('beschreibung', e.target.value)}
             onBlur={onBlur}
             className={INPUT_CLASS}
             placeholder="Optionale Beschreibung"
