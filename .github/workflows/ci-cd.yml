@@ -63,14 +63,14 @@ jobs:
       - name: Run unit tests
         run: npm run test:ci
 
-      - name: Upload coverage to Codecov
-        uses: codecov/coverage-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage/lcov.info
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
+      # - name: Upload coverage to Codecov
+      #   uses: codecov/coverage-action@v4
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }}
+      #     files: ./coverage/lcov.info
+      #     flags: unittests
+      #     name: codecov-umbrella
+      #     fail_ci_if_error: false
 
   # Job 3: Build & Security Audit
   build:
