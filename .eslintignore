@@ -1,0 +1,14 @@
+# ESLint Ignore Files
+dist/
+build/
+coverage/
+node_modules/
+playwright-report/
+test-results/
+*.config.js
+*.config.ts
+vite.config.ts
+vitest.config.ts
+playwright.config.ts
+postcss.config.js
+tailwind.config.js
