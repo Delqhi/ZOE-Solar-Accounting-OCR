@@ -2,6 +2,7 @@
 import { ExtractedData, OcrProvider } from "../types";
 import * as pdfjsLib from 'pdfjs-dist';
 import { normalizeExtractedData } from "./extractedDataNormalization";
+import { logger } from "../src/utils/logger";
 
 // Helper to robustly resolve PDF.js library instance from ESM import
 const getPdfJs = () => {
@@ -18,7 +19,7 @@ if (pdf && pdf.GlobalWorkerOptions) {
     try {
         pdf.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
     } catch (e) {
-        console.warn("Failed to set PDF worker source:", e);
+        logger.warn("PDF Worker setup warning:", e);
     }
 }
 
@@ -153,7 +154,7 @@ async function convertPdfToStitchedImage(base64Pdf: string): Promise<string> {
         // Compress to JPEG
         return stitchedCanvas.toDataURL('image/jpeg', 0.85).split(',')[1];
     } catch (e) {
-        console.error("PDF Stitching failed:", e);
+        logger.error("PDF Stitching failed:", e);
         // Keep specific user-actionable error messages when possible (e.g. size limits)
         const msg = e instanceof Error ? e.message : String(e);
         throw new Error(msg || "PDF konnte nicht für OCR konvertiert werden.");
@@ -294,7 +295,7 @@ export const analyzeDocumentWithFallback = async (base64Data: string, mimeType: 
         };
 
     } catch (error) {
-        console.error("Vision AI Fallback Failed:", error);
+        logger.error("Vision AI Fallback Failed:", error);
         const reason = toUserFriendlyFallbackReason(error);
         return {
             ...failSafeObject,

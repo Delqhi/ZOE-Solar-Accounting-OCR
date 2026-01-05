@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppSettings } from '../types';
 import * as supabaseService from '../services/supabaseService';
+import { logger } from '../src/utils/logger';
 
 interface UseSettingsReturn {
   settings: AppSettings | null;
@@ -23,7 +24,7 @@ export const useSettings = (): UseSettingsReturn => {
       setError(null);
     } catch (e) {
       setError('Fehler beim Laden der Einstellungen');
-      console.error(e);
+      logger.error('Error loading settings', e);
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DocumentRecord, DocumentStatus, ExtractedData } from '../types';
 import * as supabaseService from '../services/supabaseService';
+import { logger } from '../src/utils/logger';
 
 interface UseDocumentsReturn {
   documents: DocumentRecord[];
@@ -29,7 +30,7 @@ export const useDocuments = (): UseDocumentsReturn => {
       setError(null);
     } catch (e) {
       setError('Fehler beim Laden der Dokumente');
-      console.error(e);
+      logger.error('Error loading documents', e);
     } finally {
       setLoading(false);
     }

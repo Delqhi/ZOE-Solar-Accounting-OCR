@@ -2,6 +2,8 @@
 // Note: Actual ELSTER submission requires German authentication (ELSTER-Zertifikat)
 // This is a stub implementation - integrate with actual ELSTER API
 
+import { logger } from '../../src/utils/logger';
+
 export interface UstvaValidationRequest {
   year: number;
   period: number;
@@ -75,7 +77,7 @@ export async function submitUstva(
 ): Promise<UstvaSubmissionResult> {
   // This would integrate with the ELSTER API
   // For now, return a stub success response
-  console.warn('ELSTER submission is a stub - integrate with actual ELSTER API');
+  logger.warn('ELSTER submission is a stub - integrate with actual ELSTER API');
 
   return {
     success: true,

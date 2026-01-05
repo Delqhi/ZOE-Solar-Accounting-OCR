@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
+import { logger } from '../src/utils/logger';
 
 // Robustly resolve PDF.js library instance from ESM import
 const getPdfLib = () => {
@@ -18,7 +19,7 @@ if (pdf && pdf.GlobalWorkerOptions) {
     try {
         pdf.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
     } catch (e) {
-        console.warn("PDF Worker setup warning:", e);
+        logger.warn("PDF Worker setup warning:", e);
     }
 }
 
@@ -67,7 +68,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ url, type, onAddPage }) =>
               setNumPages(doc.numPages);
               setLoading(false);
           }).catch((err: any) => {
-              console.error("PDF Load Error", err);
+              logger.error("PDF Load Error", err);
               setError("PDF konnte nicht geladen werden.");
               setLoading(false);
           });

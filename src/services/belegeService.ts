@@ -1,5 +1,6 @@
 import { supabase, Beleg, BelegPosition, Steuerkategorie, Kontierungskonto, LieferantenRegel, Einstellung } from './supabaseClient';
 import { ExtractedData, DocumentStatus } from '../types';
+import { logger } from '../utils/logger';
 
 // Convert extracted data to database format
 function belegToDb(data: ExtractedData, fileInfo: {
@@ -125,7 +126,7 @@ export const belegeService = {
     const { data, error, count } = await query;
 
     if (error) {
-      console.error('Error fetching belege:', error);
+      logger.error('Error fetching belege:', error);
       throw error;
     }
 
@@ -144,7 +145,7 @@ export const belegeService = {
       if (error.code === 'PGRST116') {
         return null; // Not found
       }
-      console.error('Error fetching beleg:', error);
+      logger.error('Error fetching beleg:', error);
       throw error;
     }
 
@@ -168,7 +169,7 @@ export const belegeService = {
       .single();
 
     if (error) {
-      console.error('Error creating beleg:', error);
+      logger.error('Error creating beleg:', error);
       throw error;
     }
 
@@ -222,7 +223,7 @@ export const belegeService = {
       .single();
 
     if (error) {
-      console.error('Error updating beleg:', error);
+      logger.error('Error updating beleg:', error);
       throw error;
     }
 
@@ -248,7 +249,7 @@ export const belegeService = {
       .single();
 
     if (updateError) {
-      console.error('Error updating beleg status:', updateError);
+      logger.error('Error updating beleg status:', updateError);
       throw updateError;
     }
 
@@ -263,7 +264,7 @@ export const belegeService = {
       .eq('id', id);
 
     if (error) {
-      console.error('Error deleting beleg:', error);
+      logger.error('Error deleting beleg:', error);
       throw error;
     }
   },
@@ -282,7 +283,7 @@ export const belegeService = {
       if (error.code === 'PGRST116') {
         return null;
       }
-      console.error('Error checking for duplicate:', error);
+      logger.error('Error checking for duplicate:', error);
       throw error;
     }
 
@@ -302,7 +303,7 @@ export const belegeService = {
       .limit(5);
 
     if (error) {
-      console.error('Error checking for semantic duplicates:', error);
+      logger.error('Error checking for semantic duplicates:', error);
       throw error;
     }
 
@@ -328,7 +329,7 @@ export const belegeService = {
       .insert(positionData);
 
     if (error) {
-      console.error('Error creating positionen:', error);
+      logger.error('Error creating positionen:', error);
       throw error;
     }
   },
@@ -341,7 +342,7 @@ export const belegeService = {
       .eq('beleg_id', belegId);
 
     if (error) {
-      console.error('Error deleting positionen:', error);
+      logger.error('Error deleting positionen:', error);
       throw error;
     }
   },
@@ -368,7 +369,7 @@ export const belegeService = {
       .select('status, brutto_betrag');
 
     if (error) {
-      console.error('Error fetching stats:', error);
+      logger.error('Error fetching stats:', error);
       throw error;
     }
 
@@ -400,7 +401,7 @@ export const steuerkategorienService = {
       .order('label');
 
     if (error) {
-      console.error('Error fetching steuerkategorien:', error);
+      logger.error('Error fetching steuerkategorien:', error);
       throw error;
     }
 
@@ -415,7 +416,7 @@ export const steuerkategorienService = {
       .single();
 
     if (error) {
-      console.error('Error creating steuerkategorie:', error);
+      logger.error('Error creating steuerkategorie:', error);
       throw error;
     }
 
@@ -438,7 +439,7 @@ export const steuerkategorienService = {
         .upsert(cat, { onConflict: 'wert' });
 
       if (error) {
-        console.error('Error seeding steuerkategorie:', error);
+        logger.error('Error seeding steuerkategorie:', error);
       }
     }
   },
@@ -454,7 +455,7 @@ export const kontierungskontenService = {
       .order('konto_nr');
 
     if (error) {
-      console.error('Error fetching kontierungskonten:', error);
+      logger.error('Error fetching kontierungskonten:', error);
       throw error;
     }
 
@@ -469,7 +470,7 @@ export const kontierungskontenService = {
       .single();
 
     if (error) {
-      console.error('Error creating kontierungskonto:', error);
+      logger.error('Error creating kontierungskonto:', error);
       throw error;
     }
 
@@ -504,7 +505,7 @@ export const kontierungskontenService = {
         .upsert(konto, { onConflict: 'konto_nr' });
 
       if (error) {
-        console.error('Error seeding kontierungskonto:', error);
+        logger.error('Error seeding kontierungskonto:', error);
       }
     }
   },
@@ -520,7 +521,7 @@ export const lieferantenRegelnService = {
       .order('prioritaet', { ascending: true });
 
     if (error) {
-      console.error('Error fetching lieferanten_regeln:', error);
+      logger.error('Error fetching lieferanten_regeln:', error);
       throw error;
     }
 
@@ -535,7 +536,7 @@ export const lieferantenRegelnService = {
       .single();
 
     if (error) {
-      console.error('Error creating lieferanten_regel:', error);
+      logger.error('Error creating lieferanten_regel:', error);
       throw error;
     }
 
@@ -556,7 +557,7 @@ export const lieferantenRegelnService = {
       if (error.code === 'PGRST116') {
         return null;
       }
-      console.error('Error finding matching regel:', error);
+      logger.error('Error finding matching regel:', error);
       throw error;
     }
 
@@ -577,7 +578,7 @@ export const einstellungenService = {
       if (error.code === 'PGRST116') {
         return null;
       }
-      console.error('Error fetching einstellung:', error);
+      logger.error('Error fetching einstellung:', error);
       throw error;
     }
 
@@ -592,7 +593,7 @@ export const einstellungenService = {
       .single();
 
     if (error) {
-      console.error('Error setting einstellung:', error);
+      logger.error('Error setting einstellung:', error);
       throw error;
     }
 
@@ -606,7 +607,7 @@ export const einstellungenService = {
       .order('schluessel');
 
     if (error) {
-      console.error('Error fetching all einstellungen:', error);
+      logger.error('Error fetching all einstellungen:', error);
       throw error;
     }
 

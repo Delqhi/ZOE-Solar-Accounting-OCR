@@ -1,6 +1,8 @@
 // GitLab Storage Service for uploading PDFs and images
 // Files are stored in a GitLab repository using the GitLab API
 
+import { logger } from '../utils/logger';
+
 const GITLAB_URL = import.meta.env.VITE_GITLAB_INSTANCE_URL || 'https://gitlab.com';
 const GITLAB_API_TOKEN = import.meta.env.VITE_GITLAB_API_TOKEN || '';
 const GITLAB_STORAGE_PROJECT = import.meta.env.VITE_GITLAB_STORAGE_PROJECT || 'zukunftsorientierte.energie/zoe-solar-storage';
@@ -35,7 +37,7 @@ async function getProjectId(): Promise<number | null> {
   });
 
   if (!response.ok) {
-    console.error('Failed to get GitLab project:', await response.text());
+    logger.error('Failed to get GitLab project:', await response.text());
     return null;
   }
 
@@ -72,7 +74,7 @@ async function createOrUpdateFile(
 
   if (!response.ok) {
     const error = await response.text();
-    console.error('Failed to upload file to GitLab:', error);
+    logger.error('Failed to upload file to GitLab:', error);
     return {
       success: false,
       error: error,

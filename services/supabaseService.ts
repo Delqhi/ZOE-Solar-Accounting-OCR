@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { DocumentRecord, DocumentStatus, ExtractedData, AppSettings } from '../types';
+import { logger } from '../src/utils/logger';
 
 // Environment variables (must be set in .env)
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
@@ -11,7 +12,7 @@ let supabaseClient: SupabaseClient | null = null;
 
 export const initSupabase = (): SupabaseClient | null => {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.warn('Supabase credentials not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env');
+    logger.warn('Supabase credentials not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env');
     return null;
   }
 
@@ -335,7 +336,7 @@ export const getAllDocuments = async (): Promise<DocumentRecord[]> => {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching documents:', error);
+    logger.error('Error fetching documents:', error);
     return [];
   }
 
@@ -367,7 +368,7 @@ export const getDocumentsPaginated = async (
     .range(from, to);
 
   if (error) {
-    console.error('Error fetching documents:', error);
+    logger.error('Error fetching documents:', error);
     return { documents: [], total: count || 0, hasMore: false };
   }
 
@@ -592,7 +593,7 @@ export const saveVendorRule = async (vendorName: string, accountId: string, taxC
     }, { onConflict: 'vendor_name' });
 
   if (error) {
-    console.error('Failed to save vendor rule:', error);
+    logger.error('Failed to save vendor rule:', error);
   }
 };
 

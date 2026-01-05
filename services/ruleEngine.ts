@@ -1,5 +1,6 @@
 
 import { ExtractedData, DocumentRecord, AppSettings, AccountDefinition, TaxCategoryDefinition } from '../types';
+import { logger } from '../../src/utils/logger';
 
 export const generateZoeInvoiceId = (dateStr: string, existingDocs: DocumentRecord[]): string => {
     if (!dateStr) return '';
@@ -25,7 +26,7 @@ export const generateZoeInvoiceId = (dateStr: string, existingDocs: DocumentReco
 
         return `${prefix}.${(max + 1).toString().padStart(3, '0')}`;
     } catch (e) {
-        console.warn('generateZoeInvoiceId: Fehler bei der Belegnummer-Generierung', e);
+        logger.warn('generateZoeInvoiceId: Fehler bei der Belegnummer-Generierung', e);
         return '';
     }
 };

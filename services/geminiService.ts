@@ -3,6 +3,7 @@ import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { ExtractedData, OcrProvider } from "../types";
 import { analyzeDocumentWithFallback } from "./fallbackService";
 import { normalizeExtractedData } from "./extractedDataNormalization";
+import { logger } from "../../src/utils/logger";
 
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
@@ -77,7 +78,7 @@ async function generateWithRetry(model: string, params: any, config: any, retrie
     } catch (error: any) {
         const isTransient = error.status === 429 || error.status === 503 || error.message?.includes("429") || error.message?.includes("503") || error.message?.includes("Quota");
         if (isTransient && retries > 0) {
-            console.warn(`Gemini busy (429/503). Retrying once in 1500ms...`);
+            logger.warn(`Gemini busy (429/503). Retrying once in 1500ms...`);
             await delay(1500);
             return generateWithRetry(model, params, config, retries - 1);
         }
@@ -124,7 +125,7 @@ export const analyzeDocumentWithGemini = async (base64Data: string, mimeType: st
     return normalizeExtractedData(parsed);
 
   } catch (error: any) {
-    console.warn("Gemini OCR Error (or Quota limit). Switching to Fallback Service immediately.", error);
+    logger.warn("Gemini OCR Error (or Quota limit). Switching to Fallback Service immediately.", error);
 
     const geminiMsg = (() => {
         const status = error?.status ? ` (HTTP ${error.status})` : '';
