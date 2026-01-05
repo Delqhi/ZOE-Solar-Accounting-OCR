@@ -10,7 +10,7 @@ import {
   apiRateLimiter,
   ocrRateLimiter,
   authRateLimiter
-} from '../../utils/rateLimiter';
+} from '../../src/utils/rateLimiter';
 
 describe('TokenBucketRateLimiter', () => {
   let clock: SpyInstance;

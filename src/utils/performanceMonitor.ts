@@ -10,11 +10,18 @@ export interface PerformanceMetrics {
   largestContentfulPaint: number;
   cumulativeLayoutShift: number;
   interactionToNextPaint: number;
+  // Custom operation metrics
+  authSignIn?: number;
+  authSignUp?: number;
+  saveDocument?: number;
+  getAllDocuments?: number;
+  [key: string]: number | undefined;
 }
 
 export class PerformanceMonitor {
   private static metrics: Partial<PerformanceMetrics> = {};
   private static startTime: number = performance.now();
+  private static customMetrics: Record<string, number> = {};
 
   // Private constructor to prevent instantiation
   private constructor() {
@@ -182,6 +189,7 @@ export class PerformanceMonitor {
       largestContentfulPaint: this.metrics.largestContentfulPaint || 0,
       cumulativeLayoutShift: this.metrics.cumulativeLayoutShift || 0,
       interactionToNextPaint: this.metrics.interactionToNextPaint || 0,
+      ...this.customMetrics,
     };
   }
 
@@ -240,6 +248,18 @@ export class PerformanceMonitor {
     Object.entries(rest).forEach(([key, value]) => {
       console.log(`  ${key}: ${value}`);
     });
+
+    // Store the duration for this metric name
+    // Use the metric name directly (e.g., "authSignIn" stores as authSignIn)
+    this.customMetrics[metricName] = duration;
+  }
+
+  /**
+   * Reset all metrics (for testing)
+   */
+  static reset(): void {
+    this.metrics = {};
+    this.customMetrics = {};
   }
 }
 

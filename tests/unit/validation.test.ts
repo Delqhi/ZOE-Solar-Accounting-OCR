@@ -20,7 +20,7 @@ import {
   validateOCRResult,
   validateBatch,
   ValidationResult
-} from '../../utils/validation';
+} from '../../src/utils/validation';
 
 describe('Validation Utilities', () => {
   describe('validateFiles', () => {

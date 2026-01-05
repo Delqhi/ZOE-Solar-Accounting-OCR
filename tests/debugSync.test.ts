@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { syncWithCloudAction } from '../services/server-actions';
-import { PerformanceMonitor } from '../utils/performanceMonitor';
-import { apiRateLimiter } from '../utils/rateLimiter';
-import * as storageService from '../services/storageService';
-import * as supabaseService from '../services/supabaseService';
+import { syncWithCloudAction } from '../src/services/server-actions';
+import { PerformanceMonitor } from '../src/utils/performanceMonitor';
+import { apiRateLimiter } from '../src/utils/rateLimiter';
+import * as storageService from '../src/services/storageService';
+import * as supabaseService from '../src/services/supabaseService';
 
-vi.mock('../services/storageService', () => ({
+vi.mock('../src/services/storageService', () => ({
   saveDocument: vi.fn(),
   deleteDocument: vi.fn(),
   getAllDocuments: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock('../services/storageService', () => ({
   getDBStatus: vi.fn().mockResolvedValue({ isOpen: true, documentCount: 0 })
 }));
 
-vi.mock('../services/supabaseService', () => ({
+vi.mock('../src/services/supabaseService', () => ({
   isSupabaseConfigured: vi.fn().mockReturnValue(false),
   saveDocument: vi.fn(),
   deleteDocument: vi.fn(),

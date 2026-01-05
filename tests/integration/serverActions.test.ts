@@ -15,17 +15,17 @@ import {
   checkServerActionsHealth,
   sanitizeDocumentData,
   isValidDocumentStatus
-} from '../../services/server-actions';
-import { PerformanceMonitor } from '../../utils/performanceMonitor';
-import { apiRateLimiter, exportRateLimiter } from '../../utils/rateLimiter';
+} from '../../src/services/server-actions';
+import { PerformanceMonitor } from '../../src/utils/performanceMonitor';
+import { apiRateLimiter, exportRateLimiter } from '../../src/utils/rateLimiter';
 
 // Import the actual modules (we'll mock them in beforeEach)
-import * as storageService from '../../services/storageService';
-import * as supabaseService from '../../services/supabaseService';
+import * as storageService from '../../src/services/storageService';
+import * as supabaseService from '../../src/services/supabaseService';
 
 // Mock external services at module level
-vi.mock('../../services/storageService');
-vi.mock('../../services/supabaseService');
+vi.mock('../../src/services/storageService');
+vi.mock('../../src/services/supabaseService');
 
 describe('Server Actions Integration', () => {
   let consoleWarnSpy: any;

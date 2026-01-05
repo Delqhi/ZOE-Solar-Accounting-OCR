@@ -13,11 +13,11 @@ export default defineConfig({
   // Resolve aliases at root level
   resolve: {
     alias: {
-      '@': resolve(__dirname, './'),
+      '@': resolve(__dirname, './src'),
       '@tests': resolve(__dirname, './tests'),
-      '@services': resolve(__dirname, './services'),
-      '@utils': resolve(__dirname, './utils'),
-      '@components': resolve(__dirname, './components'),
+      '@services': resolve(__dirname, './src/services'),
+      '@utils': resolve(__dirname, './src/utils'),
+      '@components': resolve(__dirname, './src/components'),
     },
   },
   test: {

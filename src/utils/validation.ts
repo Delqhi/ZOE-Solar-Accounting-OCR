@@ -606,3 +606,100 @@ export function validateBatch<T>(
     sanitized: validItems,
   };
 }
+
+/**
+ * Validates password strength
+ */
+export function validatePassword(password: string): ValidationResult {
+  const errors: string[] = [];
+
+  if (!password || typeof password !== 'string') {
+    return { valid: false, errors: ['Password is required'] };
+  }
+
+  // Check length
+  if (password.length < 8) {
+    errors.push('Password too short');
+  }
+
+  if (password.length > 128) {
+    errors.push('Password too long');
+  }
+
+  // Check for common patterns (optional but recommended)
+  const commonPatterns = ['123456', 'password', 'qwerty', 'admin'];
+  const lowerPassword = password.toLowerCase();
+  for (const pattern of commonPatterns) {
+    if (lowerPassword.includes(pattern)) {
+      errors.push('Password too common');
+      break;
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Validates base64 encoded data
+ */
+export function validateBase64Data(data: string): ValidationResult {
+  const errors: string[] = [];
+
+  if (!data || typeof data !== 'string') {
+    return { valid: false, errors: ['Base64 data is required'] };
+  }
+
+  // Check if it looks like base64 (contains only valid characters)
+  const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+  if (!base64Regex.test(data)) {
+    errors.push('Invalid base64 format');
+  }
+
+  // Check length (prevent excessively large data)
+  if (data.length > 10000000) { // 10MB limit
+    errors.push('Data too large');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Validates MIME type
+ */
+export function validateMimeType(mimeType: string): ValidationResult {
+  const errors: string[] = [];
+
+  if (!mimeType || typeof mimeType !== 'string') {
+    return { valid: false, errors: ['MIME type is required'] };
+  }
+
+  // Basic MIME type format validation
+  const mimeRegex = /^[a-z]+\/[a-z0-9.+_-]+$/i;
+  if (!mimeRegex.test(mimeType)) {
+    errors.push('Invalid MIME type format');
+  }
+
+  // Check against allowed types
+  const allowedTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'application/pdf',
+  ];
+
+  if (!allowedTypes.includes(mimeType)) {
+    errors.push(`Unsupported MIME type: ${mimeType}`);
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}

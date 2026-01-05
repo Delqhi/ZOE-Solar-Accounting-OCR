@@ -5,9 +5,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { GeminiService, createGeminiService } from '../../services/geminiService';
-import { PerformanceMonitor } from '../../utils/performanceMonitor';
-import { apiRateLimiter } from '../../utils/rateLimiter';
+import { GeminiService, createGeminiService } from '../../src/services/geminiService';
+import { PerformanceMonitor } from '../../src/utils/performanceMonitor';
+import { apiRateLimiter } from '../../src/utils/rateLimiter';
 
 describe('GeminiService Integration', () => {
   let service: GeminiService;

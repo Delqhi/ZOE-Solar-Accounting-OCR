@@ -5,7 +5,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { PerformanceMonitor } from '../../utils/performanceMonitor';
+import { PerformanceMonitor } from '../../src/utils/performanceMonitor';
 
 test.describe('Critical User Flows', () => {
   test.describe('Document Upload Flow', () => {

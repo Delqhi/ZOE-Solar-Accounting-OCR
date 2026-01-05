@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi, SpyInstance } from 'vitest';
-import { PerformanceMonitor, PerformanceMetrics, perf } from '../../utils/performanceMonitor';
+import { PerformanceMonitor, PerformanceMetrics, perf } from '../../src/utils/performanceMonitor';
 
 describe('PerformanceMonitor', () => {
   let consoleLogSpy: SpyInstance;
