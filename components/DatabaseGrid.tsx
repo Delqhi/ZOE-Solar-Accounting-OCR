@@ -1,12 +1,35 @@
 
 import React, { useMemo, useState } from 'react';
-import { AppSettings, DocumentRecord, DocumentStatus } from '../types';
+import { AppSettings, DocumentRecord, DocumentStatus, ExtractedData } from '../types';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
 import { formatPreflightForDialog, runExportPreflight } from '../services/exportPreflight';
 import { generateDatevExtfBuchungsstapelCsv, runDatevExportPreflight } from '../services/datevExport';
 import { validateUstva, submitUstva, UstvaValidationRequest, UstvaSubmissionRequest } from '../services/submissionService';
 import { generateElsterXml, downloadElsterXml, ElsterExportRequest } from '../services/elsterExport';
+
+// Type-safe value accessor for sorting
+type SortableValue = string | number | boolean | null | undefined;
+
+const getSortValue = (doc: DocumentRecord, sortField: string): SortableValue => {
+  if (sortField.startsWith('data.')) {
+    const field = sortField.split('.')[1] as keyof ExtractedData;
+    if (!doc.data) return '';
+    const value = doc.data[field];
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      return value;
+    }
+    return '';
+  }
+  // Direct fields on DocumentRecord
+  switch (sortField) {
+    case 'uploadDate': return doc.uploadDate;
+    case 'fileName': return doc.fileName;
+    case 'status': return doc.status;
+    case 'id': return doc.id;
+    default: return '';
+  }
+};
 
 interface DatabaseGridProps {
   documents: DocumentRecord[];
@@ -57,6 +80,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionResult, setSubmissionResult] = useState<string>('');
 
+<<<<<<< HEAD
   // Sorting Logic - optimized to avoid repeated split()
   const sortFieldKey = sortField.startsWith('data.') ? sortField.split('.')[1] : null;
   const sortedDocs = useMemo(() => {
@@ -74,6 +98,13 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
 
       if (!valA) valA = '';
       if (!valB) valB = '';
+=======
+  // Sorting Logic (type-safe)
+  const sortedDocs = useMemo(() => {
+    return [...documents].sort((a, b) => {
+      const valA = getSortValue(a, sortField) ?? '';
+      const valB = getSortValue(b, sortField) ?? '';
+>>>>>>> 1444e0a1d3f92819ed7a7985cccb0719c49a808a
 
       if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
       if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
