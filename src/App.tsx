@@ -88,8 +88,8 @@ const classifyOcrOutcome = (data: ExtractedData): { status: DocumentStatus; erro
         (score <= 0 && (data.bruttoBetrag ?? 0) === 0);
 
     if (looksLikeManualTemplate) {
-        const msg = rationale || description || 'Analyse fehlgeschlagen. Bitte manuell erfassen.';
-        return { status: isTechnicalFailure ? DocumentStatus.ERROR : DocumentStatus.REVIEW_NEEDED, error: msg };
+        const errorMsg = rationale || description || 'Analyse fehlgeschlagen. Bitte manuell erfassen.';
+        return { status: isTechnicalFailure ? DocumentStatus.ERROR : DocumentStatus.REVIEW_NEEDED, error: errorMsg };
     }
 
     // Non-fatal but needs review
@@ -648,7 +648,7 @@ export default function App() {
            const rule = await storageService.getVendorRule(extracted.lieferantName);
            if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
       }
-            let finalData = applyAccountingRules(extracted, documents, currentSettings, overrideRule);
+            const finalData = applyAccountingRules(extracted, documents, currentSettings, overrideRule);
       finalData.eigeneBelegNummer = existingId || generateZoeInvoiceId(finalData.belegDatum, documents);
             const outcome = classifyOcrOutcome(finalData);
             const updated = { ...doc, status: outcome.status, data: finalData, error: outcome.error };
