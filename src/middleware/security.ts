@@ -25,7 +25,7 @@ export function getContentSecurityPolicy(): string {
       'https://*.supabase.co',
       'https://*.googleapis.com',
       'https://*.google.com',
-      process.env.VITE_SENTRY_DSN || '',
+      import.meta.env.VITE_SENTRY_DSN || '',
     ].filter(Boolean),
     'img-src': [
       "'self'",
@@ -103,18 +103,19 @@ export function escapeHtml(text: string): string {
 export function escapeXml(text: string): string {
   if (!text) return '';
   return text
-    .replace(/&/g, '&')
-    .replace(/</g, '<')
-    .replace(/>/g, '>')
-    .replace(/"/g, '"')
-    .replace(/'/g, "'");
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
 }
+
 /**
  * Validates file upload for security
  */
 export function validateFileSecurity(file: File): { isValid: boolean; reason?: string } {
   // Check for double extensions
-  if (file.name.match(/\..*\./)) {
+  if (file.name.match(/\\..*\\./)) {
     return { isValid: false, reason: 'Dateiname mit doppelter Erweiterung nicht erlaubt' };
   }
 
