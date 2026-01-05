@@ -87,9 +87,14 @@ export interface ExtractedData {
   qualityScore?: number; // Legacy
   ocr_score?: number;    // New System 0-10
   ocr_rationale?: string; // New System explanation
-  
+  ocr_provider?: string;  // gemini, fallback, failed
+  ocr_confidence?: string; // high, medium, low, none
+
   // Memory System
-  ruleApplied?: boolean; 
+  ruleApplied?: boolean;
+
+  // Error handling
+  error?: string;
 }
 
 export interface Attachment {
@@ -236,5 +241,10 @@ export interface VendorRule {
 
 // OCR Provider Interface for interchangeability
 export interface OcrProvider {
-  analyzeDocument(base64Data: string, mimeType: string): Promise<Partial<ExtractedData>>;
+  analyzeDocument(base64Data: string, mimeType: string, userId?: string): Promise<Partial<ExtractedData>>;
+  healthCheck?: () => Promise<{
+    healthy: boolean;
+    message: string;
+    details?: any;
+  }>;
 }

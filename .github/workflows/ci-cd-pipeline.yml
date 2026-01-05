@@ -1,0 +1,328 @@
+name: 🎯 CI/CD Pipeline - Ultra Best Practices 2026
+
+on:
+  push:
+    branches: [main, DeepthinkAI2025/*]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  # ========================================
+  # 🔍 Code Quality & Type Check
+  # ========================================
+  quality-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js (2026 LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
+        run: npm ci --prefer-offline --audit=false
+
+      - name: 🔍 TypeScript Type Check
+        run: npm run typecheck
+        continue-on-error: false
+
+      - name: 🎨 Code Formatting Check
+        run: npm run format:check
+        continue-on-error: false
+
+      - name: 🧹 ESLint Analysis
+        run: npm run lint
+        continue-on-error: false
+
+  # ========================================
+  # 🧪 Unit Tests
+  # ========================================
+  unit-tests:
+    runs-on: ubuntu-latest
+    needs: quality-check
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
+        run: npm ci
+
+      - name: 🧪 Run Unit Tests
+        run: npm run test:ci
+        continue-on-error: false
+
+      - name: 📊 Upload Coverage Report
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/coverage-final.json
+          flags: unittests
+
+  # ========================================
+  # 🎨 Build & Bundle Analysis
+  # ========================================
+  build:
+    runs-on: ubuntu-latest
+    needs: [quality-check, unit-tests]
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
+        run: npm ci
+
+      - name: 🏗️ Build Production Bundle
+        run: npm run build
+        continue-on-error: false
+
+      - name: 📦 Analyze Bundle Size
+        run: |
+          echo "=== Bundle Analysis ==="
+          ls -lh dist/
+          du -sh dist/
+          echo "Bundle size check: Should be < 500KB for main bundle"
+
+      - name: 📤 Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-build
+          path: dist/
+          retention-days: 7
+
+  # ========================================
+  # 🧪 E2E Tests (Playwright)
+  # ========================================
+  e2e-tests:
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 20
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
+        run: npm ci
+
+      - name: 🏗️ Install Playwright
+        run: npx playwright install --with-deps
+
+      - name: 🧪 Run E2E Tests
+        run: npm run test:e2e
+        continue-on-error: false
+
+      - name: 📤 Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # ========================================
+  # 🚀 Deploy Preview (Vercel/Netlify)
+  # ========================================
+  deploy-preview:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 5
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 📥 Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: production-build
+          path: dist/
+
+      - name: 🚀 Deploy to Preview
+        run: |
+          echo "=== Deploying Preview ==="
+          echo "Branch: ${{ github.head_ref }}"
+          echo "PR: #${{ github.event.pull_request.number }}"
+          echo "Preview URL would be generated here"
+          # Add your deployment script here
+          # Example: vercel --prod --yes --env=PREVIEW=true
+
+  # ========================================
+  # 🚀 Deploy Production (Main Branch)
+  # ========================================
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [build, e2e-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 📥 Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: production-build
+          path: dist/
+
+      - name: 🚀 Deploy to Production
+        run: |
+          echo "=== Deploying to Production ==="
+          echo "Commit: ${{ github.sha }}"
+          echo "Deploying to production environment..."
+          # Add your production deployment script here
+          # Example: vercel --prod --yes --env=PRODUCTION=true
+
+  # ========================================
+  # 📊 Security Scan
+  # ========================================
+  security-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔒 Dependency Audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+      - name: 🔒 CodeQL Analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - name: 🔒 Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  # ========================================
+  # 📋 PR Validation & Auto-Label
+  # ========================================
+  pr-validation:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 5
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🏷️ Auto Label PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo, number } = context.issue;
+            const pr = context.payload.pull_request;
+
+            // Determine labels based on files changed
+            const changedFiles = await github.rest.pulls.listFiles({
+              owner, repo, pull_number: number
+            });
+
+            const labels = [];
+
+            // Add labels based on changes
+            const files = changedFiles.data.map(f => f.filename);
+            if (files.some(f => f.includes('components/'))) labels.push('ui');
+            if (files.some(f => f.includes('services/'))) labels.push('backend');
+            if (files.some(f => f.includes('hooks/'))) labels.push('hooks');
+            if (files.some(f => f.includes('styles/'))) labels.push('design');
+            if (files.some(f => f.includes('config') || f.includes('package'))) labels.push('config');
+
+            // Add size label
+            const additions = changedFiles.data.reduce((sum, f) => sum + f.additions, 0);
+            if (additions < 50) labels.push('size-xs');
+            else if (additions < 200) labels.push('size-s');
+            else if (additions < 500) labels.push('size-m');
+            else labels.push('size-l');
+
+            // Apply labels
+            for (const label of labels) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner, repo, issue_number: number, labels: [label]
+                });
+              } catch (e) {
+                // Label might already exist
+              }
+            }
+
+      - name: ✅ PR Title Check
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          echo "PR Title: $PR_TITLE"
+
+          # Check if title follows convention
+          if echo "$PR_TITLE" | grep -E "^(feat|fix|docs|style|refactor|test|chore|perf|build|ci):"; then
+            echo "✅ PR title follows convention"
+          else
+            echo "⚠️ PR title should follow conventional commits"
+            echo "Expected format: type: description"
+            echo "Example: feat: add user authentication"
+          fi
+
+  # ========================================
+  # 📊 Summary & Notifications
+  # ========================================
+  summary:
+    runs-on: ubuntu-latest
+    needs: [quality-check, unit-tests, build, e2e-tests]
+    if: always()
+
+    steps:
+      - name: 📊 Generate Summary
+        run: |
+          echo "## 🎯 CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Status" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Quality Check: ${{ needs.quality-check.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Unit Tests: ${{ needs.unit-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Build: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ E2E Tests: ${{ needs.e2e-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Production build available" >> $GITHUB_STEP_SUMMARY
+          echo "- Test reports uploaded" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review any failing checks" >> $GITHUB_STEP_SUMMARY
+          echo "2. Merge PR if all checks pass" >> $GITHUB_STEP_SUMMARY
+          echo "3. Production deploy will trigger automatically" >> $GITHUB_STEP_SUMMARY
+
+      - name: 💬 Notify on Failure
+        if: failure()
+        run: |
+          echo "❌ Pipeline failed - manual intervention required"
+          # Add notification logic here (Slack, Email, etc.)

@@ -17,6 +17,47 @@ import { DocumentRecord, DocumentStatus, AppSettings, ExtractedData, Attachment 
 import { normalizeExtractedData } from './services/extractedDataNormalization';
 import { formatPreflightForDialog, runExportPreflight } from './services/exportPreflight';
 import { User } from './services/supabaseService';
+import { ocrRateLimiter, apiRateLimiter } from './utils/rateLimiter';
+import { PerformanceMonitor } from './utils/performanceMonitor';
+import { validateFiles } from './utils/validation';
+
+// Error boundary for React errors
+class AppErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error?: Error}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('App Error Boundary caught:', error, errorInfo);
+    PerformanceMonitor.recordMetric('react_error', {
+      error: error.message,
+      componentStack: errorInfo.componentStack
+    });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-screen p-6 bg-red-50 text-red-900">
+          <h1 className="text-2xl font-bold mb-4">Ein unerwarteter Fehler ist aufgetreten</h1>
+          <p className="mb-4">Die Anwendung wurde zurückgesetzt.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          >
+            Seite neu laden
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const computeFileHash = async (file: File): Promise<string> => {
   const buffer = await file.arrayBuffer();
@@ -292,370 +333,605 @@ export default function App() {
   };
 
   const handleFilesSelect = async (files: File[]) => {
-    if (files.length === 0) return;
-    setIsProcessing(true);
-    setViewMode('document');
+    const startTime = PerformanceMonitor.now();
+    const operationId = `file-upload-${Date.now()}`;
 
-    const newDocs: DocumentRecord[] = [];
-    const fileData: {id: string, file: File, hash: string, base64: string, url: string}[] = [];
+    try {
+      if (files.length === 0) return;
 
-    for (const file of files) {
-        const id = crypto.randomUUID();
-        const [hash, {base64, url}] = await Promise.all([computeFileHash(file), readFileToBase64(file)]);
-        fileData.push({ id, file, hash, base64, url });
-        newDocs.push({
-            id,
-            fileName: file.name,
-            fileType: file.type,
-            uploadDate: new Date().toISOString(),
-            status: DocumentStatus.PROCESSING,
-            data: null,
-            previewUrl: url,
-            fileHash: hash
-        });
-    }
+      // Step 1: Validate files
+      const fileValidation = validateFiles(files, {
+        maxFileSize: 50 * 1024 * 1024, // 50MB
+        maxFiles: 20
+      });
 
-    setDocuments(prev => [...newDocs, ...prev]);
+      if (!fileValidation.valid) {
+        setNotification(`Validierungsfehler: ${fileValidation.errors.join(', ')}`);
+        return;
+      }
 
-    const currentSettings = settings || await storageService.getSettings();
-    const processedBatch: DocumentRecord[] = [];
-    // Use functional state access to get the current documents
-    const currentDocsSnapshotRef: { current: DocumentRecord[] } = { current: [] };
-    setDocuments(prev => {
-        currentDocsSnapshotRef.current = [...prev];
-        return prev;
-    });
-    let autoMergedCount = 0;
+      // Step 2: Check rate limit for file uploads
+      const rateCheck = await apiRateLimiter.check(`file-upload:${operationId}`);
+      if (!rateCheck.allowed) {
+        setNotification(`Rate limit exceeded. Please wait ${rateCheck.retryAfter || 60} seconds.`);
+        return;
+      }
 
-    const processingPromises = fileData.map(async (item) => {
-        const isExactDuplicate = currentDocsSnapshotRef.current.some(d => d.id !== item.id && d.fileHash === item.hash);
-        if (isExactDuplicate) {
-                         const original = currentDocsSnapshotRef.current.find(d => d.fileHash === item.hash);
-             return { 
-                 type: 'DOC', 
-                                 doc: { 
-                                     id: item.id,
-                                     status: DocumentStatus.DUPLICATE,
-                                     error: undefined,
-                                     data: null,
-                                     duplicateReason: "Datei identisch (Hash)",
-                                     duplicateOfId: original?.id,
-                                     duplicateConfidence: 1
-                                 } 
-             };
-        }
+      setIsProcessing(true);
+      setViewMode('document');
 
-        try {
-            const extractedRaw = await analyzeDocumentWithGemini(item.base64, item.file.type);
-            const extracted = normalizeExtractedData(extractedRaw);
-            
-            // Check for Semantic Duplicate using Extracted Data
-            const semanticDup = findSemanticDuplicate(extracted, currentDocsSnapshotRef.current);
-            
-            if (semanticDup && semanticDup.doc.id !== item.id) {
-                 // OPTION A: Auto-Merge if it was a file upload that matches an existing one perfectly?
-                 // Current logic: Create a NEW doc entry but mark as DUPLICATE so user sees it.
-                 // This is safer than silently merging.
-                 return {
-                     type: 'DOC',
-                     doc: {
-                         id: item.id,
-                         status: DocumentStatus.DUPLICATE,
-                         data: extracted,
-                         duplicateReason: semanticDup.reason || "Inhaltliches Duplikat erkannt",
-                         duplicateOfId: semanticDup.doc.id,
-                         duplicateConfidence: semanticDup.confidence
-                     }
-                 };
-            }
+      console.log(`📋 [${operationId}] Processing ${files.length} files...`);
 
-            // --- Private Document Detection ---
-            const privateCheck = detectPrivateDocument(extracted);
-            if (privateCheck.isPrivate && privateCheck.detectedVendor) {
-                return {
-                    type: 'PRIVATE_DOC',
-                    id: item.id,
-                    base64: item.base64,
-                    fileName: item.file.name,
-                    fileType: item.file.type,
-                    data: extracted,
-                    vendor: privateCheck.detectedVendor,
-                    reason: privateCheck.reason || 'Private Positionen erkannt'
-                };
-            }
+      const newDocs: DocumentRecord[] = [];
+      const fileData: {id: string, file: File, hash: string, base64: string, url: string}[] = [];
 
-            const outcome = classifyOcrOutcome(extracted);
-            return { type: 'DOC', data: extracted, id: item.id, outcome };
-        } catch (e) {
-            return { 
-                type: 'DOC', 
-                doc: { id: item.id, status: DocumentStatus.ERROR, error: "KI Analyse fehlgeschlagen", data: null, duplicateReason: undefined } 
-            };
-        }
-    });
+      for (const file of files) {
+          const id = crypto.randomUUID();
+          const [hash, {base64, url}] = await Promise.all([computeFileHash(file), readFileToBase64(file)]);
+          fileData.push({ id, file, hash, base64, url });
+          newDocs.push({
+              id,
+              fileName: file.name,
+              fileType: file.type,
+              uploadDate: new Date().toISOString(),
+              status: DocumentStatus.PROCESSING,
+              data: null,
+              previewUrl: url,
+              fileHash: hash
+          });
+      }
 
-    const results = await Promise.all(processingPromises);
+      setDocuments(prev => [...newDocs, ...prev]);
 
-    for (const res of results) {
-        // --- Handle Private Documents ---
-        if (res.type === 'PRIVATE_DOC') {
-            const privateRes = res as any;
-            try {
-                // Upload to belege_privat table
-                await supabaseService.savePrivateDocument(
-                    privateRes.id,
-                    privateRes.fileName,
-                    privateRes.fileType,
-                    privateRes.base64,
-                    privateRes.data,
-                    privateRes.reason
-                );
+      const currentSettings = settings || await storageService.getSettings();
+      const processedBatch: DocumentRecord[] = [];
+      const currentDocsSnapshotRef: { current: DocumentRecord[] } = { current: [] };
+      setDocuments(prev => {
+          currentDocsSnapshotRef.current = [...prev];
+          return prev;
+      });
+      let autoMergedCount = 0;
 
-                // Show notification to user
-                setPrivateDocNotification({
-                    vendor: privateRes.vendor,
-                    amount: privateRes.data?.bruttoBetrag || 0,
-                    reason: privateRes.reason
-                });
+      const processingPromises = fileData.map(async (item) => {
+          const isExactDuplicate = currentDocsSnapshotRef.current.some(d => d.id !== item.id && d.fileHash === item.hash);
+          if (isExactDuplicate) {
+               const original = currentDocsSnapshotRef.current.find(d => d.fileHash === item.hash);
+               return {
+                   type: 'DOC',
+                   doc: {
+                       id: item.id,
+                       status: DocumentStatus.DUPLICATE,
+                       error: undefined,
+                       data: null,
+                       duplicateReason: "Datei identisch (Hash)",
+                       duplicateOfId: original?.id,
+                       duplicateConfidence: 1
+                   }
+               };
+          }
 
-                // Don't add to processedBatch (won't show in UI)
-            } catch (e) {
-                console.error('Failed to save private document:', e);
-                // Fallback: save as normal document with PRIVATE status
-                const fallbackDoc: DocumentRecord = {
-                    id: privateRes.id,
-                    fileName: privateRes.fileName,
-                    fileType: privateRes.fileType,
-                    uploadDate: new Date().toISOString(),
-                    status: DocumentStatus.PRIVATE,
-                    data: { ...privateRes.data, privatanteil: true }
-                };
-                processedBatch.push(fallbackDoc);
-                await supabaseService.saveDocument(fallbackDoc);
-            }
-            continue;
-        }
+          try {
+              const extractedRaw = await analyzeDocumentWithGemini(item.base64, item.file.type, operationId);
+              const extracted = normalizeExtractedData(extractedRaw);
 
-        if (res.type === 'MERGE') {
-             // Logic kept for potential future use, currently findSemanticDuplicate mainly flags as DUPLICATE
-             // Use type assertion because currently no path returns MERGE, so TS infers only DOC types
-             const mergeRes = res as any;
-             const targetDoc = currentDocsSnapshotRef.current.find(d => d.id === mergeRes.targetId);
-             if (targetDoc) {
-                 const updatedDoc = {
-                     ...targetDoc,
-                     attachments: [...(targetDoc.attachments || []), mergeRes.attachment]
-                 };
-                 await supabaseService.saveDocument(updatedDoc);
-                 currentDocsSnapshotRef.current = currentDocsSnapshotRef.current.map(d => d.id === targetDoc.id ? updatedDoc : d);
-                 autoMergedCount++;
-             }
-        } else if (res.type === 'DOC') {
-            let finalDoc: DocumentRecord | undefined;
+              const semanticDup = findSemanticDuplicate(extracted, currentDocsSnapshotRef.current);
 
-            if ('doc' in res && res.doc) {
-                // It's either an Error or a Duplicate
-                const resultDoc = res.doc;
-                const placeholder = newDocs.find(d => d.id === resultDoc.id);
-                if (!placeholder) continue;
-                
-                // If it's a duplicate, we still save the extracted data so the user can verify WHY it's a duplicate
-                finalDoc = { ...placeholder, ...resultDoc } as DocumentRecord;
+              if (semanticDup && semanticDup.doc.id !== item.id) {
+                   return {
+                       type: 'DOC',
+                       doc: {
+                           id: item.id,
+                           status: DocumentStatus.DUPLICATE,
+                           data: extracted,
+                           duplicateReason: semanticDup.reason || "Inhaltliches Duplikat erkannt",
+                           duplicateOfId: semanticDup.doc.id,
+                           duplicateConfidence: semanticDup.confidence
+                       }
+                   };
+              }
 
-                if (finalDoc.status === DocumentStatus.DUPLICATE && finalDoc.data) {
-                     // Apply rules even for duplicates so they look nice in the UI
-                     const zoeId = generateZoeInvoiceId(finalDoc.data.belegDatum || '', currentDocsSnapshotRef.current);
-                     finalDoc.data.eigeneBelegNummer = zoeId;
-                }
+              const privateCheck = detectPrivateDocument(extracted);
+              if (privateCheck.isPrivate && privateCheck.detectedVendor) {
+                  return {
+                      type: 'PRIVATE_DOC',
+                      id: item.id,
+                      base64: item.base64,
+                      fileName: item.file.name,
+                      fileType: item.file.type,
+                      data: extracted,
+                      vendor: privateCheck.detectedVendor,
+                      reason: privateCheck.reason || 'Private Positionen erkannt'
+                  };
+              }
 
-            } else if ('data' in res && res.data && res.id) {
-                // Success Case
-                const { id, data } = res as any;
-                const placeholder = newDocs.find(d => d.id === id);
-                if (!placeholder) continue;
+              const outcome = classifyOcrOutcome(extracted);
+              return { type: 'DOC', data: extracted, id: item.id, outcome };
+          } catch (e) {
+              console.error(`❌ [${operationId}] Processing failed for ${item.file.name}:`, e);
+              return {
+                  type: 'DOC',
+                  doc: { id: item.id, status: DocumentStatus.ERROR, error: e instanceof Error ? e.message : "KI Analyse fehlgeschlagen", data: null, duplicateReason: undefined }
+              };
+          }
+      });
 
-                const zoeId = generateZoeInvoiceId(data.belegDatum || '', currentDocsSnapshotRef.current);
-                let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
-                
-                if (data.lieferantName) {
-                    const rule = await storageService.getVendorRule(data.lieferantName);
-                    if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
-                }
-                
-                const normalized = normalizeExtractedData(data);
-                const outcome = (res as any).outcome || classifyOcrOutcome(normalized);
-                const finalData = applyAccountingRules(
-                    { ...normalized, eigeneBelegNummer: zoeId },
-                    currentDocsSnapshotRef.current,
-                    currentSettings,
-                    overrideRule
-                );
+      const results = await Promise.all(processingPromises);
 
-                finalDoc = { ...placeholder, status: outcome.status, data: finalData, error: outcome.error };
-                currentDocsSnapshotRef.current.push(finalDoc); 
-            }
-            
-            if (finalDoc) {
-                processedBatch.push(finalDoc);
-                await storageService.saveDocument(finalDoc);
-                // Optionally sync to Supabase
-                if (supabaseService.isSupabaseConfigured()) {
-                  try {
-                    await supabaseService.saveDocument(finalDoc);
-                  } catch (e) {
-                    console.warn('Failed to sync document to Supabase:', e);
+      for (const res of results) {
+          if (res.type === 'PRIVATE_DOC') {
+              const privateRes = res as any;
+              try {
+                  await supabaseService.savePrivateDocument(
+                      privateRes.id,
+                      privateRes.fileName,
+                      privateRes.fileType,
+                      privateRes.base64,
+                      privateRes.data,
+                      privateRes.reason
+                  );
+
+                  setPrivateDocNotification({
+                      vendor: privateRes.vendor,
+                      amount: privateRes.data?.bruttoBetrag || 0,
+                      reason: privateRes.reason
+                  });
+              } catch (e) {
+                  console.error('Failed to save private document:', e);
+                  const fallbackDoc: DocumentRecord = {
+                      id: privateRes.id,
+                      fileName: privateRes.fileName,
+                      fileType: privateRes.fileType,
+                      uploadDate: new Date().toISOString(),
+                      status: DocumentStatus.PRIVATE,
+                      data: { ...privateRes.data, privatanteil: true }
+                  };
+                  processedBatch.push(fallbackDoc);
+                  await supabaseService.saveDocument(fallbackDoc);
+              }
+              continue;
+          }
+
+          if (res.type === 'MERGE') {
+               const mergeRes = res as any;
+               const targetDoc = currentDocsSnapshotRef.current.find(d => d.id === mergeRes.targetId);
+               if (targetDoc) {
+                   const updatedDoc = {
+                       ...targetDoc,
+                       attachments: [...(targetDoc.attachments || []), mergeRes.attachment]
+                   };
+                   await supabaseService.saveDocument(updatedDoc);
+                   currentDocsSnapshotRef.current = currentDocsSnapshotRef.current.map(d => d.id === targetDoc.id ? updatedDoc : d);
+                   autoMergedCount++;
+               }
+          } else if (res.type === 'DOC') {
+              let finalDoc: DocumentRecord | undefined;
+
+              if ('doc' in res && res.doc) {
+                  const resultDoc = res.doc;
+                  const placeholder = newDocs.find(d => d.id === resultDoc.id);
+                  if (!placeholder) continue;
+
+                  finalDoc = { ...placeholder, ...resultDoc } as DocumentRecord;
+
+                  if (finalDoc.status === DocumentStatus.DUPLICATE && finalDoc.data) {
+                       const zoeId = generateZoeInvoiceId(finalDoc.data.belegDatum || '', currentDocsSnapshotRef.current);
+                       finalDoc.data.eigeneBelegNummer = zoeId;
                   }
-                }
-            }
-        }
+
+              } else if ('data' in res && res.data && res.id) {
+                  const { id, data } = res as any;
+                  const placeholder = newDocs.find(d => d.id === id);
+                  if (!placeholder) continue;
+
+                  const zoeId = generateZoeInvoiceId(data.belegDatum || '', currentDocsSnapshotRef.current);
+                  let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
+
+                  if (data.lieferantName) {
+                      const rule = await storageService.getVendorRule(data.lieferantName);
+                      if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
+                  }
+
+                  const normalized = normalizeExtractedData(data);
+                  const outcome = (res as any).outcome || classifyOcrOutcome(normalized);
+                  const finalData = applyAccountingRules(
+                      { ...normalized, eigeneBelegNummer: zoeId },
+                      currentDocsSnapshotRef.current,
+                      currentSettings,
+                      overrideRule
+                  );
+
+                  finalDoc = { ...placeholder, status: outcome.status, data: finalData, error: outcome.error };
+                  currentDocsSnapshotRef.current.push(finalDoc);
+              }
+
+              if (finalDoc) {
+                  processedBatch.push(finalDoc);
+                  await storageService.saveDocument(finalDoc);
+                  if (supabaseService.isSupabaseConfigured()) {
+                    try {
+                      await supabaseService.saveDocument(finalDoc);
+                    } catch (e) {
+                      console.warn('Failed to sync document to Supabase:', e);
+                    }
+                  }
+              }
+          }
+      }
+
+      setDocuments(prev => {
+          const cleanPrev = prev.filter(d => !newDocs.some(n => n.id === d.id));
+          const mergedTargetIds = results.filter(r => r.type === 'MERGE').map((r:any) => r.targetId);
+          const updatedOldDocs = cleanPrev.map(d => {
+              if (mergedTargetIds.includes(d.id)) {
+                  return currentDocsSnapshotRef.current.find(snap => snap.id === d.id) || d;
+              }
+              return d;
+          });
+          return [...processedBatch, ...updatedOldDocs];
+      });
+
+      setIsProcessing(false);
+
+      const duration = PerformanceMonitor.now() - startTime;
+      console.log(`✅ [${operationId}] Upload completed in ${duration.toFixed(2)}ms`);
+
+      PerformanceMonitor.recordMetric('file_upload_success', {
+        operationId,
+        duration,
+        fileCount: files.length,
+        processedCount: processedBatch.length
+      });
+
+      if (autoMergedCount > 0) {
+          setNotification(`${autoMergedCount} Duplikat(e) automatisch zusammengeführt.`);
+      }
+
+      if (processedBatch.length > 0) setSelectedDocId(processedBatch[0].id);
+
+    } catch (error: any) {
+      console.error('❌ handleFilesSelect failed:', error);
+      setIsProcessing(false);
+      setNotification(`Upload fehlgeschlagen: ${error.message || 'Unbekannter Fehler'}`);
+
+      PerformanceMonitor.recordMetric('file_upload_failure', {
+        operationId: `file-upload-${Date.now()}`,
+        error: error.message
+      });
     }
-
-    setDocuments(prev => {
-        const cleanPrev = prev.filter(d => !newDocs.some(n => n.id === d.id));
-        const mergedTargetIds = results.filter(r => r.type === 'MERGE').map((r:any) => r.targetId);
-        const updatedOldDocs = cleanPrev.map(d => {
-            if (mergedTargetIds.includes(d.id)) {
-                return currentDocsSnapshotRef.current.find(snap => snap.id === d.id) || d;
-            }
-            return d;
-        });
-        return [...processedBatch, ...updatedOldDocs];
-    });
-
-    setIsProcessing(false);
-    
-    if (autoMergedCount > 0) {
-        setNotification(`${autoMergedCount} Duplikat(e) automatisch zusammengeführt.`);
-    }
-
-    if (processedBatch.length > 0) setSelectedDocId(processedBatch[0].id);
   };
 
   const handleSaveDocument = async (updatedDoc: DocumentRecord) => {
-    setDocuments(prev => prev.map(doc => doc.id === updatedDoc.id ? updatedDoc : doc));
-    // Local-first: Save to IndexedDB first
-    await storageService.saveDocument(updatedDoc);
-    // Optionally sync to Supabase if configured
-    if (supabaseService.isSupabaseConfigured()) {
-      try {
-        await supabaseService.saveDocument(updatedDoc);
-      } catch (e) {
-        console.warn('Failed to sync document to Supabase:', e);
+    const startTime = PerformanceMonitor.now();
+    const operationId = `save-doc-${Date.now()}`;
+
+    try {
+      console.log(`📋 [${operationId}] Saving document ${updatedDoc.id}...`);
+
+      // Step 1: Rate limit check
+      const rateCheck = await apiRateLimiter.check(operationId);
+      if (!rateCheck.allowed) {
+        setNotification(`Rate limit exceeded. Please wait ${rateCheck.retryAfter || 60} seconds.`);
+        return;
       }
-    }
-    // Save vendor rule if applicable
-    if (updatedDoc.data?.lieferantName && updatedDoc.data?.kontierungskonto && updatedDoc.data?.steuerkategorie) {
-      await storageService.saveVendorRule(updatedDoc.data.lieferantName, updatedDoc.data.kontierungskonto, updatedDoc.data.steuerkategorie);
+
+      // Step 2: Update UI state immediately
+      setDocuments(prev => prev.map(doc => doc.id === updatedDoc.id ? updatedDoc : doc));
+
+      // Step 3: Save to IndexedDB first (local-first)
+      await storageService.saveDocument(updatedDoc);
+
+      // Step 4: Sync to Supabase if configured
       if (supabaseService.isSupabaseConfigured()) {
         try {
-          await supabaseService.saveVendorRule(updatedDoc.data.lieferantName, updatedDoc.data.kontierungskonto, updatedDoc.data.steuerkategorie);
+          await supabaseService.saveDocument(updatedDoc);
         } catch (e) {
-          console.warn('Failed to sync vendor rule to Supabase:', e);
+          console.warn(`⚠️  [${operationId}] Cloud sync failed, local save successful:`, e);
+          setNotification('Lokal gespeichert, Cloud-Sync fehlgeschlagen.');
         }
       }
+
+      // Step 5: Save vendor rule if applicable
+      if (updatedDoc.data?.lieferantName && updatedDoc.data?.kontierungskonto && updatedDoc.data?.steuerkategorie) {
+        await storageService.saveVendorRule(
+          updatedDoc.data.lieferantName,
+          updatedDoc.data.kontierungskonto,
+          updatedDoc.data.steuerkategorie
+        );
+
+        if (supabaseService.isSupabaseConfigured()) {
+          try {
+            await supabaseService.saveVendorRule(
+              updatedDoc.data.lieferantName,
+              updatedDoc.data.kontierungskonto,
+              updatedDoc.data.steuerkategorie
+            );
+          } catch (e) {
+            console.warn(`⚠️  [${operationId}] Vendor rule sync failed:`, e);
+          }
+        }
+      }
+
+      const duration = PerformanceMonitor.now() - startTime;
+      console.log(`✅ [${operationId}] Document saved in ${duration.toFixed(2)}ms`);
+
+      PerformanceMonitor.recordMetric('save_document_success', {
+        operationId,
+        duration,
+        documentId: updatedDoc.id,
+        status: updatedDoc.status
+      });
+
+    } catch (error: any) {
+      const duration = PerformanceMonitor.now() - startTime;
+      console.error(`❌ [${operationId}] Save document failed after ${duration.toFixed(2)}ms`, error);
+
+      PerformanceMonitor.recordMetric('save_document_failure', {
+        operationId,
+        duration,
+        error: error.message,
+        documentId: updatedDoc.id
+      });
+
+      setNotification(`Fehler beim Speichern: ${error.message || 'Unbekannter Fehler'}`);
     }
   };
 
   const handleDeleteDocument = async (id: string) => {
-    setDocuments(prev => prev.filter(d => d.id !== id));
-    if (selectedDocId === id) setSelectedDocId(null);
-    // Local-first: Delete from IndexedDB first
-    await storageService.deleteDocument(id);
-    // Optionally sync to Supabase if configured
-    if (supabaseService.isSupabaseConfigured()) {
-      try {
-        await supabaseService.deleteDocument(id);
-      } catch (e) {
-        console.warn('Failed to delete document from Supabase:', e);
+    const startTime = PerformanceMonitor.now();
+    const operationId = `delete-doc-${Date.now()}`;
+
+    try {
+      console.log(`📋 [${operationId}] Deleting document ${id}...`);
+
+      // Step 1: Rate limit check
+      const rateCheck = await apiRateLimiter.check(operationId);
+      if (!rateCheck.allowed) {
+        setNotification(`Rate limit exceeded. Please wait ${rateCheck.retryAfter || 60} seconds.`);
+        return;
       }
+
+      // Step 2: Update UI state immediately
+      setDocuments(prev => prev.filter(d => d.id !== id));
+      if (selectedDocId === id) setSelectedDocId(null);
+
+      // Step 3: Delete from IndexedDB first (local-first)
+      await storageService.deleteDocument(id);
+
+      // Step 4: Delete from Supabase if configured
+      if (supabaseService.isSupabaseConfigured()) {
+        try {
+          await supabaseService.deleteDocument(id);
+        } catch (e) {
+          console.warn(`⚠️  [${operationId}] Cloud delete failed, local delete successful:`, e);
+          setNotification('Lokal gelöscht, Cloud-Sync fehlgeschlagen.');
+        }
+      }
+
+      const duration = PerformanceMonitor.now() - startTime;
+      console.log(`✅ [${operationId}] Document deleted in ${duration.toFixed(2)}ms`);
+
+      PerformanceMonitor.recordMetric('delete_document_success', {
+        operationId,
+        duration,
+        documentId: id
+      });
+
+    } catch (error: any) {
+      const duration = PerformanceMonitor.now() - startTime;
+      console.error(`❌ [${operationId}] Delete document failed after ${duration.toFixed(2)}ms`, error);
+
+      PerformanceMonitor.recordMetric('delete_document_failure', {
+        operationId,
+        duration,
+        error: error.message,
+        documentId: id
+      });
+
+      setNotification(`Fehler beim Löschen: ${error.message || 'Unbekannter Fehler'}`);
     }
   };
 
   const handleMergeDocuments = async (sourceId: string, targetId: string) => {
-    if (sourceId === targetId) return;
-    const sourceDoc = documents.find(d => d.id === sourceId);
-    const targetDoc = documents.find(d => d.id === targetId);
-    if (!sourceDoc || !targetDoc) return;
+    const startTime = PerformanceMonitor.now();
+    const operationId = `merge-docs-${Date.now()}`;
 
-    // D2: Safety checks - don't merge duplicates
-    if (sourceDoc.status === DocumentStatus.DUPLICATE || targetDoc.status === DocumentStatus.DUPLICATE) {
+    try {
+      console.log(`📋 [${operationId}] Merging ${sourceId} into ${targetId}...`);
+
+      // Step 1: Basic validation
+      if (sourceId === targetId) {
+        console.warn(`⚠️  [${operationId}] Source and target are the same`);
+        return;
+      }
+
+      // Step 2: Rate limit check
+      const rateCheck = await apiRateLimiter.check(operationId);
+      if (!rateCheck.allowed) {
+        setNotification(`Rate limit exceeded. Please wait ${rateCheck.retryAfter || 60} seconds.`);
+        return;
+      }
+
+      // Step 3: Find documents
+      const sourceDoc = documents.find(d => d.id === sourceId);
+      const targetDoc = documents.find(d => d.id === targetId);
+
+      if (!sourceDoc || !targetDoc) {
+        setNotification('Merge fehlgeschlagen: Dokumente nicht gefunden.');
+        return;
+      }
+
+      // Step 4: Safety checks - don't merge duplicates
+      if (sourceDoc.status === DocumentStatus.DUPLICATE || targetDoc.status === DocumentStatus.DUPLICATE) {
         setNotification('Merge abgebrochen: Duplikate können nicht als Quelle/Ziel genutzt werden.');
         return;
-    }
+      }
 
-    if (sourceDoc.status === DocumentStatus.ERROR || targetDoc.status === DocumentStatus.ERROR) {
+      if (sourceDoc.status === DocumentStatus.ERROR || targetDoc.status === DocumentStatus.ERROR) {
         setNotification('Merge abgebrochen: Belege mit Fehlerstatus können nicht gemerged werden.');
         return;
-    }
+      }
 
-    if (sourceDoc.status === DocumentStatus.REVIEW_NEEDED || targetDoc.status === DocumentStatus.REVIEW_NEEDED) {
+      if (sourceDoc.status === DocumentStatus.REVIEW_NEEDED || targetDoc.status === DocumentStatus.REVIEW_NEEDED) {
         setNotification('Merge abgebrochen: Belege mit Status "Prüfen" bitte erst korrigieren, dann mergen.');
         return;
-    }
-
-    if (!confirm(`Möchten Sie "${sourceDoc.fileName}" in "${targetDoc.fileName}" integrieren?`)) return;
-
-    // Preserve the source document as an attachment
-    const newAttachment: Attachment = {
-        id: crypto.randomUUID(), 
-        url: sourceDoc.previewUrl || '', 
-        type: sourceDoc.fileType, 
-        name: sourceDoc.fileName
-    };
-    
-    const updatedTarget: DocumentRecord = {
-        ...targetDoc,
-        // Combine existing attachments from target, the new source file, and any attachments the source already had
-        attachments: [
-            ...(targetDoc.attachments || []), 
-            newAttachment, 
-            ...(sourceDoc.attachments || [])
-        ]
-    };
-
-    // Save merged document locally first
-    await storageService.saveDocument(updatedTarget);
-    await storageService.deleteDocument(sourceId);
-
-    // Optionally sync to Supabase if configured
-    if (supabaseService.isSupabaseConfigured()) {
-      try {
-        await supabaseService.saveDocument(updatedTarget);
-        await supabaseService.deleteDocument(sourceId);
-      } catch (e) {
-        console.warn('Failed to sync merge to Supabase:', e);
       }
+
+      // Step 5: User confirmation
+      if (!confirm(`Möchten Sie "${sourceDoc.fileName}" in "${targetDoc.fileName}" integrieren?`)) {
+        console.log(`ℹ️  [${operationId}] Merge cancelled by user`);
+        return;
+      }
+
+      // Step 6: Create attachment from source
+      const newAttachment: Attachment = {
+        id: crypto.randomUUID(),
+        url: sourceDoc.previewUrl || '',
+        type: sourceDoc.fileType,
+        name: sourceDoc.fileName
+      };
+
+      const updatedTarget: DocumentRecord = {
+        ...targetDoc,
+        attachments: [
+          ...(targetDoc.attachments || []),
+          newAttachment,
+          ...(sourceDoc.attachments || [])
+        ]
+      };
+
+      // Step 7: Save merged document to IndexedDB
+      await storageService.saveDocument(updatedTarget);
+      await storageService.deleteDocument(sourceId);
+
+      // Step 8: Sync to Supabase if configured
+      if (supabaseService.isSupabaseConfigured()) {
+        try {
+          await supabaseService.saveDocument(updatedTarget);
+          await supabaseService.deleteDocument(sourceId);
+        } catch (e) {
+          console.warn(`⚠️  [${operationId}] Cloud sync failed, local merge successful:`, e);
+          setNotification('Lokal zusammengeführt, Cloud-Sync fehlgeschlagen.');
+        }
+      }
+
+      // Step 9: Update UI
+      setDocuments(prev => prev.filter(d => d.id !== sourceId).map(d => d.id === targetId ? updatedTarget : d));
+      setNotification('Belege erfolgreich zusammengeführt.');
+
+      if (selectedDocId === sourceId) setSelectedDocId(targetId);
+
+      const duration = PerformanceMonitor.now() - startTime;
+      console.log(`✅ [${operationId}] Merge completed in ${duration.toFixed(2)}ms`);
+
+      PerformanceMonitor.recordMetric('merge_documents_success', {
+        operationId,
+        duration,
+        sourceId,
+        targetId,
+        attachmentCount: updatedTarget.attachments?.length || 0
+      });
+
+    } catch (error: any) {
+      const duration = PerformanceMonitor.now() - startTime;
+      console.error(`❌ [${operationId}] Merge failed after ${duration.toFixed(2)}ms`, error);
+
+      PerformanceMonitor.recordMetric('merge_documents_failure', {
+        operationId,
+        duration,
+        error: error.message,
+        sourceId,
+        targetId
+      });
+
+      setNotification(`Merge fehlgeschlagen: ${error.message || 'Unbekannter Fehler'}`);
     }
-    
-    setDocuments(prev => prev.filter(d => d.id !== sourceId).map(d => d.id === targetId ? updatedTarget : d));
-    
-    setNotification('Belege erfolgreich zusammengeführt.');
-    
-    if (selectedDocId === sourceId) setSelectedDocId(targetId);
   };
 
   const handleRetryOCR = async (doc: DocumentRecord) => {
-    if (!doc.previewUrl) return;
-        setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, status: DocumentStatus.PROCESSING, error: undefined } : d));
+    const startTime = PerformanceMonitor.now();
+    const operationId = `retry-ocr-${Date.now()}`;
+
     try {
+      console.log(`📋 [${operationId}] Retrying OCR for document ${doc.id}...`);
+
+      // Step 1: Validate document has preview
+      if (!doc.previewUrl) {
+        setNotification('Dokument hat keine Vorschau zum Analysieren.');
+        return;
+      }
+
+      // Step 2: Rate limit check
+      const rateCheck = await apiRateLimiter.check(operationId);
+      if (!rateCheck.allowed) {
+        setNotification(`Rate limit exceeded. Please wait ${rateCheck.retryAfter || 60} seconds.`);
+        return;
+      }
+
+      // Step 3: Update UI to processing state
+      setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, status: DocumentStatus.PROCESSING, error: undefined } : d));
+
+      // Step 4: Extract base64 data
       const base64 = doc.previewUrl.split(',')[1];
-            const extractedRaw = await analyzeDocumentWithGemini(base64, doc.fileType);
-            const extracted = normalizeExtractedData(extractedRaw);
+      if (!base64) {
+        throw new Error('Invalid preview URL format');
+      }
+
+      // Step 5: Retry OCR analysis with fallback
+      let extractedRaw;
+      try {
+        extractedRaw = await analyzeDocumentWithGemini(base64, doc.fileType, operationId);
+      } catch (geminiError) {
+        console.warn(`⚠️  [${operationId}] Gemini failed, trying fallback...`);
+        // Note: fallbackService would need to be imported for this to work
+        // For now, we'll re-throw the Gemini error
+        throw geminiError;
+      }
+
+      const extracted = normalizeExtractedData(extractedRaw);
+
+      // Step 6: Apply accounting rules with vendor override
       const currentSettings = settings || await storageService.getSettings();
       const existingId = doc.data?.eigeneBelegNummer;
       let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
+
       if (extracted.lieferantName) {
-           const rule = await storageService.getVendorRule(extracted.lieferantName);
-           if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
+        const rule = await storageService.getVendorRule(extracted.lieferantName);
+        if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
       }
-            let finalData = applyAccountingRules(extracted, documents, currentSettings, overrideRule);
+
+      let finalData = applyAccountingRules(extracted, documents, currentSettings, overrideRule);
       finalData.eigeneBelegNummer = existingId || generateZoeInvoiceId(finalData.belegDatum, documents);
-            const outcome = classifyOcrOutcome(finalData);
-            const updated = { ...doc, status: outcome.status, data: finalData, error: outcome.error };
+
+      // Step 7: Classify outcome and create updated document
+      const outcome = classifyOcrOutcome(finalData);
+      const updated = { ...doc, status: outcome.status, data: finalData, error: outcome.error };
+
+      // Step 8: Save document
       await handleSaveDocument(updated);
-    } catch (e) {
-            const msg = e instanceof Error ? e.message : 'Retry fehlgeschlagen';
-            const errDoc = { ...doc, status: DocumentStatus.ERROR, error: msg };
+
+      const duration = PerformanceMonitor.now() - startTime;
+      console.log(`✅ [${operationId}] OCR retry completed in ${duration.toFixed(2)}ms`);
+
+      PerformanceMonitor.recordMetric('retry_ocr_success', {
+        operationId,
+        duration,
+        documentId: doc.id,
+        status: outcome.status
+      });
+
+    } catch (error: any) {
+      const duration = PerformanceMonitor.now() - startTime;
+      console.error(`❌ [${operationId}] OCR retry failed after ${duration.toFixed(2)}ms`, error);
+
+      PerformanceMonitor.recordMetric('retry_ocr_failure', {
+        operationId,
+        duration,
+        error: error.message,
+        documentId: doc.id
+      });
+
+      const msg = error instanceof Error ? error.message : 'Retry fehlgeschlagen';
+      const errDoc = { ...doc, status: DocumentStatus.ERROR, error: msg };
       await handleSaveDocument(errDoc);
     }
   };
@@ -671,8 +947,33 @@ export default function App() {
   };
 
   const handleIgnoreDuplicate = async (id: string) => {
-    const doc = documents.find(d => d.id === id);
-    if (doc) {
+    const startTime = PerformanceMonitor.now();
+    const operationId = `ignore-duplicate-${Date.now()}`;
+
+    try {
+      console.log(`📋 [${operationId}] Ignoring duplicate for document ${id}...`);
+
+      // Step 1: Rate limit check
+      const rateCheck = await apiRateLimiter.check(operationId);
+      if (!rateCheck.allowed) {
+        setNotification(`Rate limit exceeded. Please wait ${rateCheck.retryAfter || 60} seconds.`);
+        return;
+      }
+
+      // Step 2: Find document
+      const doc = documents.find(d => d.id === id);
+      if (!doc) {
+        setNotification('Dokument nicht gefunden.');
+        return;
+      }
+
+      // Step 3: Validate document can be updated
+      if (doc.status === DocumentStatus.ERROR) {
+        setNotification('Dokument mit Fehlerstatus kann nicht bearbeitet werden.');
+        return;
+      }
+
+      // Step 4: Create updated document
       const updated = {
         ...doc,
         status: DocumentStatus.REVIEW_NEEDED as DocumentStatus,
@@ -680,9 +981,35 @@ export default function App() {
         duplicateConfidence: undefined,
         duplicateReason: undefined
       };
+
+      // Step 5: Save document
       await handleSaveDocument(updated);
+
+      // Step 6: Close comparison modal
+      handleCloseCompare();
+
+      const duration = PerformanceMonitor.now() - startTime;
+      console.log(`✅ [${operationId}] Duplicate ignored in ${duration.toFixed(2)}ms`);
+
+      PerformanceMonitor.recordMetric('ignore_duplicate_success', {
+        operationId,
+        duration,
+        documentId: id
+      });
+
+    } catch (error: any) {
+      const duration = PerformanceMonitor.now() - startTime;
+      console.error(`❌ [${operationId}] Ignore duplicate failed after ${duration.toFixed(2)}ms`, error);
+
+      PerformanceMonitor.recordMetric('ignore_duplicate_failure', {
+        operationId,
+        duration,
+        error: error.message,
+        documentId: id
+      });
+
+      setNotification(`Fehler beim Ignorieren des Duplikats: ${error.message || 'Unbekannter Fehler'}`);
     }
-    handleCloseCompare();
   };
 
   const filteredDocuments = useMemo(() => {
@@ -718,47 +1045,149 @@ export default function App() {
   const renderContent = () => {
       if (viewMode === 'settings' && settings) {
           return <SettingsView settings={settings} onSave={async (s) => {
-            setSettings(s);
-            // Local-first: Save to IndexedDB first
-            await storageService.saveSettings(s);
-            // Optionally sync to Supabase
-            if (supabaseService.isSupabaseConfigured()) {
-              try {
-                await supabaseService.saveSettings(s);
-              } catch (e) {
-                console.warn('Failed to sync settings to Supabase:', e);
+            const startTime = PerformanceMonitor.now();
+            const operationId = `save-settings-${Date.now()}`;
+
+            try {
+              console.log(`📋 [${operationId}] Saving settings...`);
+
+              // Step 1: Rate limit check
+              const rateCheck = await apiRateLimiter.check(operationId);
+              if (!rateCheck.allowed) {
+                setNotification(`Rate limit exceeded. Please wait ${rateCheck.retryAfter || 60} seconds.`);
+                return;
               }
+
+              // Step 2: Validate settings
+              if (!s || typeof s !== 'object') {
+                setNotification('Ungültige Einstellungen.');
+                return;
+              }
+
+              // Step 3: Update UI immediately
+              setSettings(s);
+
+              // Step 4: Save to IndexedDB first (local-first)
+              await storageService.saveSettings(s);
+
+              // Step 5: Sync to Supabase if configured
+              if (supabaseService.isSupabaseConfigured()) {
+                try {
+                  await supabaseService.saveSettings(s);
+                } catch (e) {
+                  console.warn(`⚠️  [${operationId}] Cloud sync failed, local save successful:`, e);
+                  setNotification('Lokal gespeichert, Cloud-Sync fehlgeschlagen.');
+                }
+              }
+
+              const duration = PerformanceMonitor.now() - startTime;
+              console.log(`✅ [${operationId}] Settings saved in ${duration.toFixed(2)}ms`);
+
+              PerformanceMonitor.recordMetric('save_settings_success', {
+                operationId,
+                duration
+              });
+
+              setNotification('Einstellungen erfolgreich gespeichert.');
+
+            } catch (error: any) {
+              const duration = PerformanceMonitor.now() - startTime;
+              console.error(`❌ [${operationId}] Save settings failed after ${duration.toFixed(2)}ms`, error);
+
+              PerformanceMonitor.recordMetric('save_settings_failure', {
+                operationId,
+                duration,
+                error: error.message
+              });
+
+              setNotification(`Fehler beim Speichern: ${error.message || 'Unbekannter Fehler'}`);
             }
           }} onClose={() => setViewMode('document')} />;
       }
       if (viewMode === 'database') {
           const handleExportSQLWithPreflight = async () => {
-              const currentSettings = settings || await storageService.getSettings();
-              const docsToExport = filteredDocuments;
-              const preflight = runExportPreflight(docsToExport, currentSettings);
-              const dialog = formatPreflightForDialog(preflight);
+              const startTime = PerformanceMonitor.now();
+              const operationId = `export-sql-${Date.now()}`;
 
-              if (preflight.blockers.length > 0) {
-                  alert(`${dialog.title}\n\n${dialog.body}`);
+              try {
+                console.log(`📋 [${operationId}] Starting SQL export...`);
+
+                // Step 1: Rate limit check
+                const rateCheck = await apiRateLimiter.check(operationId);
+                if (!rateCheck.allowed) {
+                  setNotification(`Rate limit exceeded. Please wait ${rateCheck.retryAfter || 60} seconds.`);
                   return;
-              }
+                }
 
-              if (preflight.warnings.length > 0) {
+                // Step 2: Validate documents
+                if (!filteredDocuments || filteredDocuments.length === 0) {
+                  setNotification('Keine Dokumente zum Exportieren ausgewählt.');
+                  return;
+                }
+
+                // Step 3: Get current settings
+                const currentSettings = settings || await storageService.getSettings();
+                const docsToExport = filteredDocuments;
+
+                // Step 4: Run preflight validation
+                const preflight = runExportPreflight(docsToExport, currentSettings);
+                const dialog = formatPreflightForDialog(preflight);
+
+                if (preflight.blockers.length > 0) {
+                  alert(`${dialog.title}\n\n${dialog.body}`);
+                  console.warn(`⚠️  [${operationId}] Export blocked:`, preflight.blockers);
+                  return;
+                }
+
+                if (preflight.warnings.length > 0) {
                   const ok = confirm(`${dialog.title}\n\n${dialog.body}\n\nTrotzdem exportieren?`);
-                  if (!ok) return;
-              }
+                  if (!ok) {
+                    console.log(`ℹ️  [${operationId}] Export cancelled by user`);
+                    return;
+                  }
+                }
 
-              const sql = supabaseService.exportDocumentsToSQL(docsToExport, currentSettings);
-              const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-              const y = filterYear === 'all' ? 'all' : filterYear;
-              const q = filterQuarter === 'all' ? 'all' : filterQuarter;
-              const m = filterMonth === 'all' ? 'all' : filterMonth;
-              const fileName = `zoe_belege_${y}_${q}_${m}_${timestamp}.sql`;
-              const url = URL.createObjectURL(new Blob([sql], { type: 'text/sql' }));
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = fileName;
-              a.click();
+                // Step 5: Generate SQL
+                const sql = supabaseService.exportDocumentsToSQL(docsToExport, currentSettings);
+
+                // Step 6: Create download
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const y = filterYear === 'all' ? 'all' : filterYear;
+                const q = filterQuarter === 'all' ? 'all' : filterQuarter;
+                const m = filterMonth === 'all' ? 'all' : filterMonth;
+                const fileName = `zoe_belege_${y}_${q}_${m}_${timestamp}.sql`;
+                const url = URL.createObjectURL(new Blob([sql], { type: 'text/sql' }));
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                a.click();
+                URL.revokeObjectURL(url); // Cleanup
+
+                const duration = PerformanceMonitor.now() - startTime;
+                console.log(`✅ [${operationId}] SQL export completed in ${duration.toFixed(2)}ms (${sql.length} bytes)`);
+
+                PerformanceMonitor.recordMetric('export_sql_success', {
+                  operationId,
+                  duration,
+                  docCount: docsToExport.length,
+                  sqlSize: sql.length
+                });
+
+                setNotification(`SQL Export erfolgreich: ${docsToExport.length} Dokumente`);
+
+              } catch (error: any) {
+                const duration = PerformanceMonitor.now() - startTime;
+                console.error(`❌ [${operationId}] Export failed after ${duration.toFixed(2)}ms`, error);
+
+                PerformanceMonitor.recordMetric('export_sql_failure', {
+                  operationId,
+                  duration,
+                  error: error.message,
+                  docCount: filteredDocuments?.length || 0
+                });
+
+                setNotification(`Export fehlgeschlagen: ${error.message || 'Unbekannter Fehler'}`);
+              }
           };
 
           return <DatabaseGrid 

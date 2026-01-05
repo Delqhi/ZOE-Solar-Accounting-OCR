@@ -1,0 +1,184 @@
+# ZOE Solar Accounting OCR - Comprehensive .gitignore
+# Security-first configuration for production deployment
+
+# ========================================
+# 🚨 CRITICAL: Environment & Secrets
+# ========================================
+# NEVER commit environment files with secrets
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.staging
+
+# Vercel environment
+.vercel
+
+# ========================================
+# 📦 Dependencies
+# ========================================
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
+# ========================================
+# 🏗️ Build Outputs
+# ========================================
+dist/
+dist-ssr/
+*.local
+*.bundle.js
+*.chunk.js
+
+# ========================================
+# 📊 Testing & Coverage
+# ========================================
+coverage/
+.nyc_output/
+.jest-cache/
+test-results/
+vitest/results/
+
+# ========================================
+# 📝 Logs & Debug
+# ========================================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+bun-debug.log*
+debug.log
+
+# ========================================
+# 🗃️ IDE & Editor Files
+# ========================================
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ========================================
+# 📁 Local Storage (User Data)
+# ========================================
+belege-uploads/*
+!belege-uploads/.gitkeep
+uploads/
+storage/
+
+# ========================================
+# 🎨 Cache & Temporary Files
+# =================================
+.cache/
+.tmp/
+.temp/
+*.tmp
+*.temp
+
+# ========================================
+# ⚡ Vite & Build Cache
+# ========================================
+.vite/
+.vitest/
+*.tsbuildinfo
+
+# ========================================
+# 📜 TypeScript & ESLint
+# ========================================
+tsconfig.tsbuildinfo
+eslint.cache
+
+# ========================================
+# 🔒 Security & Credentials
+# ========================================
+*.key
+*.pem
+*.crt
+*.csr
+*.p12
+*.pfx
+.id
+
+# ========================================
+# 📋 Documentation (Generated)
+# ========================================
+docs/generated/
+*.docgen.json
+
+# ========================================
+# 🐙 Git & CI/CD
+# ========================================
+.github/secrets/
+.github/actions/*/node_modules/
+.github/actions/*/dist/
+
+# ========================================
+# 🔧 Environment-Specific
+# ========================================
+*.env.encrypted
+*.secrets.yaml
+secrets.yml
+config/secrets/
+
+# ========================================
+# 📱 Mobile & Desktop
+# ========================================
+*.apk
+*.ipa
+*.dmg
+*.app
+
+# ========================================
+# 📦 Package Managers
+# ========================================
+.pnpm-store/
+.turbo/
+.next/
+.nuxt/
+.astro/
+
+# ========================================
+# 🔍 Search & Index
+# ========================================
+*.index/
+.vscode-search/
+.~search-index/
+
+# ========================================
+# 🎯 Project-Specific
+# ========================================
+# OCR Processing Cache
+ocr-cache/
+processing-temp/
+
+# AI API Responses Cache
+ai-responses/
+
+# Database Files (if local)
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup Files
+*.backup
+*.bak
+backups/
+
+# ========================================
+# ✅ Allow These Files
+# ========================================
+!.env.example
+!.env.template
+!.github/workflows/*.yml
+!dist/.gitkeep
+!uploads/.gitkeep
