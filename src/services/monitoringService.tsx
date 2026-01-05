@@ -139,10 +139,10 @@ class MonitoringService {
       // });
 
       if (import.meta.env.DEV) {
-        // Would send error to external service
+        console.log('[Monitoring] Would send error to external service:', errorInfo);
       }
     } catch (error) {
-      // Silent fail
+      console.warn('Failed to send to monitoring service:', error);
     }
   }
 
@@ -207,11 +207,11 @@ export class MonitoredErrorBoundary extends React.Component<
 
   render() {
     if (this.state.hasError) {
-      return this.props.fallback || React.createElement(
-        'div',
-        { className: 'p-4 bg-red-50 border border-red-200 rounded' },
-        React.createElement('h2', null, 'Ein Fehler ist aufgetreten'),
-        React.createElement('button', { onClick: () => window.location.reload() }, 'Seite neu laden')
+      return this.props.fallback || (
+        <div className="p-4 bg-red-50 border border-red-200 rounded">
+          <h2>Ein Fehler ist aufgetreten</h2>
+          <button onClick={() => window.location.reload()}>Seite neu laden</button>
+        </div>
       );
     }
     return this.props.children;
