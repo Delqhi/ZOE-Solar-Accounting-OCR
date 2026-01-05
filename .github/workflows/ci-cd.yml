@@ -172,20 +172,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: build-output
-          path: dist/
+          node-version: '20'
+          cache: 'npm'
 
-      - name: Deploy to Vercel/Netlify
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Deploy to Vercel Production
         run: |
-          # Add your deployment command here
-          # Example for Vercel:
-          # npm i -g vercel
-          # vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
-          echo "🚀 Deploying to production..."
-          echo "✅ Deploy complete!"
+          vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          VITE_SILICONFLOW_API_KEY: ${{ secrets.VITE_SILICONFLOW_API_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: Notify deployment success
         if: success()
