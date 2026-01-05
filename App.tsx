@@ -17,6 +17,7 @@ import { DocumentRecord, DocumentStatus, AppSettings, ExtractedData, Attachment 
 import { normalizeExtractedData } from './services/extractedDataNormalization';
 import { formatPreflightForDialog, runExportPreflight } from './services/exportPreflight';
 import { User } from './services/supabaseService';
+import { logger } from './src/utils/logger';
 
 const computeFileHash = async (file: File): Promise<string> => {
   const buffer = await file.arrayBuffer();
@@ -245,11 +246,11 @@ export default function App() {
               setSettings(cloudSettings);
             }
           } catch (syncError) {
-            console.warn('Supabase sync failed, using local data:', syncError);
+            logger.warn('Supabase sync failed, using local data:', syncError);
           }
         }
       } catch (e) {
-        console.error("Init Error:", e);
+        logger.error("Init Error:", e);
         setNotification('Fehler beim Laden der Daten. IndexedDB oder Supabase prüfen.');
       }
     };
@@ -420,7 +421,7 @@ export default function App() {
 
                 // Don't add to processedBatch (won't show in UI)
             } catch (e) {
-                console.error('Failed to save private document:', e);
+                logger.error('Failed to save private document:', e);
                 // Fallback: save as normal document with PRIVATE status
                 const fallbackDoc: DocumentRecord = {
                     id: privateRes.id,
@@ -503,7 +504,7 @@ export default function App() {
                   try {
                     await supabaseService.saveDocument(finalDoc);
                   } catch (e) {
-                    console.warn('Failed to sync document to Supabase:', e);
+                    logger.warn('Failed to sync document to Supabase:', e);
                   }
                 }
             }
@@ -540,7 +541,7 @@ export default function App() {
       try {
         await supabaseService.saveDocument(updatedDoc);
       } catch (e) {
-        console.warn('Failed to sync document to Supabase:', e);
+        logger.warn('Failed to sync document to Supabase:', e);
       }
     }
     // Save vendor rule if applicable
@@ -550,7 +551,7 @@ export default function App() {
         try {
           await supabaseService.saveVendorRule(updatedDoc.data.lieferantName, updatedDoc.data.kontierungskonto, updatedDoc.data.steuerkategorie);
         } catch (e) {
-          console.warn('Failed to sync vendor rule to Supabase:', e);
+          logger.warn('Failed to sync vendor rule to Supabase:', e);
         }
       }
     }
@@ -566,7 +567,7 @@ export default function App() {
       try {
         await supabaseService.deleteDocument(id);
       } catch (e) {
-        console.warn('Failed to delete document from Supabase:', e);
+        logger.warn('Failed to delete document from Supabase:', e);
       }
     }
   };
@@ -623,7 +624,7 @@ export default function App() {
         await supabaseService.saveDocument(updatedTarget);
         await supabaseService.deleteDocument(sourceId);
       } catch (e) {
-        console.warn('Failed to sync merge to Supabase:', e);
+        logger.warn('Failed to sync merge to Supabase:', e);
       }
     }
     
@@ -726,7 +727,7 @@ export default function App() {
               try {
                 await supabaseService.saveSettings(s);
               } catch (e) {
-                console.warn('Failed to sync settings to Supabase:', e);
+                logger.warn('Failed to sync settings to Supabase:', e);
               }
             }
           }} onClose={() => setViewMode('document')} />;

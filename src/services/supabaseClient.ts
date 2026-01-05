@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { logger } from '../utils/logger';
 
 // Environment variables (imported via import.meta.env for Vite)
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
@@ -6,7 +7,7 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // Validate configuration
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.warn('Supabase configuration missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env');
+  logger.warn('Supabase configuration missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env');
 }
 
 // Create Supabase client for browser-side usage

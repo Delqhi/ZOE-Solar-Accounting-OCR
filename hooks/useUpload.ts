@@ -5,6 +5,7 @@ import { applyAccountingRules, generateZoeInvoiceId } from '../services/ruleEngi
 import { normalizeExtractedData } from '../services/extractedDataNormalization';
 import { detectPrivateDocument } from '../services/privateDocumentDetection';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from '../src/utils/logger';
 
 interface UseUploadReturn {
   processing: boolean;
@@ -80,7 +81,7 @@ export const useUpload = (): UseUploadReturn => {
       return doc;
 
     } catch (error) {
-      console.error('Upload error:', error);
+      logger.error('Upload error:', error);
       setProgress(null);
       return null;
     } finally {
