@@ -13,7 +13,7 @@ export interface User {
 }
 
 // Supabase client placeholder - actual client is initialized in supabaseClient.ts
-let supabaseClient: any = null;
+const supabaseClient: any = null;
 
 export function isSupabaseConfigured(): boolean {
   // Check if Supabase URL and anon key are configured
