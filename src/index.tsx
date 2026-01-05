@@ -14,7 +14,7 @@ import { AppProvider } from './context/AppContext';
 // Services & Monitoring
 import { performSecurityCheck } from './middleware/security';
 import { monitoringService } from './services/monitoringService';
-import { loadEnvConfig, logConfigSummary, isFeatureEnabled, getEnvironmentConfig } from './config/env';
+import { loadEnvConfig, logConfigSummary, getEnvironmentConfig } from './config/env';
 import { analytics } from './lib/analytics';
 
 // Styles

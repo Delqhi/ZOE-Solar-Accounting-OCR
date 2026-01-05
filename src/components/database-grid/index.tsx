@@ -23,7 +23,7 @@ interface DatabaseGridProps {
   documents: DocumentRecord[];
   onOpen: (doc: DocumentRecord) => void;
   onDelete: (id: string) => void;
-  onMerge: (sourceId: string, targetId: string) => void;
+  onMerge?: (sourceId: string, targetId: string) => void;
   onDuplicateCompare: (doc: DocumentRecord) => void;
 }
 
@@ -31,7 +31,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
   documents,
   onOpen,
   onDelete,
-  onMerge,
+  onMerge: _onMerge,
   onDuplicateCompare,
 }) => {
   const table = useTableState(documents);

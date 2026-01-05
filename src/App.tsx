@@ -1,13 +1,9 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { UploadArea } from './components/UploadArea';
-import { DatabaseView } from './components/DatabaseView';
 import { DatabaseGrid } from './components/database-grid';
 import { DocumentDetail } from './components/DetailModal';
 import { DuplicateCompareModal } from './components/DuplicateCompareModal';
 import { SettingsView } from './components/SettingsView';
-import { AuthView } from './components/AuthView';
-import { BackupView } from './components/BackupView';
-import { FilterBar } from './components/FilterBar';
 import { analyzeDocumentWithGemini } from './services/geminiService';
 import { applyAccountingRules, generateZoeInvoiceId } from './services/ruleEngine';
 import * as storageService from './services/storageService';
@@ -15,8 +11,6 @@ import * as supabaseService from './services/supabaseService';
 import { detectPrivateDocument } from './services/privateDocumentDetection';
 import { DocumentRecord, DocumentStatus, AppSettings, ExtractedData, Attachment } from './types';
 import { normalizeExtractedData } from './services/extractedDataNormalization';
-import { formatPreflightForDialog, runExportPreflight } from './services/exportPreflight';
-import { User } from './services/supabaseService';
 
 const computeFileHash = async (file: File): Promise<string> => {
   const buffer = await file.arrayBuffer();
@@ -186,18 +180,10 @@ export default function App() {
     reason: string;
   } | null>(null);
 
-  // Auth State
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-
   // Filter State
   const [filterYear, setFilterYear] = useState<string>('all');
-  const [filterQuarter, setFilterQuarter] = useState<string>('all');
+  const [filterQuarter] = useState<string>('all');
   const [filterMonth, setFilterMonth] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterVendor, setFilterVendor] = useState<string>('all');
-  const [filterAccount, setFilterAccount] = useState<string>('all');
-  const [filterTaxCategory, setFilterTaxCategory] = useState<string>('all');
   
   // Drag State for Sidebar
   const [sidebarDragTarget, setSidebarDragTarget] = useState<string | null>(null);
@@ -245,11 +231,10 @@ export default function App() {
               setSettings(cloudSettings);
             }
           } catch (syncError) {
-            console.warn('Supabase sync failed, using local data:', syncError);
+            // Supabase sync failed, using local data
           }
         }
       } catch (e) {
-        console.error("Init Error:", e);
         setNotification('Fehler beim Laden der Daten. IndexedDB oder Supabase prüfen.');
       }
     };
@@ -420,7 +405,6 @@ export default function App() {
 
                 // Don't add to processedBatch (won't show in UI)
             } catch (e) {
-                console.error('Failed to save private document:', e);
                 // Fallback: save as normal document with PRIVATE status
                 const fallbackDoc: DocumentRecord = {
                     id: privateRes.id,
@@ -503,7 +487,7 @@ export default function App() {
                   try {
                     await supabaseService.saveDocument(finalDoc);
                   } catch (e) {
-                    console.warn('Failed to sync document to Supabase:', e);
+                    // Supabase sync failed - document saved locally
                   }
                 }
             }
@@ -540,7 +524,7 @@ export default function App() {
       try {
         await supabaseService.saveDocument(updatedDoc);
       } catch (e) {
-        console.warn('Failed to sync document to Supabase:', e);
+        // Supabase sync failed - document saved locally
       }
     }
     // Save vendor rule if applicable
@@ -550,7 +534,7 @@ export default function App() {
         try {
           await supabaseService.saveVendorRule(updatedDoc.data.lieferantName, updatedDoc.data.kontierungskonto, updatedDoc.data.steuerkategorie);
         } catch (e) {
-          console.warn('Failed to sync vendor rule to Supabase:', e);
+          // Supabase sync failed - vendor rule saved locally
         }
       }
     }
@@ -566,7 +550,7 @@ export default function App() {
       try {
         await supabaseService.deleteDocument(id);
       } catch (e) {
-        console.warn('Failed to delete document from Supabase:', e);
+        // Supabase delete failed - document deleted locally
       }
     }
   };
@@ -623,7 +607,7 @@ export default function App() {
         await supabaseService.saveDocument(updatedTarget);
         await supabaseService.deleteDocument(sourceId);
       } catch (e) {
-        console.warn('Failed to sync merge to Supabase:', e);
+        // Supabase sync failed - merge saved locally
       }
     }
     
@@ -717,7 +701,7 @@ export default function App() {
 
   const renderContent = () => {
       if (viewMode === 'settings' && settings) {
-          return <SettingsView settings={settings} onSave={async (s) => {
+          return <SettingsView settings={settings} _onSave={async (s) => {
             setSettings(s);
             // Local-first: Save to IndexedDB first
             await storageService.saveSettings(s);
@@ -726,41 +710,12 @@ export default function App() {
               try {
                 await supabaseService.saveSettings(s);
               } catch (e) {
-                console.warn('Failed to sync settings to Supabase:', e);
+                // Supabase sync failed - settings saved locally
               }
             }
           }} onClose={() => setViewMode('document')} />;
       }
       if (viewMode === 'database') {
-          const handleExportSQLWithPreflight = async () => {
-              const currentSettings = settings || await storageService.getSettings();
-              const docsToExport = filteredDocuments;
-              const preflight = runExportPreflight(docsToExport, currentSettings);
-              const dialog = formatPreflightForDialog(preflight);
-
-              if (preflight.blockers.length > 0) {
-                  alert(`${dialog.title}\n\n${dialog.body}`);
-                  return;
-              }
-
-              if (preflight.warnings.length > 0) {
-                  const ok = confirm(`${dialog.title}\n\n${dialog.body}\n\nTrotzdem exportieren?`);
-                  if (!ok) return;
-              }
-
-              const sql = supabaseService.exportDocumentsToSQL(docsToExport, currentSettings);
-              const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-              const y = filterYear === 'all' ? 'all' : filterYear;
-              const q = filterQuarter === 'all' ? 'all' : filterQuarter;
-              const m = filterMonth === 'all' ? 'all' : filterMonth;
-              const fileName = `zoe_belege_${y}_${q}_${m}_${timestamp}.sql`;
-              const url = URL.createObjectURL(new Blob([sql], { type: 'text/sql' }));
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = fileName;
-              a.click();
-          };
-
           return <DatabaseGrid
               documents={filteredDocuments}
               onOpen={(d) => { setSelectedDocId(d.id); }}

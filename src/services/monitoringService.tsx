@@ -41,6 +41,7 @@ class MonitoringService {
       this.errors = this.errors.slice(-this.maxLogs);
     }
 
+    // eslint-disable-next-line no-console
     console.error('🚨 Captured Error:', errorInfo);
 
     // In production, send to external service
@@ -65,6 +66,7 @@ class MonitoringService {
       this.metrics = this.metrics.slice(-this.maxLogs);
     }
 
+    // eslint-disable-next-line no-console
     console.log(`⚡ Metric: ${name} = ${duration.toFixed(2)}ms`);
   }
 
@@ -139,9 +141,11 @@ class MonitoringService {
       // });
 
       if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
         console.log('[Monitoring] Would send error to external service:', errorInfo);
       }
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.warn('Failed to send to monitoring service:', error);
     }
   }

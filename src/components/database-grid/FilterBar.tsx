@@ -19,7 +19,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   selectionCount,
   onSelectAll,
   onClearSelection,
-  selectedIds,
+  selectedIds: _selectedIds,
   totalItems,
 }) => {
   const years = ['2026', '2025', '2024'];

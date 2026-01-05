@@ -8,7 +8,7 @@ interface PrivateCheckResult {
   reason?: string;
 }
 
-export function detectPrivateDocument(data: Partial<ExtractedData>): PrivateCheckResult {
+export function detectPrivateDocument(_data: Partial<ExtractedData>): PrivateCheckResult {
   // Placeholder logic - normally this would detect private expenses
   return {
     isPrivate: false

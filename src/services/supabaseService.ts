@@ -13,6 +13,7 @@ export interface User {
 }
 
 // Supabase client placeholder - actual client is initialized in supabaseClient.ts
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const supabaseClient: any = null;
 
 export function isSupabaseConfigured(): boolean {
@@ -88,6 +89,7 @@ export async function getAllDocuments(): Promise<DocumentRecord[]> {
       attachments: beleg.attachments,
     }));
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error fetching documents from Supabase:', error);
     return [];
   }
@@ -101,6 +103,7 @@ export async function getSettings(): Promise<AppSettings | null> {
     const settingsStr = await einstellungenService.get('app_settings');
     return settingsStr ? JSON.parse(settingsStr) : null;
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error fetching settings from Supabase:', error);
     return null;
   }
@@ -113,6 +116,7 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
     const { einstellungenService } = await import('./belegeService');
     await einstellungenService.set('app_settings', JSON.stringify(settings));
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error saving settings to Supabase:', error);
     throw error;
   }
@@ -143,6 +147,7 @@ export async function saveDocument(doc: DocumentRecord): Promise<void> {
       }
     }
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error saving document to Supabase:', error);
     throw error;
   }
@@ -154,6 +159,7 @@ export async function deleteDocument(id: string): Promise<void> {
   try {
     await belegeService.delete(id);
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error deleting document from Supabase:', error);
     throw error;
   }
@@ -172,8 +178,10 @@ export async function savePrivateDocument(
   try {
     // Save to belege_privat table (placeholder - actual implementation depends on schema)
     // For now, we'll just log it
+    // eslint-disable-next-line no-console
     console.log('Private document saved to Supabase:', { id, fileName, reason });
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error saving private document to Supabase:', error);
     throw error;
   }
@@ -206,12 +214,13 @@ export async function saveVendorRule(vendorName: string, accountId: string, taxC
       aktiv: true,
     });
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error saving vendor rule to Supabase:', error);
     throw error;
   }
 }
 
-export function exportDocumentsToSQL(documents: DocumentRecord[], settings: AppSettings): string {
+export function exportDocumentsToSQL(documents: DocumentRecord[], _settings: AppSettings): string {
   // Generate SQL INSERT statements for Supabase
   let sql = '-- ZOE Solar Accounting OCR Export\n';
   sql += '-- Generated: ' + new Date().toISOString() + '\n\n';
@@ -249,12 +258,13 @@ export async function getCurrentUser(): Promise<User | null> {
     // return user;
     return null;
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error getting current user:', error);
     return null;
   }
 }
 
-export async function signIn(email: string, password: string): Promise<User | null> {
+export async function signIn(_email: string, _password: string): Promise<User | null> {
   if (!isSupabaseConfigured()) return null;
 
   try {
@@ -263,6 +273,7 @@ export async function signIn(email: string, password: string): Promise<User | nu
     // return user;
     return null;
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error signing in:', error);
     throw error;
   }
@@ -275,6 +286,7 @@ export async function signOut(): Promise<void> {
     // Placeholder - would use actual Supabase auth
     // await supabase.auth.signOut();
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error signing out:', error);
     throw error;
   }

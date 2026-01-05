@@ -27,6 +27,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // eslint-disable-next-line no-console
     console.error('❌ ErrorBoundary caught error:', {
       message: error.message,
       stack: error.stack,
@@ -50,6 +51,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidMount() {
     // Log app version for debugging
+    // eslint-disable-next-line no-console
     console.log('🚀 ZOE App Version:', import.meta.env.VITE_APP_VERSION || 'dev');
   }
 
@@ -149,11 +151,13 @@ export class ErrorBoundary extends Component<Props, State> {
  */
 export function setupGlobalErrorHandler() {
   window.addEventListener('error', (event) => {
+    // eslint-disable-next-line no-console
     console.error('Global error:', event.error);
     toast.error('Ein kritischer Fehler ist aufgetreten.');
   });
 
   window.addEventListener('unhandledrejection', (event) => {
+    // eslint-disable-next-line no-console
     console.error('Unhandled promise rejection:', event.reason);
     toast.error('Ein unerwartetes Problem ist aufgetreten.');
   });

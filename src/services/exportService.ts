@@ -13,8 +13,8 @@ export interface ExportResult {
 }
 
 export async function exportToCSV(
-  documents: DocumentRecord[],
-  settings?: AppSettings
+  _documents: DocumentRecord[],
+  _settings?: AppSettings
 ): Promise<ExportResult> {
   // Placeholder implementation
   return {
@@ -25,8 +25,8 @@ export async function exportToCSV(
 }
 
 export async function exportToSQL(
-  documents: DocumentRecord[],
-  settings?: AppSettings
+  _documents: DocumentRecord[],
+  _settings?: AppSettings
 ): Promise<ExportResult> {
   // Placeholder implementation
   return {
@@ -37,8 +37,8 @@ export async function exportToSQL(
 }
 
 export async function exportToPDF(
-  documents: DocumentRecord[],
-  settings?: AppSettings
+  _documents: DocumentRecord[],
+  _settings?: AppSettings
 ): Promise<ExportResult> {
   // Placeholder implementation
   return {

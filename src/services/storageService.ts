@@ -5,8 +5,8 @@
 
 import {
   belegeService,
-  steuerkategorienService,
-  kontierungskontenService,
+  // steuerkategorienService, // Unused - kept for future use
+  // kontierungskontenService, // Unused - kept for future use
   lieferantenRegelnService,
   einstellungenService
 } from './belegeService';

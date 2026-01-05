@@ -42,7 +42,9 @@ export function loadEnvConfig(): EnvConfig {
 
   // Log errors if any
   if (errors.length > 0) {
+    // eslint-disable-next-line no-console
     console.error('❌ Missing environment variables:');
+    // eslint-disable-next-line no-console
     errors.forEach(err => console.error(`   - ${err}`));
 
     // Don't throw in development
@@ -137,12 +139,19 @@ export function logConfigSummary(): void {
   const config = loadEnvConfig();
   const env = getEnvironmentConfig();
 
+  // eslint-disable-next-line no-console
   console.log('📋 Configuration Summary:');
+  // eslint-disable-next-line no-console
   console.log('  Environment:', env.environment);
+  // eslint-disable-next-line no-console
   console.log('  API URL:', env.apiUrl);
+  // eslint-disable-next-line no-console
   console.log('  Debug Mode:', env.debug);
+  // eslint-disable-next-line no-console
   console.log('  OCR Timeout:', env.ocrTimeout, 'ms');
+  // eslint-disable-next-line no-console
   console.log('  Max File Size:', (env.maxFileSize / (1024 * 1024)), 'MB');
+  // eslint-disable-next-line no-console
   console.log('  Features:', {
     duplicateDetection: isFeatureEnabled('advanced-duplicate-detection'),
     mlVendorMapping: isFeatureEnabled('ml-vendor-mapping'),
@@ -151,8 +160,11 @@ export function logConfigSummary(): void {
   });
 
   // Mask sensitive keys
+  // eslint-disable-next-line no-console
   console.log('  Supabase URL:', config.supabaseUrl ? '✅' : '❌');
+  // eslint-disable-next-line no-console
   console.log('  Gemini API Key:', config.geminiApiKey ? '✅ (masked)' : '❌');
+  // eslint-disable-next-line no-console
   console.log('  SiliconFlow Key:', config.siliconFlowApiKey ? '✅ (masked)' : '⚠️ (optional)');
 }
 

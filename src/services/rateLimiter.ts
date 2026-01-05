@@ -25,6 +25,7 @@ class RateLimiter {
     const valid = timestamps.filter(t => now - t < this.window);
 
     if (valid.length >= this.limit) {
+      // eslint-disable-next-line no-console
       console.warn(`⚠️ Rate limit exceeded for key: ${key}`);
       return false;
     }
@@ -46,6 +47,7 @@ class RateLimiter {
 
     if (oldest && now - oldest < this.window && timestamps.length >= this.limit) {
       const waitTime = this.window - (now - oldest);
+      // eslint-disable-next-line no-console
       console.log(`⏳ Waiting ${waitTime}ms for rate limit on ${key}`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
       // Clean up old entries
@@ -87,7 +89,7 @@ class RateLimiter {
   /**
    * Set custom limits for specific keys
    */
-  setCustomLimit(key: string, limit: number, windowMs: number): void {
+  setCustomLimit(_key: string, _limit: number, _windowMs: number): void {
     // Store in metadata map if needed
     // For simplicity, we keep single config but allow override via instance
   }

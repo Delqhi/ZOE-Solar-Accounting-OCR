@@ -1,4 +1,4 @@
-import { supabase, Beleg, BelegPosition, Steuerkategorie, Kontierungskonto, LieferantenRegel, Einstellung } from './supabaseClient';
+import { supabase, Beleg, Steuerkategorie, Kontierungskonto, LieferantenRegel, Einstellung } from './supabaseClient';
 import { ExtractedData, DocumentStatus } from '../types';
 
 // Convert extracted data to database format
@@ -50,8 +50,8 @@ function belegToDb(data: ExtractedData, fileInfo: {
   };
 }
 
-// Convert database format to extracted data
-function dbToBeleg(beleg: Beleg): Partial<ExtractedData> {
+// Convert database format to extracted data (exported for testing)
+export function dbToBeleg(beleg: Beleg): Partial<ExtractedData> {
   return {
     documentType: beleg.document_type || undefined,
     belegDatum: beleg.beleg_datum || '',
@@ -125,6 +125,7 @@ export const belegeService = {
     const { data, error, count } = await query;
 
     if (error) {
+      // eslint-disable-next-line no-console
       console.error('Error fetching belege:', error);
       throw error;
     }
@@ -144,6 +145,7 @@ export const belegeService = {
       if (error.code === 'PGRST116') {
         return null; // Not found
       }
+      // eslint-disable-next-line no-console
       console.error('Error fetching beleg:', error);
       throw error;
     }
@@ -168,6 +170,7 @@ export const belegeService = {
       .single();
 
     if (error) {
+      // eslint-disable-next-line no-console
       console.error('Error creating beleg:', error);
       throw error;
     }
@@ -222,6 +225,7 @@ export const belegeService = {
       .single();
 
     if (error) {
+      // eslint-disable-next-line no-console
       console.error('Error updating beleg:', error);
       throw error;
     }
@@ -253,6 +257,7 @@ export const belegeService = {
       .single();
 
     if (updateError) {
+      // eslint-disable-next-line no-console
       console.error('Error updating beleg status:', updateError);
       throw updateError;
     }
@@ -268,6 +273,7 @@ export const belegeService = {
       .eq('id', id);
 
     if (error) {
+      // eslint-disable-next-line no-console
       console.error('Error deleting beleg:', error);
       throw error;
     }
@@ -287,6 +293,7 @@ export const belegeService = {
       if (error.code === 'PGRST116') {
         return null;
       }
+      // eslint-disable-next-line no-console
       console.error('Error checking for duplicate:', error);
       throw error;
     }
@@ -307,6 +314,7 @@ export const belegeService = {
       .limit(5);
 
     if (error) {
+      // eslint-disable-next-line no-console
       console.error('Error checking for semantic duplicates:', error);
       throw error;
     }
@@ -333,6 +341,7 @@ export const belegeService = {
       .insert(positionData);
 
     if (error) {
+      // eslint-disable-next-line no-console
       console.error('Error creating positionen:', error);
       throw error;
     }
@@ -346,6 +355,7 @@ export const belegeService = {
       .eq('beleg_id', belegId);
 
     if (error) {
+      // eslint-disable-next-line no-console
       console.error('Error deleting positionen:', error);
       throw error;
     }
@@ -373,6 +383,7 @@ export const belegeService = {
       .select('status, brutto_betrag');
 
     if (error) {
+      // eslint-disable-next-line no-console
       console.error('Error fetching stats:', error);
       throw error;
     }
@@ -405,6 +416,7 @@ export const steuerkategorienService = {
       .order('label');
 
     if (error) {
+      // eslint-disable-next-line no-console
       console.error('Error fetching steuerkategorien:', error);
       throw error;
     }
@@ -420,6 +432,7 @@ export const steuerkategorienService = {
       .single();
 
     if (error) {
+      // eslint-disable-next-line no-console
       console.error('Error creating steuerkategorie:', error);
       throw error;
     }
@@ -443,6 +456,7 @@ export const steuerkategorienService = {
         .upsert(cat, { onConflict: 'wert' });
 
       if (error) {
+        // eslint-disable-next-line no-console
         console.error('Error seeding steuerkategorie:', error);
       }
     }
@@ -459,6 +473,7 @@ export const kontierungskontenService = {
       .order('konto_nr');
 
     if (error) {
+      // eslint-disable-next-line no-console
       console.error('Error fetching kontierungskonten:', error);
       throw error;
     }
@@ -474,6 +489,7 @@ export const kontierungskontenService = {
       .single();
 
     if (error) {
+      // eslint-disable-next-line no-console
       console.error('Error creating kontierungskonto:', error);
       throw error;
     }
@@ -509,6 +525,7 @@ export const kontierungskontenService = {
         .upsert(konto, { onConflict: 'konto_nr' });
 
       if (error) {
+        // eslint-disable-next-line no-console
         console.error('Error seeding kontierungskonto:', error);
       }
     }
@@ -525,6 +542,7 @@ export const lieferantenRegelnService = {
       .order('prioritaet', { ascending: true });
 
     if (error) {
+      // eslint-disable-next-line no-console
       console.error('Error fetching lieferanten_regeln:', error);
       throw error;
     }
@@ -540,6 +558,7 @@ export const lieferantenRegelnService = {
       .single();
 
     if (error) {
+      // eslint-disable-next-line no-console
       console.error('Error creating lieferanten_regel:', error);
       throw error;
     }
@@ -561,6 +580,7 @@ export const lieferantenRegelnService = {
       if (error.code === 'PGRST116') {
         return null;
       }
+      // eslint-disable-next-line no-console
       console.error('Error finding matching regel:', error);
       throw error;
     }
@@ -582,6 +602,7 @@ export const einstellungenService = {
       if (error.code === 'PGRST116') {
         return null;
       }
+      // eslint-disable-next-line no-console
       console.error('Error fetching einstellung:', error);
       throw error;
     }
@@ -597,6 +618,7 @@ export const einstellungenService = {
       .single();
 
     if (error) {
+      // eslint-disable-next-line no-console
       console.error('Error setting einstellung:', error);
       throw error;
     }
@@ -611,6 +633,7 @@ export const einstellungenService = {
       .order('schluessel');
 
     if (error) {
+      // eslint-disable-next-line no-console
       console.error('Error fetching all einstellungen:', error);
       throw error;
     }
