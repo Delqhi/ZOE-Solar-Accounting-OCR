@@ -7,4 +7,6 @@ echo "🚀 Running pre-push checks..."
 npm run lint
 npm run typecheck
 
+# Skip tests - no test files exist yet
+
 echo "✅ Pre-push checks passed!"
