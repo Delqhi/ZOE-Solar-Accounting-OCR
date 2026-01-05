@@ -178,14 +178,14 @@ jobs:
           name: build-output
           path: dist/
 
-      - name: Deploy to Vercel/Netlify
-        run: |
-          # Add your deployment command here
-          # Example for Vercel:
-          # npm i -g vercel
-          # vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
-          echo "🚀 Deploying to production..."
-          echo "✅ Deploy complete!"
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: ./
 
       - name: Notify deployment success
         if: success()

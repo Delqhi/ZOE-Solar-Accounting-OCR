@@ -1,9 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "name": "zurich",
+  "name": "zoe-solar-accounting-ocr",
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "devCommand": "npm run dev",
-  "installCommand": "npm install"
+  "installCommand": "npm ci",
+  "build": {
+    "env": {
+      "VITE_APP_VERSION": "1.0.0"
+    }
+  }
 }
