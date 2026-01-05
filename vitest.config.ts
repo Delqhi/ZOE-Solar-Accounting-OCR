@@ -4,15 +4,15 @@ import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, './'),
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
     include: ['**/*.test.{ts,tsx}'],
-    resolve: {
-      alias: {
-        '@': resolve(__dirname, './'),
-      },
-    },
   },
 });

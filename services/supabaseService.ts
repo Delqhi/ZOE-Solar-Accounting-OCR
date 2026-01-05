@@ -134,7 +134,7 @@ export const onAuthStateChange = (callback: (user: User | null) => void): (() =>
     return () => {};
   }
 
-  return client.auth.onAuthStateChange((event, session) => {
+  const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
     if (session?.user) {
       callback({
         id: session.user.id,
@@ -145,6 +145,8 @@ export const onAuthStateChange = (callback: (user: User | null) => void): (() =>
       callback(null);
     }
   });
+
+  return () => subscription.unsubscribe();
 };
 
 // --- Document Operations ---
@@ -295,7 +297,7 @@ const DEFAULT_ELSTER_STAMMDATEN = {
   finanzamtName: '',
   finanzamtNr: '',
   rechtsform: undefined,
-  besteuerungUst: 'unbekannt',
+  besteuerungUst: 'unbekannt' as const,
   kleinunternehmer: false,
   iban: '',
   kontaktEmail: '',
@@ -470,8 +472,12 @@ function transformSupabaseToDocument(doc: SupabaseDocument): DocumentRecord {
       lieferantAdresse: doc.lieferant_adresse || '',
       belegDatum: doc.beleg_datum || '',
       bruttoBetrag: doc.brutto_betrag || 0,
-      mwstBetrag: doc.mwst_betrag || 0,
+      mwstBetrag19: doc.mwst_betrag && doc.mwst_satz === 19 ? doc.mwst_betrag : 0,
+      mwstBetrag7: doc.mwst_betrag && doc.mwst_satz === 7 ? doc.mwst_betrag : 0,
+      mwstBetrag0: 0,
       mwstSatz19: doc.mwst_satz || 0,
+      mwstSatz7: doc.mwst_satz === 7 ? 7 : 0,
+      mwstSatz0: 0,
       steuerkategorie: doc.steuerkategorie || '',
       kontierungskonto: doc.skr03_konto || '',
       lineItems: parsedLineItems || [],
@@ -491,10 +497,6 @@ function transformSupabaseToDocument(doc: SupabaseDocument): DocumentRecord {
       belegNummerLieferant: '',
       steuernummer: '',
       nettoBetrag: 0,
-      mwstSatz0: 0,
-      mwstBetrag0: 0,
-      mwstSatz7: 0,
-      mwstBetrag7: 0,
       zahlungsmethode: '',
       eigeneBelegNummer: '',
       zahlungsDatum: '',
@@ -531,8 +533,8 @@ function transformDocumentToSupabase(doc: DocumentRecord): SupabaseDocument {
     lieferant_adresse: data?.lieferantAdresse || null,
     beleg_datum: data?.belegDatum || null,
     brutto_betrag: data?.bruttoBetrag || null,
-    mwst_betrag: data?.mwstBetrag || null,
-    mwst_satz: data?.mwstSatz19 || null,
+    mwst_betrag: (data?.mwstBetrag19 || 0) + (data?.mwstBetrag7 || 0) + (data?.mwstBetrag0 || 0) || null,
+    mwst_satz: data?.mwstSatz19 || data?.mwstSatz7 || data?.mwstSatz0 || null,
     steuerkategorie: data?.steuerkategorie || null,
     skr03_konto: data?.konto_skr03 || null,
     line_items: data?.lineItems || null,

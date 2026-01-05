@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react';
-import { DocumentRecord, ExtractedData, Attachment } from '../types';
+import { DocumentRecord, ExtractedData, Attachment, DocumentStatus, AppSettings } from '../types';
 import { analyzeDocumentWithGemini } from '../services/geminiService';
 import { applyAccountingRules, generateZoeInvoiceId } from '../services/ruleEngine';
 import { normalizeExtractedData } from '../services/extractedDataNormalization';
 import { detectPrivateDocument } from '../services/privateDocumentDetection';
+import { getAllDocuments, getSettings } from '../services/storageService';
 import { v4 as uuidv4 } from 'uuid';
 
 interface UseUploadReturn {
@@ -11,12 +12,6 @@ interface UseUploadReturn {
   progress: string | null;
   uploadFile: (file: File) => Promise<DocumentRecord | null>;
 }
-
-const computeFileHash = async (file: File): Promise<string> => {
-  const buffer = await file.arrayBuffer();
-  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-};
 
 const readFileToBase64 = (file: File): Promise<{ base64: string; url: string }> => {
   return new Promise((resolve, reject) => {
@@ -47,33 +42,42 @@ export const useUpload = (): UseUploadReturn => {
       const extractedData = await analyzeDocumentWithGemini(base64, file.type);
       setProgress('Buchungsregeln werden angewendet...');
 
-      // Step 3: Apply accounting rules
-      const enrichedData = applyAccountingRules(extractedData);
+      // Step 3: Normalize extracted data to ensure full ExtractedData type
+      const normalizedData = normalizeExtractedData(extractedData);
 
-      // Step 4: Generate ZOE invoice ID
-      const zoeId = generateZoeInvoiceId();
+      // Get existing documents and settings for rule application
+      const [existingDocs, settings] = await Promise.all([
+        getAllDocuments(),
+        getSettings()
+      ]);
 
-      // Step 5: Check for private documents
-      const isPrivate = detectPrivateDocument(enrichedData);
+      // Step 4: Apply accounting rules
+      const enrichedData = applyAccountingRules(
+        normalizedData,
+        existingDocs,
+        settings || getDefaultSettings()
+      );
 
-      // Step 6: Create document record
+      // Step 5: Generate ZOE invoice ID
+      const zoeId = generateZoeInvoiceId(enrichedData.belegDatum, existingDocs);
+
+      // Step 6: Check for private documents
+      const privateCheck = detectPrivateDocument(enrichedData);
+
+      // Step 7: Create document record
       const doc: DocumentRecord = {
         id: uuidv4(),
         fileName: file.name,
         fileType: file.type,
         uploadDate: new Date().toISOString(),
-        status: isPrivate ? 'PRIVATE' : 'REVIEW_NEEDED',
+        status: privateCheck.isPrivate ? DocumentStatus.PRIVATE : DocumentStatus.REVIEW_NEEDED,
         duplicateOfId: undefined,
         duplicateReason: undefined,
         previewUrl: url,
         data: {
-          ...normalizeExtractedData(enrichedData),
-          eigeneBelegNummer: zoeId,
-          ocr_score: extractedData.ocr_score ?? 0,
-          ocr_rationale: extractedData.ocr_rationale
-        },
-        isPrivate,
-        privateReason: isPrivate ? enrichedData.ocr_rationale : undefined
+          ...enrichedData,
+          eigeneBelegNummer: zoeId
+        }
       };
 
       setProgress(null);
@@ -94,3 +98,46 @@ export const useUpload = (): UseUploadReturn => {
     uploadFile
   };
 };
+
+// Helper to get default settings
+const getDefaultSettings = (): AppSettings => ({
+  id: 'global',
+  taxDefinitions: [],
+  accountDefinitions: [],
+  datevConfig: {
+    beraterNr: '',
+    mandantNr: '',
+    wirtschaftsjahrBeginn: '',
+    sachkontenlaenge: 4,
+    waehrung: 'EUR',
+    herkunftKz: 'RE',
+    diktatkuerzel: '',
+    stapelBezeichnung: 'Buchungsstapel',
+    taxCategoryToBuKey: {}
+  },
+  elsterStammdaten: {
+    unternehmensName: '',
+    land: 'DE',
+    plz: '',
+    ort: '',
+    strasse: '',
+    hausnummer: '',
+    eigeneSteuernummer: '',
+    eigeneUstIdNr: '',
+    finanzamtName: '',
+    finanzamtNr: '',
+    rechtsform: undefined,
+    besteuerungUst: 'unbekannt',
+    kleinunternehmer: false,
+    iban: '',
+    kontaktEmail: ''
+  },
+  accountGroups: [],
+  ocrConfig: {
+    scores: {},
+    required_fields: [],
+    field_weights: {},
+    regex_patterns: {},
+    validation_rules: { sum_check: true, date_check: true, min_confidence: 0.8 }
+  }
+});

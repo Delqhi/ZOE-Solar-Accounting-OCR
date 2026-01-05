@@ -77,17 +77,17 @@ export async function generatePDFReport(
   });
 
   // Add summary if requested
-  if (options?.includeSummary !== false && doc.lastAutoTable) {
-    const finalY = doc.lastAutoTable.finalY + 10;
+  if (options?.includeSummary !== false && (doc as any).lastAutoTable) {
+    const finalY = (doc as any).lastAutoTable.finalY || 100;
     const totals = calculateTotals(documents);
 
     doc.setFontSize(11);
     doc.setTextColor(0);
-    doc.text('ZUSAMMENFASSUNG', 14, finalY);
+    doc.text('ZUSAMMENFASSUNG', 14, finalY + 10);
     doc.setFontSize(9);
-    doc.text(`Gesamt Brutto: ${formatCurrency(totals.brutto)}`, 14, finalY + 6);
-    doc.text(`Gesamt Netto: ${formatCurrency(totals.netto)}`, 14, finalY + 11);
-    doc.text(`Gesamt MwSt: ${formatCurrency(totals.tax)}`, 14, finalY + 16);
+    doc.text(`Gesamt Brutto: ${formatCurrency(totals.brutto)}`, 14, finalY + 16);
+    doc.text(`Gesamt Netto: ${formatCurrency(totals.netto)}`, 14, finalY + 21);
+    doc.text(`Gesamt MwSt: ${formatCurrency(totals.tax)}`, 14, finalY + 26);
   }
 
   // Trigger download

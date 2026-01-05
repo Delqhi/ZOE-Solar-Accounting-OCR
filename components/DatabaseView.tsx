@@ -26,6 +26,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   onBulkDelete,
   onBulkMarkReviewed,
   onBulkOCR,
+  onMerge,
   onCompareDuplicates
 }) => {
   const [dragTargetId, setDragTargetId] = useState<string | null>(null);
