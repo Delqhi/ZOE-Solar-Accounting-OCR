@@ -3,6 +3,8 @@
  * Error tracking and performance monitoring
  */
 
+import React from 'react';
+
 interface ErrorInfo {
   message: string;
   stack?: string;
@@ -137,10 +139,10 @@ class MonitoringService {
       // });
 
       if (import.meta.env.DEV) {
-        console.log('[Monitoring] Would send error to external service:', errorInfo);
+        // Would send error to external service
       }
     } catch (error) {
-      console.warn('Failed to send to monitoring service:', error);
+      // Silent fail
     }
   }
 

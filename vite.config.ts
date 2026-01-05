@@ -11,9 +11,7 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.SILICONFLOW_API_KEY': JSON.stringify(env.SILICONFLOW_API_KEY),
+        // Only expose non-sensitive build info
         'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.npm_package_version || '1.0.0'),
         'import.meta.env.VITE_BUILD_TIME': JSON.stringify(new Date().toISOString()),
       },
@@ -23,12 +21,11 @@ export default defineConfig(({ mode }) => {
         }
       },
       build: {
-        sourcemap: true,
+        sourcemap: mode !== 'production', // Disable source maps in production for security
         rollupOptions: {
           output: {
             manualChunks: {
               vendor: ['react', 'react-dom'],
-              ui: ['react-hot-toast'],
             }
           }
         }
