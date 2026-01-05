@@ -4,30 +4,32 @@
  */
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import { DocumentRecord, AppSettings, AppContextType, AppState } from '../types';
-import { supabaseService } from '../services/supabaseService';
+import { getAllDocuments, saveDocument, deleteDocument, saveSettings, getSettings } from '../services/storageService';
 import { toast } from 'react-hot-toast';
 
 // Initial State
 const initialSettings: AppSettings = {
-  theme: 'light',
-  exportFormat: 'ELSTER',
-  defaultTaxRate: 19,
-  ocrConfig: {
-    provider: 'gemini',
-    timeout: 60000,
-    required_fields: ['belegDatum', 'lieferantName', 'bruttoBetrag'],
-  },
-  accountDefinitions: [
-    { id: '3400', name: 'Wareneingang', steuerkategorien: ['19', '7', '0'] },
-    { id: '4400', name: 'Energie', steuerkategorien: ['19'] },
-    { id: '4930', name: 'Büromaterial', steuerkategorien: ['19', '0'] },
-    { id: '4964', name: 'Software', steuerkategorien: ['19'] },
-  ],
+  id: 'default',
   taxDefinitions: [
-    { value: '19', label: '19% USt', type: 'regular' },
-    { value: '7', label: '7% USt (erm.', type: 'reduced' },
-    { value: '0', label: '0% Steuer', type: 'exempt' },
+    { value: '19', label: '19% USt', ust_satz: 0.19, vorsteuer: true, reverse_charge: false },
+    { value: '7', label: '7% USt (erm.', ust_satz: 0.07, vorsteuer: true, reverse_charge: false },
+    { value: '0', label: '0% Steuer', ust_satz: 0, vorsteuer: true, reverse_charge: false },
   ],
+  accountDefinitions: [
+    { id: '3400', name: 'Wareneingang', skr03: '3400', steuerkategorien: ['19', '7', '0'] },
+    { id: '4400', name: 'Energie', skr03: '4400', steuerkategorien: ['19'] },
+    { id: '4930', name: 'Büromaterial', skr03: '4930', steuerkategorien: ['19', '0'] },
+    { id: '4964', name: 'Software', skr03: '4964', steuerkategorien: ['19'] },
+  ],
+  // Legacy
+  accountGroups: [],
+  ocrConfig: {
+    scores: {},
+    required_fields: ['belegDatum', 'lieferantName', 'bruttoBetrag'],
+    field_weights: {},
+    regex_patterns: {},
+    validation_rules: { sum_check: true, date_check: true, min_confidence: 0.7 },
+  },
 };
 
 const initialState: AppState = {
@@ -131,11 +133,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dispatch({ type: 'SET_LOADING', payload: true });
 
       // Load from Supabase
-      const docs = await supabaseService.getDocuments();
+      const docs = await getAllDocuments();
       dispatch({ type: 'SET_DOCUMENTS', payload: docs });
 
       // Load settings
-      const settings = await supabaseService.getSettings();
+      const settings = await getSettings();
       if (settings) {
         dispatch({ type: 'SET_SETTINGS', payload: settings });
       }
@@ -154,8 +156,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addDocument = useCallback(async (doc: DocumentRecord) => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
-      const saved = await supabaseService.saveDocument(doc);
-      dispatch({ type: 'ADD_DOCUMENT', payload: saved });
+      const saved = await saveDocument(doc);
+      dispatch({ type: 'ADD_DOCUMENT', payload: saved as any });
       toast.success('Dokument gespeichert');
     } catch (error: any) {
       console.error('Add error:', error);
@@ -167,8 +169,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateDocument = useCallback(async (doc: DocumentRecord) => {
     try {
-      const saved = await supabaseService.saveDocument(doc);
-      dispatch({ type: 'UPDATE_DOCUMENT', payload: saved });
+      const saved = await saveDocument(doc);
+      dispatch({ type: 'UPDATE_DOCUMENT', payload: saved as any });
       toast.success('Aktualisiert');
     } catch (error: any) {
       console.error('Update error:', error);
@@ -176,9 +178,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
-  const deleteDocument = useCallback(async (id: string) => {
+  const removeDocument = useCallback(async (id: string) => {
     try {
-      await supabaseService.deleteDocument(id);
+      await deleteDocument(id);
       dispatch({ type: 'DELETE_DOCUMENT', payload: id });
     } catch (error: any) {
       console.error('Delete error:', error);
@@ -189,7 +191,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateSettings = useCallback(async (updates: Partial<AppSettings>) => {
     try {
       const newSettings = { ...state.settings, ...updates };
-      await supabaseService.saveSettings(newSettings);
+      await saveSettings(newSettings);
       dispatch({ type: 'UPDATE_SETTINGS', payload: updates });
       toast.success('Einstellungen gespeichert');
     } catch (error: any) {
@@ -238,21 +240,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const updatedTarget = { ...target, data: mergedData };
       await updateDocument(updatedTarget);
-      await deleteDocument(sourceId);
+      await removeDocument(sourceId);
 
       toast.success('Dokumente erfolgreich verbunden');
     } catch (error: any) {
       console.error('Merge error:', error);
       toast.error('Verbinden fehlgeschlagen');
     }
-  }, [state.documents, updateDocument, deleteDocument]);
+  }, [state.documents, updateDocument, removeDocument]);
 
   // Value
   const value: AppContextType = {
     state,
     addDocument,
     updateDocument,
-    deleteDocument,
+    deleteDocument: removeDocument,
     updateSettings,
     selectDocument,
     updateFilters,

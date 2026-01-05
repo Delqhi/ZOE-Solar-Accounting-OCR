@@ -31,7 +31,7 @@ export interface Beleg {
   dateigroesse: number | null;
   file_hash: string | null;
   gitlab_storage_url: string | null;
-  status: 'PROCESSING' | 'REVIEW_NEEDED' | 'COMPLETED' | 'ERROR' | 'DUPLICATE';
+  status: 'PROCESSING' | 'REVIEW_NEEDED' | 'COMPLETED' | 'ERROR' | 'DUPLICATE' | 'PRIVATE';
   fehler: string | null;
   ocr_score: number | null;
   ocr_rationale: string | null;
@@ -70,6 +70,12 @@ export interface Beleg {
   uploaded_at: string;
   processed_at: string | null;
   updated_at: string | null;
+  // Additional fields for compatibility
+  kontogruppe?: string | null;
+  konto_skr03?: string | null;
+  ust_typ?: string | null;
+  steuerKategorie?: string | null;
+  beschreibung?: string | null;
   // Line items (joined)
   positionen?: BelegPosition[];
 }
@@ -110,6 +116,9 @@ export interface LieferantenRegel {
   lieferant_name_pattern: string;
   standard_konto: string | null;
   standard_steuerkategorie: string | null;
+  // Alternative field names used in code
+  kontierungskonto?: string;
+  steuerkategorie?: string;
   prioritaet: number;
   aktiv: boolean;
   created_at: string;

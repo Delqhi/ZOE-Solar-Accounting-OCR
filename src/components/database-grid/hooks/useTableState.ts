@@ -5,7 +5,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { DocumentRecord } from '../../../types';
 
-interface FilterState {
+export interface FilterState {
   year: string;
   quarter: string;
   month: string;
@@ -14,11 +14,13 @@ interface FilterState {
   dateRange: { start: string; end: string };
 }
 
+export type SortableField = keyof DocumentRecord | 'lieferantName' | 'amountBrutto';
+
 interface TableState {
   currentPage: number;
   itemsPerPage: number;
   selectedIds: Set<string>;
-  sortField: keyof DocumentRecord;
+  sortField: SortableField;
   sortDirection: 'asc' | 'desc';
   filters: FilterState;
 }
@@ -102,13 +104,19 @@ export function useTableState(documents: DocumentRecord[]) {
     const { sortField, sortDirection } = state;
 
     sorted.sort((a, b) => {
-      let aVal = a[sortField];
-      let bVal = b[sortField];
+      let aVal: any;
+      let bVal: any;
 
       // Handle nested fields
-      if (sortField === 'lieferantName' && a.data && b.data) {
-        aVal = a.data.lieferantName || '';
-        bVal = b.data.lieferantName || '';
+      if (sortField === 'lieferantName') {
+        aVal = a.data?.lieferantName || '';
+        bVal = b.data?.lieferantName || '';
+      } else if (sortField === 'amountBrutto') {
+        aVal = a.data?.bruttoBetrag || 0;
+        bVal = b.data?.bruttoBetrag || 0;
+      } else {
+        aVal = a[sortField as keyof DocumentRecord];
+        bVal = b[sortField as keyof DocumentRecord];
       }
 
       if (typeof aVal === 'string') {
@@ -189,7 +197,7 @@ export function useTableState(documents: DocumentRecord[]) {
     }));
   }, []);
 
-  const sortBy = useCallback((field: keyof DocumentRecord) => {
+  const sortBy = useCallback((field: SortableField) => {
     setState(prev => {
       if (prev.sortField === field) {
         return {

@@ -145,13 +145,13 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
                     />
                   </th>
                   <th className="p-2 text-xs font-semibold text-gray-600">ZOE-ID</th>
-                  <th className="p-2 text-xs font-semibold text-gray-600 cursor-pointer" onClick={() => table.sortBy('uploadDate')}>
+                  <th className="p-2 text-xs font-semibold text-gray-600 cursor-pointer" onClick={() => table.sortBy('uploadDate' as any)}>
                     Datum {table.sortField === 'uploadDate' ? (table.sortDirection === 'asc' ? '↑' : '↓') : ''}
                   </th>
-                  <th className="p-2 text-xs font-semibold text-gray-600 cursor-pointer" onClick={() => table.sortBy('lieferantName')}>
+                  <th className="p-2 text-xs font-semibold text-gray-600 cursor-pointer" onClick={() => table.sortBy('lieferantName' as any)}>
                     Lieferant {table.sortField === 'lieferantName' ? (table.sortDirection === 'asc' ? '↑' : '↓') : ''}
                   </th>
-                  <th className="p-2 text-xs font-semibold text-gray-600 cursor-pointer" onClick={() => table.sortBy('amountBrutto')}>
+                  <th className="p-2 text-xs font-semibold text-gray-600 cursor-pointer" onClick={() => table.sortBy('amountBrutto' as any)}>
                     Betrag {table.sortField === 'amountBrutto' ? (table.sortDirection === 'asc' ? '↑' : '↓') : ''}
                   </th>
                   <th className="p-2 text-xs font-semibold text-gray-600">Konto</th>

@@ -110,6 +110,22 @@ export function truncate(str: string, maxLength: number): string {
   return str.substring(0, maxLength - 3) + '...';
 }
 
+// ==================== Missing Exports for Compatibility ====================
+
+export function isPresent(value: any): boolean {
+  return value !== null && value !== undefined && value !== '';
+}
+
+export function getErrorNextSteps(errorType: string): string[] {
+  const steps = {
+    'api_key': ['Check environment variables', 'Verify API key is valid', 'Regenerate API key if needed'],
+    'network': ['Check internet connection', 'Verify firewall settings', 'Try again in a moment'],
+    'validation': ['Review input data', 'Check required fields', 'Verify data formats'],
+    'default': ['Try again', 'Contact support if issue persists', 'Check logs for details']
+  };
+  return steps[errorType as keyof typeof steps] || steps.default;
+}
+
 // ==================== Complex Object Validation ====================
 
 export interface ValidationResult {
@@ -126,7 +142,7 @@ export function validateDocumentData(data: any): ValidationResult {
   };
 
   // Required fields
-  const required = ['vendor', 'amountNetto', 'amountBrutto', 'date', 'account'];
+  const required = ['lieferantName', 'nettoBetrag', 'bruttoBetrag', 'belegDatum', 'kontierungskonto'];
   for (const field of required) {
     if (!data[field]) {
       result.isValid = false;
@@ -135,19 +151,19 @@ export function validateDocumentData(data: any): ValidationResult {
   }
 
   // Type checks
-  if (data.amountNetto && !validateAmount(data.amountNetto)) {
+  if (data.nettoBetrag && !validateAmount(data.nettoBetrag)) {
     result.isValid = false;
     result.errors.push('Ungültiger Nettobetrag');
   }
 
-  if (data.account && !validateSKR03Account(data.account)) {
+  if (data.kontierungskonto && !validateSKR03Account(data.kontierungskonto)) {
     result.isValid = false;
     result.errors.push('Ungültiges SKR03 Konto');
   }
 
   // Sum check
-  if (data.amountNetto && data.amountMwSt && data.amountBrutto) {
-    if (!validateSumCheck(data.amountNetto, data.amountMwSt, data.amountBrutto)) {
+  if (data.nettoBetrag && data.mwstBetrag19 && data.bruttoBetrag) {
+    if (!validateSumCheck(data.nettoBetrag, data.mwstBetrag19, data.bruttoBetrag)) {
       result.warnings.push('Summenprüfung fehlgeschlagen (Netto + MwSt ≠ Brutto)');
     }
   }
@@ -171,7 +187,7 @@ export function validateExportData(documents: any[], format: string): Validation
 
   // ELSTER specific
   if (format === 'ELSTER') {
-    if (documents.some(d => !d.taxRate || d.taxRate === 0)) {
+    if (documents.some(d => !d.data?.steuerkategorie || d.data.steuerkategorie === '0')) {
       result.warnings.push('Einige Dokumente haben 0% Steuer - prüfen Sie Berechtigung');
     }
   }
@@ -179,7 +195,7 @@ export function validateExportData(documents: any[], format: string): Validation
   // DATEV specific
   if (format === 'DATEV') {
     documents.forEach((doc, index) => {
-      if (!doc.account || !validateSKR03Account(doc.account)) {
+      if (!doc.data?.kontierungskonto || !validateSKR03Account(doc.data?.kontierungskonto)) {
         result.errors.push(`Dokument ${index + 1}: Fehlendes/ungültiges Konto`);
       }
     });
@@ -240,7 +256,7 @@ export function validateOCRResponse(response: any): ValidationResult {
   }
 
   // Check required OCR fields
-  const required = ['vendor', 'amountNetto', 'amountBrutto', 'date'];
+  const required = ['lieferantName', 'nettoBetrag', 'bruttoBetrag', 'belegDatum'];
   for (const field of required) {
     if (!response[field]) {
       result.warnings.push(`Feld "${field}" fehlt in OCR-Ergebnis`);

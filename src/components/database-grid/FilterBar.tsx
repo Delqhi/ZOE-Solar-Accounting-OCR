@@ -1,8 +1,9 @@
 import React from 'react';
+import { FilterState } from './hooks/useTableState';
 
 interface FilterBarProps {
-  filters: any;
-  onFilterChange: (filters: any) => void;
+  filters: FilterState;
+  onFilterChange: (filters: Partial<FilterState>) => void;
   onReset: () => void;
   selectionCount: number;
   onSelectAll: () => void;
