@@ -1,0 +1,236 @@
+{
+  "version": "2026.1",
+  "name": "ZOE Solar Accounting OCR - Claude CLI Configuration",
+  "description": "Ultimate agent delegation with MCP integration for 100% error-free code",
+
+  "agents": {
+    "delegation_strategy": "always_maximize",
+    "priority_order": ["serena", "tavily", "canva", "manual"],
+    "ralph_loop": {
+      "enabled": true,
+      "max_iterations": 10,
+      "triggers": [
+        "fix all errors",
+        "100% working",
+        "mach alle error weg",
+        "alles soll funktinoieren",
+        "committe und deploye"
+      ],
+      "validation_required": true
+    }
+  },
+
+  "mcp_servers": {
+    "serena": {
+      "enabled": true,
+      "priority": "critical",
+      "purpose": "Code analysis, editing, refactoring",
+      "activation": "immediate",
+      "tools": [
+        "find_symbol",
+        "replace_symbol_body",
+        "insert_after_symbol",
+        "rename_symbol",
+        "find_referencing_symbols",
+        "search_for_pattern",
+        "read_file",
+        "edit_file",
+        "list_dir",
+        "find_file"
+      ],
+      "when_to_use": [
+        "Any file modification needed",
+        "Code analysis required",
+        "Symbol navigation",
+        "Refactoring tasks",
+        "Finding code references",
+        "Reading and editing files"
+      ]
+    },
+
+    "tavily": {
+      "enabled": true,
+      "priority": "high",
+      "purpose": "Real-time web research and documentation",
+      "activation": "when_research_needed",
+      "tools": [
+        "search",
+        "research",
+        "get_context"
+      ],
+      "when_to_use": [
+        "Researching current best practices",
+        "Finding latest documentation",
+        "2026 trends and updates",
+        "Comparing solutions",
+        "Real-time information beyond knowledge cutoff"
+      ]
+    },
+
+    "canva": {
+      "enabled": true,
+      "priority": "medium",
+      "purpose": "Visual design, diagrams, mockups",
+      "activation": "when_visual_output_needed",
+      "tools": [
+        "create_design",
+        "add_elements",
+        "export_design",
+        "generate_diagram"
+      ],
+      "when_to_use": [
+        "Creating architecture diagrams",
+        "Visual workflow documentation",
+        "Presentation slides",
+        "Flowcharts",
+        "Mockups and wireframes"
+      ]
+    }
+  },
+
+  "workflow": {
+    "diagnostic_commands": [
+      "npm run build",
+      "npx tsc --noEmit",
+      "npm run lint",
+      "node .claude/commands/console-check.js"
+    ],
+
+    "validation_commands": [
+      "./validate.sh",
+      "node .claude/commands/console-check.js"
+    ],
+
+    "commit_commands": [
+      "git add .",
+      "git commit -m 'fix: resolve all errors'",
+      "git push"
+    ],
+
+    "deploy_commands": [
+      "vercel deploy --prod"
+    ]
+  },
+
+  "delegation_patterns": {
+    "fix_all_errors": {
+      "trigger": "mach alle error weg",
+      "steps": [
+        "Run diagnostic_commands",
+        "Delegate all code issues to Serena",
+        "Execute fixes",
+        "Run validation_commands",
+        "Report results",
+        "Commit if requested",
+        "Deploy if requested"
+      ]
+    },
+
+    "research_and_implement": {
+      "trigger": "research",
+      "steps": [
+        "Delegate research to Tavily",
+        "Analyze findings",
+        "Delegate implementation to Serena",
+        "Validate results"
+      ]
+    },
+
+    "visual_design": {
+      "trigger": "diagram|visual|design",
+      "steps": [
+        "Analyze requirements with Serena",
+        "Delegate design to Canva",
+        "Integrate into documentation"
+      ]
+    }
+  },
+
+  "performance_metrics": {
+    "delegation_rate": "> 90%",
+    "ralph_loop_usage": "100% for complex tasks",
+    "mcp_utilization": "Always when available",
+    "validation_pass_rate": "100%",
+    "user_satisfaction": "10/10"
+  },
+
+  "fallback_strategy": {
+    "when_mcp_unavailable": "Use manual tools + document",
+    "when_ralph_loop_fails": "Set max iterations, report issue",
+    "when_no_internet": "Use cached knowledge, validate manually"
+  },
+
+  "documentation": {
+    "required_files": [
+      ".claude/agents.md",
+      ".claude/claude-config.md",
+      ".claude/universal-testing-instructions.md",
+      ".claude/COMMANDS.md",
+      ".claude/SETUP_COMPLETE.md",
+      ".claude/README.md",
+      "validate.sh",
+      "test-visual.js"
+    ],
+
+    "update_triggers": [
+      "New MCP server added",
+      "Workflow changes",
+      "Performance optimization"
+    ]
+  },
+
+  "success_criteria": {
+    "code_quality": {
+      "build": "0 errors",
+      "typescript": "0 errors",
+      "eslint": "0 errors",
+      "tests": "all passing"
+    },
+    "visual_quality": {
+      "console_check": "clean",
+      "dom_errors": "none",
+      "tailwind": "working",
+      "favicon": "present"
+    },
+    "deployment": {
+      "committed": true,
+      "pushed": true,
+      "deployed": false
+    }
+  },
+
+  "commands": {
+    "quick_validate": "./validate.sh",
+    "visual_test": "node test-visual.js",
+    "console_check": "node .claude/commands/console-check.js",
+    "full_validation": "./validate.sh && node .claude/commands/console-check.js",
+    "ralph_loop": "node .claude/commands/console-check.js && ./validate.sh"
+  },
+
+  "environment_variables": {
+    "required": [
+      "SERENA_ENABLED",
+      "TAVILY_API_KEY",
+      "CANVA_API_KEY"
+    ],
+    "optional": [
+      "CLAUDE_MAX_ITERATIONS",
+      "DELEGATION_TIMEOUT"
+    ]
+  },
+
+  "version_control": {
+    "commit_message_format": "type: description\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
+    "auto_commit": false,
+    "require_validation": true
+  },
+
+  "notes": [
+    "This configuration enables maximum delegation to MCP servers",
+    "Serena is used for all code modifications",
+    "Tavily for research beyond knowledge cutoff",
+    "Canva for visual design tasks",
+    "Ralph-Loop ensures 100% error-free results",
+    "Always validate before declaring completion"
+  ]
+}
