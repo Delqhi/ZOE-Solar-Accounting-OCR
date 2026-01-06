@@ -1,0 +1,400 @@
+{
+  "name": "claude_master_developer_v1",
+  "description": "Autonomous AI Development Workflow - Netflix Conductor Compatible",
+  "version": 1,
+  "schemaVersion": 2,
+  "tasks": [
+    {
+      "name": "PHASE_1_ANALYZE",
+      "taskReferenceName": "analyze_task",
+      "type": "SIMPLE",
+      "inputParameters": {
+        "agent": "serena_mcp",
+        "action": "analyze_context",
+        "project_path": "/Users/jeremy/conductor/repos/zoe-solar-accounting-ocr",
+        "depth": "full"
+      },
+      "status": "PENDING",
+      "checkpoint": true
+    },
+    {
+      "name": "PHASE_1_RESEARCH",
+      "taskReferenceName": "research_task",
+      "type": "SIMPLE",
+      "inputParameters": {
+        "agent": "research_agent",
+        "sources": ["github_api", "google_search", "stackoverflow"],
+        "query": "${workflow.input.task}"
+      },
+      "status": "PENDING",
+      "retryLogic": "EXPONENTIAL_BACKOFF",
+      "retryCount": 3,
+      "timeoutSeconds": 300
+    },
+    {
+      "name": "PHASE_2_PLAN",
+      "taskReferenceName": "plan_task",
+      "type": "SIMPLE",
+      "inputParameters": {
+        "agent": "claude_main",
+        "action": "generate_task_queue",
+        "input": "${PHASE_1_ANALYZE.output}"
+      },
+      "status": "PENDING",
+      "checkpoint": true
+    },
+    {
+      "name": "PHASE_2_VALIDATE_SCHEMA",
+      "taskReferenceName": "validate_schema_task",
+      "type": "SIMPLE",
+      "inputParameters": {
+        "agent": "validation_agent",
+        "schema": "task_queue_schema",
+        "input": "${PHASE_2_PLAN.output}"
+      },
+      "status": "PENDING",
+      "optional": false
+    },
+    {
+      "name": "PHASE_3_CODE_IMPLEMENTATION",
+      "taskReferenceName": "code_task",
+      "type": "FORK_JOIN",
+      "inputParameters": {
+        "agent": "code_agent",
+        "tasks": "${PHASE_2_PLAN.output.tasks}",
+        "coverage_target": 0.80
+      },
+      "status": "PENDING",
+      "forkJoinTasks": [
+        {
+          "name": "code_subtask_1",
+          "taskReferenceName": "code_enhanced_error_handling",
+          "type": "SIMPLE",
+          "inputParameters": {
+            "files": ["src/services/supabaseClient.ts", "src/services/monitoringService.tsx"],
+            "tests": ["connection.test.ts", "error_handling.test.ts"]
+          }
+        },
+        {
+          "name": "code_subtask_2",
+          "taskReferenceName": "code_diagnostics",
+          "type": "SIMPLE",
+          "inputParameters": {
+            "files": ["check-supabase-connection.js", "SUPABASE_TROUBLESHOOTING.md"]
+          }
+        },
+        {
+          "name": "code_subtask_3",
+          "taskReferenceName": "code_infrastructure",
+          "type": "SIMPLE",
+          "inputParameters": {
+            "files": ["~/.claude/GLOBAL_INFRASTRUCTURE.md", "~/.claude/QUICK_REFERENCE.md"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "PHASE_3_SELF_REVIEW",
+      "taskReferenceName": "self_review_task",
+      "type": "SIMPLE",
+      "inputParameters": {
+        "agent": "code_agent",
+        "checks": ["eslint", "typecheck", "security_scan"]
+      },
+      "status": "PENDING",
+      "dependsOn": ["PHASE_3_CODE_IMPLEMENTATION"]
+    },
+    {
+      "name": "PHASE_3_AUTO_COMMIT",
+      "taskReferenceName": "git_commit_task",
+      "type": "SIMPLE",
+      "inputParameters": {
+        "agent": "deploy_agent",
+        "action": "git_commit",
+        "message_template": "feat: ${workflow.input.task} - ${timestamp}"
+      },
+      "status": "PENDING",
+      "dependsOn": ["PHASE_3_SELF_REVIEW"]
+    },
+    {
+      "name": "PHASE_4_UNIT_TESTS",
+      "taskReferenceName": "unit_test_task",
+      "type": "SIMPLE",
+      "inputParameters": {
+        "agent": "test_agent",
+        "command": "npm run test",
+        "coverage_threshold": 0.80
+      },
+      "status": "PENDING",
+      "checkpoint": true,
+      "retryLogic": "EXPONENTIAL_BACKOFF",
+      "retryCount": 2
+    },
+    {
+      "name": "PHASE_4_INTEGRATION_TESTS",
+      "taskReferenceName": "integration_test_task",
+      "type": "SIMPLE",
+      "inputParameters": {
+        "agent": "test_agent",
+        "tests": ["api_endpoints", "database_connectivity", "env_validation"]
+      },
+      "status": "PENDING",
+      "dependsOn": ["PHASE_4_UNIT_TESTS"]
+    },
+    {
+      "name": "PHASE_4_E2E_TESTS",
+      "taskReferenceName": "e2e_test_task",
+      "type": "SIMPLE",
+      "inputParameters": {
+        "agent": "test_agent",
+        "framework": "playwright",
+        "tests": ["user_flows", "deployment_validation", "performance_benchmarks"]
+      },
+      "status": "PENDING",
+      "dependsOn": ["PHASE_4_INTEGRATION_TESTS"]
+    },
+    {
+      "name": "PHASE_4_SECURITY_SCAN",
+      "taskReferenceName": "security_scan_task",
+      "type": "SIMPLE",
+      "inputParameters": {
+        "agent": "security_agent",
+        "scans": ["secret_scanning", "dependency_audit", "cors_csp_validation"]
+      },
+      "status": "PENDING",
+      "dependsOn": ["PHASE_4_E2E_TESTS"]
+    },
+    {
+      "name": "PHASE_5_CHECKPOINT_GATE",
+      "taskReferenceName": "checkpoint_gate_task",
+      "type": "HUMAN",
+      "inputParameters": {
+        "agent": "review_agent",
+        "type": "human_or_ai_review",
+        "timeout_seconds": 600,
+        "auto_approve_threshold": 0.95
+      },
+      "status": "PENDING",
+      "dependsOn": ["PHASE_4_SECURITY_SCAN"],
+      "checkpoint": true
+    },
+    {
+      "name": "PHASE_5_GIT_OPERATIONS",
+      "taskReferenceName": "git_ops_task",
+      "type": "SIMPLE",
+      "inputParameters": {
+        "agent": "deploy_agent",
+        "actions": [
+          "git_checkout_main",
+          "git_pull_origin_main",
+          "git_merge_feature",
+          "git_push_origin_main"
+        ]
+      },
+      "status": "PENDING",
+      "dependsOn": ["PHASE_5_CHECKPOINT_GATE"]
+    },
+    {
+      "name": "PHASE_5_VERCEL_DEPLOY",
+      "taskReferenceName": "vercel_deploy_task",
+      "type": "SIMPLE",
+      "inputParameters": {
+        "agent": "deploy_agent",
+        "command": "vercel --prod --yes",
+        "wait_for_completion": true
+      },
+      "status": "PENDING",
+      "dependsOn": ["PHASE_5_GIT_OPERATIONS"],
+      "retryLogic": "EXPONENTIAL_BACKOFF",
+      "retryCount": 3,
+      "timeoutSeconds": 600
+    },
+    {
+      "name": "PHASE_5_POST_DEPLOY_CHECK",
+      "taskReferenceName": "post_deploy_check_task",
+      "type": "SIMPLE",
+      "inputParameters": {
+        "agent": "monitor_agent",
+        "checks": ["health_check", "error_logs", "performance_metrics"]
+      },
+      "status": "PENDING",
+      "dependsOn": ["PHASE_5_VERCEL_DEPLOY"]
+    },
+    {
+      "name": "PHASE_6_SKYVERN_MONITORING",
+      "taskReferenceName": "skyvern_monitor_task",
+      "type": "SIMPLE",
+      "inputParameters": {
+        "agent": "skyvern_mcp",
+        "actions": ["open_vercel_logs", "screenshot", "check_errors", "performance_metrics"],
+        "deployment_url": "${workflow.input.deployment_url}"
+      },
+      "status": "PENDING",
+      "dependsOn": ["PHASE_5_POST_DEPLOY_CHECK"],
+      "checkpoint": true
+    },
+    {
+      "name": "PHASE_6_ERROR_DETECTION",
+      "taskReferenceName": "error_detection_task",
+      "type": "SIMPLE",
+      "inputParameters": {
+        "agent": "monitor_agent",
+        "patterns": ["ERR_CONNECTION_REFUSED", "TypeError", "404", "500", "CORS"]
+      },
+      "status": "PENDING",
+      "dependsOn": ["PHASE_6_SKYVERN_MONITORING"]
+    },
+    {
+      "name": "PHASE_7_ERROR_HANDLER",
+      "taskReferenceName": "error_handler_task",
+      "type": "DECISION",
+      "inputParameters": {
+        "condition": "${PHASE_6_ERROR_DETECTION.output.errors.length > 0}"
+      },
+      "status": "PENDING",
+      "dependsOn": ["PHASE_6_ERROR_DETECTION"],
+      "decisionCases": {
+        "true": [
+          {
+            "name": "PHASE_7_ROLLBACK",
+            "taskReferenceName": "rollback_task",
+            "type": "SIMPLE",
+            "inputParameters": {
+              "agent": "deploy_agent",
+              "action": "auto_rollback",
+              "target": "last_stable_deployment",
+              "max_retries": 3
+            }
+          },
+          {
+            "name": "PHASE_7_RETRY_LOOP",
+            "taskReferenceName": "retry_loop_task",
+            "type": "SIMPLE",
+            "inputParameters": {
+              "agent": "workflow_executor",
+              "action": "return_to_phase_1",
+              "retry_count": "${workflow.input.retry_count + 1}",
+              "max_retries": 3
+            }
+          }
+        ],
+        "false": [
+          {
+            "name": "PHASE_7_SUCCESS_DOCUMENTATION",
+            "taskReferenceName": "success_docs_task",
+            "type": "SIMPLE",
+            "inputParameters": {
+              "agent": "docs_agent",
+              "actions": [
+                "update_project_knowledge",
+                "update_error_solutions",
+                "generate_success_log",
+                "notify_slack_success"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PHASE_8_FINAL_SUMMARY",
+      "taskReferenceName": "final_summary_task",
+      "type": "SIMPLE",
+      "inputParameters": {
+        "agent": "monitor_agent",
+        "report_location": "/Users/jeremy/.claude/MONITORING_REPORT.md",
+        "metrics": ["task_completion_rate", "error_detection_time", "deployment_success", "auto_fix_rate"]
+      },
+      "status": "PENDING",
+      "dependsOn": ["PHASE_7_ERROR_HANDLER"]
+    }
+  ],
+  "inputParameters": [
+    "task",
+    "project_path",
+    "deployment_url",
+    "retry_count"
+  ],
+  "outputParameters": {
+    "status": "${PHASE_8_FINAL_SUMMARY.output.status}",
+    "report": "${PHASE_8_FINAL_SUMMARY.output.report}",
+    "metrics": "${PHASE_8_FINAL_SUMMARY.output.metrics}"
+  },
+  "failureWorkflow": "error_notification_workflow",
+  "restartable": true,
+  "checkpoint": {
+    "enabled": true,
+    "frequency": "after_each_phase",
+    "storage": ".claude/checkpoints/"
+  },
+  "retryPolicy": {
+    "type": "EXPONENTIAL_BACKOFF",
+    "initial_delay_seconds": 60,
+    "max_delay_seconds": 600,
+    "max_retries": 3
+  },
+  "timeoutPolicy": {
+    "type": "FIXED",
+    "seconds": 3600
+  },
+  "observability": {
+    "tracing": true,
+    "logging": true,
+    "metrics": true,
+    "audit_trail": true
+  },
+  "notification": {
+    "slack": {
+      "success_channel": "#dev-success",
+      "error_channel": "#dev-alerts",
+      "events": ["deploy_success", "deploy_failed", "rollback_initiated"]
+    },
+    "email": {
+      "to": "jeremy@example.com",
+      "events": ["critical_error", "rollback_initiated"]
+    }
+  },
+  "schema_validation": {
+    "input_schema": {
+      "task": "string",
+      "project_path": "string",
+      "deployment_url": "string"
+    },
+    "output_schema": {
+      "status": "string",
+      "report": "string",
+      "metrics": "object"
+    }
+  },
+  "event_triggers": [
+    {
+      "event": "skyvern_error_detected",
+      "action": "trigger_fix_workflow"
+    },
+    {
+      "event": "vercel_deploy_success",
+      "action": "trigger_validation"
+    },
+    {
+      "event": "user_feedback_received",
+      "action": "trigger_new_iteration"
+    }
+  ],
+  "metadata": {
+    "author": "Claude Code",
+    "created": "2026-01-06",
+    "version": "1.0",
+    "compatible_with": ["Netflix Conductor", "Orkes Conductor"],
+    "key_features": [
+      "Persistent Context (.claude/project.md)",
+      "Track System (specs.md + plan.md)",
+      "Checkpoints (Review Gates)",
+      "Auto-Revert (Error Handling)",
+      "80% Test Coverage",
+      "Multi-Agent Orchestration",
+      "State Management (PENDING→RUNNING→COMPLETED→FAILED)",
+      "Fault Tolerance (Retry + Error Handling)",
+      "Observability (Full Traceability)"
+    ]
+  }
+}
