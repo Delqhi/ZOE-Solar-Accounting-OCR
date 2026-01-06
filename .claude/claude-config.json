@@ -232,5 +232,29 @@
     "Canva for visual design tasks",
     "Ralph-Loop ensures 100% error-free results",
     "Always validate before declaring completion"
-  ]
+  ],
+
+  "web_search": {
+    "strategy": "tavily_mcp_fallback",
+    "description": "When built-in WebSearch fails, use Tavily MCP server",
+    "tavily_config": {
+      "server": "tavily",
+      "tools": ["search", "research", "get_context"],
+      "fallback_commands": [
+        "npx -y @tavily/mcp-server",
+        "Use Tavily MCP via Claude tools"
+      ]
+    },
+    "manual_fallback": {
+      "description": "If MCP also fails, use manual search with specific queries",
+      "template": "Search for: [query] on [platform] with keywords: [keywords]"
+    }
+  },
+
+  "web_search_alternatives": {
+    "native_claude_websearch": "Use WebSearch tool (may be region-restricted)",
+    "tavily_mcp": "Use Tavily MCP server (configured in mcp.json)",
+    "manual_search": "Provide search query for manual lookup",
+    "browser_fetch": "Use WebFetch for specific URLs"
+  }
 }

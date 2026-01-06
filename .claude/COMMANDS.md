@@ -207,6 +207,73 @@ node test-visual.js --headless=false
 
 ---
 
+---
+
+## 🔍 `/web-search` / `/search`
+
+**Purpose:** Alternative web search methods when built-in WebSearch is unavailable.
+
+### Usage
+
+```bash
+# Run helper script
+node .claude/commands/web-search-helper.js
+
+# Search for specific query
+node .claude/commands/web-search-helper.js "Azure AI Vision pricing 2025"
+
+# Use predefined queries
+node .claude/commands/web-search-helper.js azure_ocr_pricing
+node .claude/commands/web-search-helper.js azure_vision_pricing
+
+# Get setup instructions
+node .claude/commands/web-search-helper.js --help
+```
+
+### When to Use
+
+| Situation | Solution |
+|-----------|----------|
+| WebSearch returns "did 0 searches" | Use this helper |
+| Region-restricted WebSearch | Use Tavily MCP or manual queries |
+| Need real-time pricing info | Use predefined queries |
+| MCP server not configured | Follow setup guide in helper |
+
+### Available Strategies
+
+1. **Tavily MCP Server** (Recommended)
+   - Already configured in `mcp.json`
+   - Real-time web research
+   - Use via Claude's MCP tools
+
+2. **Manual Search Queries**
+   - I provide exact search terms
+   - You search on Google/Bing
+   - Share results for analysis
+
+3. **WebFetch Tool**
+   - For specific URLs
+   - Example: `WebFetch("https://azure.microsoft.com/pricing")`
+
+4. **Predefined Queries**
+   - `azure_ocr_pricing` - Azure AI Vision OCR pricing
+   - `azure_vision_pricing` - Azure AI Vision Computer Vision pricing
+
+### Quick Fix for WebSearch Issues
+
+```bash
+# Check if Tavily MCP is configured
+cat .claude/mcp.json | grep tavily
+
+# Run helper to get search terms
+node .claude/commands/web-search-helper.js "your query"
+
+# Or use Tavily directly via MCP
+# (Claude will use Tavily tools if available)
+```
+
+---
+
 ## 🤖 Claude's Automatic Workflow
 
 When you tell Claude to "fix all errors" or "make everything work", it automatically:

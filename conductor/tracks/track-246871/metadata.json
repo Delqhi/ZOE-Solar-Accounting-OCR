@@ -1,0 +1,15 @@
+{
+  "id": "track-246871",
+  "title": "Test: Create a simple counter component",
+  "status": "RUNNING",
+  "created": "2026-01-06T11:34:06.872Z",
+  "phase": 2,
+  "agents": [
+    "claude",
+    "gemini",
+    "conductor",
+    "test_agent",
+    "monitor_agent"
+  ],
+  "parallel": true
+}

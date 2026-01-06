@@ -275,6 +275,10 @@ node test-visual.js
 
 # Console checking
 node .claude/commands/console-check.js
+
+# WebSearch Fix (when "did 0 searches" occurs)
+node .claude/websearch-fix.js "your search query"
+node .claude/websearch-fix.js "Azure AI Vision pricing 2025"
 ```
 
 ### **Common Issues & Fixes**

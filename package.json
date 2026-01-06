@@ -19,7 +19,55 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
-    "lint-staged": "npx lint-staged"
+    "lint-staged": "npx lint-staged",
+
+    "🚀 AUTO-SWARM COMMANDS": "========================================",
+    "swarm": "node .claude/parallel-swarm.js",
+    "auto-swarm": "node .claude/auto-swarm-executor.js",
+    "master-loop": "node .claude/master-loop-executor.js",
+
+    "🎯 VISION QUALITY GATE": "========================================",
+    "vision-gate": "node .claude/vision-workflow.js",
+    "vision-check": "node .claude/vision-workflow.js --check",
+    "vision-fix": "node .claude/vision-workflow.js --fix",
+
+    "🛡️ BIG PICKLE HANDOVER": "========================================",
+    "setup-big-pickle": "node .claude/explizit-handover.js",
+    "handover": "node .claude/explizit-handover.js",
+    "handover:force": "node .claude/explizit-handover.js --force",
+    "handover:log": "cat .claude/handover-log.md",
+
+    "📋 CONDUCTOR WORKFLOW": "========================================",
+    "conductor:setup": "bash .claude/setup-auto-swarm.sh",
+    "conductor:newTrack": "npx gemini-cli /conductor:newTrack",
+    "conductor:implement": "npx gemini-cli /conductor:implement",
+    "conductor:status": "npx gemini-cli /conductor:status",
+    "conductor:revert": "npx gemini-cli /conductor:revert",
+
+    "🚀 DEPLOYMENT": "========================================",
+    "deploy:prod": "npm run build && vercel --prod --yes",
+    "deploy:full": "npm run vision-gate && vercel --prod --yes",
+    "deploy:with-check": "npm run check && npm run vision-gate && vercel --prod --yes",
+
+    "📊 MONITORING": "========================================",
+    "monitor": "python3 ~/.claude/skyvern_monitor.py --url https://zoe-solar-accounting-ocr.vercel.app",
+    "monitor:logs": "cat ~/.claude/MONITORING_REPORT.md",
+    "status": "ls -la .claude/checkpoints/ && cat ~/.claude/TASK_QUEUE.yaml 2>/dev/null || echo 'No active tasks'",
+
+    "📚 KNOWLEDGE": "========================================",
+    "knowledge:update": "cat .claude/PROJECT_KNOWLEDGE.md",
+    "knowledge:errors": "cat ~/.claude/ERROR_SOLUTIONS.md",
+    "knowledge:research": "cat .claude/RESEARCH_LOG.md",
+
+    "🔧 SETUP & HELP": "========================================",
+    "setup": "bash .claude/setup-auto-swarm.sh",
+    "help": "echo '🚀 Usage: npm run master-loop \"[Aufgabe]\"' && echo '🎯 Swarm: npm run swarm \"[Aufgabe]\"' && echo '🎨 Vision: npm run vision-gate' && echo '🛡️ Handover: npm run handover'",
+
+    "⚡ QUICK COMMANDS": "========================================",
+    "quick-fix": "npm run master-loop \"Fix Supabase Connection\"",
+    "quick-build": "npm run check && npm run deploy:prod",
+    "quick-deploy": "npm run build && vercel --prod --yes",
+    "quick-status": "npm run status && npm run knowledge:errors"
   },
   "dependencies": {
     "@google/genai": "^1.33.0",
