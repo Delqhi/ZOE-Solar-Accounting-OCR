@@ -1,4 +1,4 @@
-import { supabase, Beleg, Steuerkategorie, Kontierungskonto, LieferantenRegel, Einstellung, isSupabaseConfigured } from './supabaseClient';
+import { supabase, Beleg, Steuerkategorie, Kontierungskonto, LieferantenRegel, Einstellung, isSupabaseConfigured, testSupabaseConnection } from './supabaseClient';
 import { ExtractedData, DocumentStatus } from '../types';
 
 // Helper to ensure Supabase is available
@@ -154,8 +154,19 @@ export const belegeService = {
       return { data: data as Beleg[], count: count || 0 };
     } catch (err) {
       // Handle network errors when Supabase is unreachable
-      // eslint-disable-next-line no-console
-      console.warn('Supabase connection unavailable (returning empty):', (err as Error).message);
+      // Import monitoring service to log the error properly
+      try {
+        const { monitoringService } = await import('./monitoringService');
+        monitoringService.captureError(err, {
+          operation: 'belegeService.getAll',
+          url: 'supabase://belege',
+          context: options,
+        });
+      } catch (importErr) {
+        // Fallback if monitoring service import fails
+        // eslint-disable-next-line no-console
+        console.warn('Supabase connection unavailable (returning empty):', (err as Error).message);
+      }
       return { data: [], count: 0 };
     }
   },

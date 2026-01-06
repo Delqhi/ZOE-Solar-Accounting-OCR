@@ -7,6 +7,10 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 // Validate configuration
 const isConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
+// Connection test cache
+let connectionTestCache: { timestamp: number; result: boolean } | null = null;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 // Create Supabase client for browser-side usage
 // Only create client if properly configured to avoid connection errors
 let supabaseInstance: SupabaseClient | null = null;
@@ -22,11 +26,120 @@ if (isConfigured) {
       headers: {
         'x-application-name': 'zoe-solar-accounting-ocr',
       },
+      // Enhanced fetch with better error handling
+      fetch: async (url: string, options?: RequestInit) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+        try {
+          const response = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+            // Add CORS headers for self-hosted Supabase
+            mode: 'cors',
+            credentials: 'omit',
+          });
+          clearTimeout(timeoutId);
+          return response;
+        } catch (error) {
+          clearTimeout(timeoutId);
+
+          // Enhanced error handling
+          if (error instanceof Error) {
+            if (error.name === 'AbortError') {
+              throw new Error(`Supabase request timeout after 15s - URL: ${url}`);
+            }
+            if (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED')) {
+              throw new Error(
+                `Connection refused to Supabase. Please check:\n` +
+                `1. Supabase instance is running at ${SUPABASE_URL}\n` +
+                `2. Network connectivity to the server\n` +
+                `3. CORS settings if self-hosted\n` +
+                `4. Firewall rules blocking the connection`
+              );
+            }
+            if (error.message.includes('TypeError')) {
+              throw new Error(`Network error: ${error.message}. Check your internet connection.`);
+            }
+          }
+          throw error;
+        }
+      },
     },
   });
 }
 
 export const supabase: SupabaseClient = supabaseInstance as any;
+
+/**
+ * Test Supabase connectivity with caching
+ * Returns true if connection is working, false otherwise
+ */
+export async function testSupabaseConnection(): Promise<boolean> {
+  // Return cached result if recent
+  const now = Date.now();
+  if (connectionTestCache && (now - connectionTestCache.timestamp) < CACHE_DURATION) {
+    return connectionTestCache.result;
+  }
+
+  if (!isConfigured || !supabaseInstance) {
+    connectionTestCache = { timestamp: now, result: false };
+    return false;
+  }
+
+  try {
+    // Try a simple query to test connectivity
+    const { error } = await supabaseInstance
+      .from('einstellungen')
+      .select('schluessel')
+      .limit(1);
+
+    // If we get here without a network error, connection works
+    // (even if table doesn't exist, that's a different issue)
+    const success = error === null || error.code !== 'PGRST116'; // PGRST116 = table not found
+
+    connectionTestCache = { timestamp: now, result: success };
+    return success;
+  } catch (error) {
+    // Network error or connection refused
+    console.warn('Supabase connection test failed:', error);
+    connectionTestCache = { timestamp: now, result: false };
+    return false;
+  }
+}
+
+/**
+ * Get connection status with detailed information
+ */
+export async function getSupabaseStatus(): Promise<{
+  configured: boolean;
+  reachable: boolean;
+  url: string;
+  error?: string;
+  timestamp: number;
+}> {
+  const timestamp = Date.now();
+
+  if (!isConfigured) {
+    return {
+      configured: false,
+      reachable: false,
+      url: SUPABASE_URL || 'not set',
+      error: 'Supabase URL or ANON_KEY not configured',
+      timestamp,
+    };
+  }
+
+  const reachable = await testSupabaseConnection();
+
+  return {
+    configured: true,
+    reachable,
+    url: SUPABASE_URL,
+    error: reachable ? undefined : 'Unable to connect to Supabase instance',
+    timestamp,
+  };
+}
 
 // Database types based on our schema
 export interface Beleg {

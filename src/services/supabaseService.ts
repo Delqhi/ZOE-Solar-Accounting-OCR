@@ -5,6 +5,7 @@
 
 import { belegeService } from './belegeService';
 import { DocumentRecord, ExtractedData, AppSettings } from '../types';
+import { testSupabaseConnection, getSupabaseStatus } from './supabaseClient';
 
 export interface User {
   id: string;
@@ -21,6 +22,27 @@ export function isSupabaseConfigured(): boolean {
   const url = import.meta.env.VITE_SUPABASE_URL;
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
   return Boolean(url && key);
+}
+
+/**
+ * Check Supabase connectivity and configuration
+ * Useful for debugging connection issues
+ */
+export async function checkSupabaseHealth(): Promise<{
+  configured: boolean;
+  reachable: boolean;
+  error?: string;
+  url?: string;
+}> {
+  // Use the enhanced connection test from supabaseClient
+  const status = await getSupabaseStatus();
+
+  return {
+    configured: status.configured,
+    reachable: status.reachable,
+    error: status.error,
+    url: status.url,
+  };
 }
 
 export async function getAllDocuments(): Promise<DocumentRecord[]> {

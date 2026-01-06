@@ -150,15 +150,16 @@ export class ErrorBoundary extends Component<Props, State> {
  * Global Error Handler for non-React errors
  */
 export function setupGlobalErrorHandler() {
-  window.addEventListener('error', (event) => {
-    // eslint-disable-next-line no-console
-    console.error('Global error:', event.error);
-    toast.error('Ein kritischer Fehler ist aufgetreten.');
-  });
+  // Import monitoring service dynamically to avoid circular dependencies
+  import('../services/monitoringService').then(({ monitoringService }) => {
+    window.addEventListener('error', (event) => {
+      monitoringService.captureError(event.error, { source: 'global_error' });
+      toast.error('Ein kritischer Fehler ist aufgetreten.');
+    });
 
-  window.addEventListener('unhandledrejection', (event) => {
-    // eslint-disable-next-line no-console
-    console.error('Unhandled promise rejection:', event.reason);
-    toast.error('Ein unerwartetes Problem ist aufgetreten.');
+    window.addEventListener('unhandledrejection', (event) => {
+      monitoringService.captureError(event.reason, { source: 'unhandled_promise' });
+      toast.error('Ein unerwartetes Problem ist aufgetreten.');
+    });
   });
 }

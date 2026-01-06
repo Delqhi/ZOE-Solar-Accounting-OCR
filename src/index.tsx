@@ -56,9 +56,10 @@ window.fetch = async (...args) => {
     return response;
   } catch (error) {
     const duration = performance.now() - start;
-    monitoringService.captureError(error as Error, {
+    monitoringService.captureError(error, {
       url: args[0],
       duration: Math.round(duration),
+      type: 'fetch_error',
     });
     throw error;
   }
