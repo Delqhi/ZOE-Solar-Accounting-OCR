@@ -27,10 +27,38 @@ class MonitoringService {
   /**
    * Capture error
    */
-  captureError(error: Error | string, context?: any): void {
+  captureError(error: Error | string | any, context?: any): void {
+    let errorMessage: string;
+    let errorStack: string | undefined;
+
+    // Handle different error types
+    if (typeof error === 'string') {
+      errorMessage = error;
+      errorStack = undefined;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+      errorStack = error.stack;
+    } else if (typeof error === 'object' && error !== null && error.message) {
+      // Object with a message property (like Supabase errors)
+      errorMessage = error.message;
+      errorStack = error.stack; // May or may not exist
+    } else if (typeof error === 'object' && error !== null) {
+      // Generic object, try to stringify it
+      try {
+        errorMessage = JSON.stringify(error);
+      } catch (e) {
+        errorMessage = `[Non-stringifiable Object] Type: ${typeof error}`;
+      }
+      errorStack = undefined;
+    } else {
+      // Other primitive types
+      errorMessage = String(error);
+      errorStack = undefined;
+    }
+
     const errorInfo: ErrorInfo = {
-      message: typeof error === 'string' ? error : error.message,
-      stack: typeof error === 'string' ? undefined : error.stack,
+      message: errorMessage,
+      stack: errorStack,
       context,
       timestamp: Date.now(),
     };
@@ -83,7 +111,7 @@ class MonitoringService {
     } catch (error) {
       const duration = performance.now() - start;
       this.captureMetric(`${name}_failed`, duration);
-      this.captureError(error as Error, { operation: name });
+      this.captureError(error, { operation: name });
       throw error;
     }
   }
@@ -226,7 +254,7 @@ export class MonitoredErrorBoundary extends React.Component<
  * Hook for monitoring
  */
 export function useMonitoring() {
-  const logError = (error: Error | string, context?: any) => {
+  const logError = (error: Error | string | any, context?: any) => {
     monitoringService.captureError(error, context);
   };
 
