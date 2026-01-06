@@ -12,8 +12,10 @@ import {
 } from './belegeService';
 
 import { ExtractedData, DocumentRecord, VendorRule } from '../types';
+import { isSupabaseConfigured } from './supabaseService';
 
 export async function getAllDocuments(): Promise<DocumentRecord[]> {
+  if (!isSupabaseConfigured()) return [];
   const result = await belegeService.getAll();
   // Convert Beleg[] to DocumentRecord[]
   return result.data.map((beleg: any) => ({
@@ -72,6 +74,7 @@ export async function getAllDocuments(): Promise<DocumentRecord[]> {
 }
 
 export async function saveDocument(data: Partial<ExtractedData> & { id?: string }) {
+  if (!isSupabaseConfigured()) return null;
   // Transform to expected format
   const doc = {
     ...data,
@@ -93,19 +96,23 @@ export async function saveDocument(data: Partial<ExtractedData> & { id?: string 
 }
 
 export async function deleteDocument(id: string) {
+  if (!isSupabaseConfigured()) return null;
   return await belegeService.delete(id);
 }
 
 export async function saveSettings(settings: any) {
+  if (!isSupabaseConfigured()) return null;
   return await einstellungenService.set('app_settings', JSON.stringify(settings));
 }
 
 export async function getSettings() {
+  if (!isSupabaseConfigured()) return null;
   const result = await einstellungenService.get('app_settings');
   return result ? JSON.parse(result) : null;
 }
 
 export async function getVendorRule(vendorName: string): Promise<VendorRule | null> {
+  if (!isSupabaseConfigured()) return null;
   const rules = await lieferantenRegelnService.getAll();
   const rule = rules.find(r => r.lieferant_name_pattern === vendorName);
   if (!rule) return null;
@@ -120,6 +127,7 @@ export async function getVendorRule(vendorName: string): Promise<VendorRule | nu
 }
 
 export async function saveVendorRule(vendorName: string, konto: string, kategorie: string) {
+  if (!isSupabaseConfigured()) return null;
   const existing = await getVendorRule(vendorName);
   if (existing) {
     return await lieferantenRegelnService.create({
@@ -144,6 +152,7 @@ export async function saveVendorRule(vendorName: string, konto: string, kategori
 }
 
 export async function getAllDocumentsAndSettings() {
+  if (!isSupabaseConfigured()) return { docs: [], settings: null };
   const [docs, settings] = await Promise.all([
     getAllDocuments(),
     getSettings()

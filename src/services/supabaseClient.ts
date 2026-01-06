@@ -5,24 +5,28 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // Validate configuration
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  // eslint-disable-next-line no-console
-  console.warn('Supabase configuration missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env');
-}
+const isConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
 // Create Supabase client for browser-side usage
-export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: false, // We don't need session persistence for this app
-    detectSessionInUrl: false,
-  },
-  global: {
-    headers: {
-      'x-application-name': 'zoe-solar-accounting-ocr',
+// Only create client if properly configured to avoid connection errors
+let supabaseInstance: SupabaseClient | null = null;
+
+if (isConfigured) {
+  supabaseInstance = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: false, // We don't need session persistence for this app
+      detectSessionInUrl: false,
     },
-  },
-});
+    global: {
+      headers: {
+        'x-application-name': 'zoe-solar-accounting-ocr',
+      },
+    },
+  });
+}
+
+export const supabase: SupabaseClient = supabaseInstance as any;
 
 // Database types based on our schema
 export interface Beleg {

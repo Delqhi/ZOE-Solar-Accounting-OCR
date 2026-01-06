@@ -14,7 +14,7 @@ import fs from 'fs';
 
 async function consoleCheck(options = {}) {
     const {
-        url = 'http://localhost:5173',
+        url = 'http://localhost:3001',
         headless = true,
         timeout = 30000,
         screenshot = true
@@ -217,7 +217,7 @@ async function consoleCheck(options = {}) {
 if (import.meta.url === `file://${process.argv[1]}`) {
     const args = process.argv.slice(2);
 
-    let url = 'http://localhost:5173';
+    let url = 'http://localhost:3001';
     let headless = true;
 
     // Parse arguments

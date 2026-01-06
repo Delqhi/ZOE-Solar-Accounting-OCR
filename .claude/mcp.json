@@ -1,0 +1,73 @@
+{
+  "mcpServers": {
+    "serena": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena",
+        "start-mcp-server"
+      ],
+      "description": "Code analysis, editing, refactoring - P0 Priority"
+    },
+    "tavily": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@tavily/mcp-server"
+      ],
+      "env": {
+        "TAVILY_API_KEY": "${TAVILY_API_KEY}"
+      },
+      "description": "Real-time web research and documentation - P1 Priority"
+    },
+    "canva": {
+      "type": "http",
+      "url": "https://mcp.canva.com/mcp",
+      "env": {
+        "CANVA_API_KEY": "${CANVA_API_KEY}"
+      },
+      "description": "Visual design, diagrams, mockups - P2 Priority"
+    }
+  },
+  "delegation_strategy": {
+    "priority_order": ["serena", "tavily", "canva", "manual"],
+    "max_iterations": 15,
+    "validation_required": true,
+    "auto_commit": false
+  },
+  "triggers": {
+    "ralph_loop": [
+      "fix all errors",
+      "100% working",
+      "mach alle error weg",
+      "alles soll funktinoieren",
+      "committe und deploye",
+      "design muss optimal sein"
+    ],
+    "serena": [
+      "fix",
+      "refactor",
+      "edit",
+      "update",
+      "change",
+      "modify"
+    ],
+    "tavily": [
+      "research",
+      "find",
+      "search",
+      "latest",
+      "best practices",
+      "documentation"
+    ],
+    "canva": [
+      "diagram",
+      "visual",
+      "design",
+      "mockup",
+      "flowchart",
+      "presentation"
+    ]
+  }
+}
