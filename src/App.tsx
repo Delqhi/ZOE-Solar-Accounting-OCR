@@ -4,13 +4,15 @@ import { DatabaseGrid } from './components/database-grid';
 import { DocumentDetail } from './components/DetailModal';
 import { DuplicateCompareModal } from './components/DuplicateCompareModal';
 import { SettingsView } from './components/SettingsView';
-import { analyzeDocumentWithGemini } from './services/geminiService';
 import { applyAccountingRules, generateZoeInvoiceId } from './services/ruleEngine';
 import * as storageService from './services/storageService';
 import * as supabaseService from './services/supabaseService';
 import { detectPrivateDocument } from './services/privateDocumentDetection';
 import { DocumentRecord, DocumentStatus, AppSettings, ExtractedData, Attachment } from './types';
 import { normalizeExtractedData } from './services/extractedDataNormalization';
+import { documentProcessingPipeline } from './services/pipeline/documentProcessingPipeline';
+import { costOptimizer } from './services/optimization/costOptimizer';
+import { pipelineErrorHandler } from './services/errors/pipelineErrorHandler';
 
 const computeFileHash = async (file: File): Promise<string> => {
   const buffer = await file.arrayBuffer();
@@ -197,6 +199,23 @@ export default function App() {
   const [compareDoc, setCompareDoc] = useState<DocumentRecord | null>(null);
   const [originalDoc, setOriginalDoc] = useState<DocumentRecord | null>(null);
 
+  // Pipeline Progress State
+  const [pipelineProgress, setPipelineProgress] = useState<{
+    phase: string;
+    completed: number;
+    total: number;
+    message: string;
+    batchIndex: number;
+    currentFile: string;
+  } | null>(null);
+
+  // Cost Tracking State
+  const [costInfo, setCostInfo] = useState<{
+    remaining: number;
+    budget: number;
+    avgCost: number;
+  } | null>(null);
+
   useEffect(() => {
     const initData = async () => {
       try {
@@ -207,6 +226,14 @@ export default function App() {
         ]);
         setDocuments(localDocs.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()));
         setSettings(localSettings);
+
+        // Load cost info
+        const status = await documentProcessingPipeline.getStatus();
+        setCostInfo({
+          remaining: status.remaining,
+          budget: status.budget,
+          avgCost: status.avgCost,
+        });
 
         // Optionally sync with Supabase if configured
         if (supabaseService.isSupabaseConfigured()) {
@@ -280,7 +307,9 @@ export default function App() {
     if (files.length === 0) return;
     setIsProcessing(true);
     setViewMode('document');
+    setPipelineProgress(null);
 
+    // Prepare file data
     const newDocs: DocumentRecord[] = [];
     const fileData: {id: string, file: File, hash: string, base64: string, url: string}[] = [];
 
@@ -303,216 +332,124 @@ export default function App() {
     setDocuments(prev => [...newDocs, ...prev]);
 
     const currentSettings = settings || await storageService.getSettings();
-    const processedBatch: DocumentRecord[] = [];
-    // Use functional state access to get the current documents
-    const currentDocsSnapshotRef: { current: DocumentRecord[] } = { current: [] };
-    setDocuments(prev => {
-        currentDocsSnapshotRef.current = [...prev];
-        return prev;
-    });
-    let autoMergedCount = 0;
+    const currentDocs = await storageService.getAllDocuments();
 
-    const processingPromises = fileData.map(async (item) => {
-        const isExactDuplicate = currentDocsSnapshotRef.current.some(d => d.id !== item.id && d.fileHash === item.hash);
+    // Check for exact duplicates first
+    const exactDuplicates: DocumentRecord[] = [];
+    const filesToProcess: typeof fileData = [];
+
+    for (const item of fileData) {
+        const isExactDuplicate = currentDocs.some(d => d.fileHash === item.hash);
         if (isExactDuplicate) {
-                         const original = currentDocsSnapshotRef.current.find(d => d.fileHash === item.hash);
-             return { 
-                 type: 'DOC', 
-                                 doc: { 
-                                     id: item.id,
-                                     status: DocumentStatus.DUPLICATE,
-                                     error: undefined,
-                                     data: null,
-                                     duplicateReason: "Datei identisch (Hash)",
-                                     duplicateOfId: original?.id,
-                                     duplicateConfidence: 1
-                                 } 
-             };
+            const original = currentDocs.find(d => d.fileHash === item.hash);
+            exactDuplicates.push({
+                id: item.id,
+                fileName: item.file.name,
+                fileType: item.file.type,
+                uploadDate: new Date().toISOString(),
+                status: DocumentStatus.DUPLICATE,
+                data: null,
+                duplicateReason: "Datei identisch (Hash)",
+                duplicateOfId: original?.id,
+                duplicateConfidence: 1,
+                previewUrl: item.url,
+                fileHash: item.hash
+            });
+        } else {
+            filesToProcess.push(item);
         }
+    }
 
-        try {
-            const extractedRaw = await analyzeDocumentWithGemini(item.base64, item.file.type);
-            const extracted = normalizeExtractedData(extractedRaw);
-            
-            // Check for Semantic Duplicate using Extracted Data
-            const semanticDup = findSemanticDuplicate(extracted, currentDocsSnapshotRef.current);
-            
-            if (semanticDup && semanticDup.doc.id !== item.id) {
-                 // OPTION A: Auto-Merge if it was a file upload that matches an existing one perfectly?
-                 // Current logic: Create a NEW doc entry but mark as DUPLICATE so user sees it.
-                 // This is safer than silently merging.
-                 return {
-                     type: 'DOC',
-                     doc: {
-                         id: item.id,
-                         status: DocumentStatus.DUPLICATE,
-                         data: extracted,
-                         duplicateReason: semanticDup.reason || "Inhaltliches Duplikat erkannt",
-                         duplicateOfId: semanticDup.doc.id,
-                         duplicateConfidence: semanticDup.confidence
-                     }
-                 };
-            }
-
-            // --- Private Document Detection ---
-            const privateCheck = detectPrivateDocument(extracted);
-            if (privateCheck.isPrivate && privateCheck.detectedVendor) {
-                return {
-                    type: 'PRIVATE_DOC',
-                    id: item.id,
-                    base64: item.base64,
-                    fileName: item.file.name,
-                    fileType: item.file.type,
-                    data: extracted,
-                    vendor: privateCheck.detectedVendor,
-                    reason: privateCheck.reason || 'Private Positionen erkannt'
-                };
-            }
-
-            const outcome = classifyOcrOutcome(extracted);
-            return { type: 'DOC', data: extracted, id: item.id, outcome };
-        } catch (e) {
-            return { 
-                type: 'DOC', 
-                doc: { id: item.id, status: DocumentStatus.ERROR, error: "KI Analyse fehlgeschlagen", data: null, duplicateReason: undefined } 
-            };
+    // Process remaining files through the pipeline
+    const processedResults = await documentProcessingPipeline.processBatch(
+        filesToProcess,
+        currentDocs,
+        currentSettings,
+        (progress) => {
+            setPipelineProgress({
+                phase: progress.phase,
+                completed: progress.completed,
+                total: progress.total,
+                message: progress.message,
+                batchIndex: progress.batchIndex,
+                currentFile: filesToProcess[progress.batchIndex]?.file.name || '',
+            });
         }
-    });
+    );
 
-    const results = await Promise.all(processingPromises);
+    // Combine results
+    const finalResults = [...exactDuplicates, ...processedResults.map(r => r.document)];
 
-    for (const res of results) {
-        // --- Handle Private Documents ---
-        if (res.type === 'PRIVATE_DOC') {
-            const privateRes = res as any;
+    // Save all documents
+    for (const doc of finalResults) {
+        await storageService.saveDocument(doc);
+        if (supabaseService.isSupabaseConfigured()) {
             try {
-                // Upload to belege_privat table
-                await supabaseService.savePrivateDocument(
-                    privateRes.id,
-                    privateRes.fileName,
-                    privateRes.fileType,
-                    privateRes.base64,
-                    privateRes.data,
-                    privateRes.reason
-                );
-
-                // Show notification to user
-                setPrivateDocNotification({
-                    vendor: privateRes.vendor,
-                    amount: privateRes.data?.bruttoBetrag || 0,
-                    reason: privateRes.reason
-                });
-
-                // Don't add to processedBatch (won't show in UI)
+                await supabaseService.saveDocument(doc);
             } catch (e) {
-                // Fallback: save as normal document with PRIVATE status
-                const fallbackDoc: DocumentRecord = {
-                    id: privateRes.id,
-                    fileName: privateRes.fileName,
-                    fileType: privateRes.fileType,
-                    uploadDate: new Date().toISOString(),
-                    status: DocumentStatus.PRIVATE,
-                    data: { ...privateRes.data, privatanteil: true }
-                };
-                processedBatch.push(fallbackDoc);
-                await supabaseService.saveDocument(fallbackDoc);
+                // Supabase sync failed - document saved locally
             }
-            continue;
         }
 
-        if (res.type === 'MERGE') {
-             // Logic kept for potential future use, currently findSemanticDuplicate mainly flags as DUPLICATE
-             // Use type assertion because currently no path returns MERGE, so TS infers only DOC types
-             const mergeRes = res as any;
-             const targetDoc = currentDocsSnapshotRef.current.find(d => d.id === mergeRes.targetId);
-             if (targetDoc) {
-                 const updatedDoc = {
-                     ...targetDoc,
-                     attachments: [...(targetDoc.attachments || []), mergeRes.attachment]
-                 };
-                 await supabaseService.saveDocument(updatedDoc);
-                 currentDocsSnapshotRef.current = currentDocsSnapshotRef.current.map(d => d.id === targetDoc.id ? updatedDoc : d);
-                 autoMergedCount++;
-             }
-        } else if (res.type === 'DOC') {
-            let finalDoc: DocumentRecord | undefined;
-
-            if ('doc' in res && res.doc) {
-                // It's either an Error or a Duplicate
-                const resultDoc = res.doc;
-                const placeholder = newDocs.find(d => d.id === resultDoc.id);
-                if (!placeholder) continue;
-                
-                // If it's a duplicate, we still save the extracted data so the user can verify WHY it's a duplicate
-                finalDoc = { ...placeholder, ...resultDoc } as DocumentRecord;
-
-                if (finalDoc.status === DocumentStatus.DUPLICATE && finalDoc.data) {
-                     // Apply rules even for duplicates so they look nice in the UI
-                     const zoeId = generateZoeInvoiceId(finalDoc.data.belegDatum || '', currentDocsSnapshotRef.current);
-                     finalDoc.data.eigeneBelegNummer = zoeId;
-                }
-
-            } else if ('data' in res && res.data && res.id) {
-                // Success Case
-                const { id, data } = res as any;
-                const placeholder = newDocs.find(d => d.id === id);
-                if (!placeholder) continue;
-
-                const zoeId = generateZoeInvoiceId(data.belegDatum || '', currentDocsSnapshotRef.current);
-                let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
-                
-                if (data.lieferantName) {
-                    const rule = await storageService.getVendorRule(data.lieferantName);
-                    if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
-                }
-                
-                const normalized = normalizeExtractedData(data);
-                const outcome = (res as any).outcome || classifyOcrOutcome(normalized);
-                const finalData = applyAccountingRules(
-                    { ...normalized, eigeneBelegNummer: zoeId },
-                    currentDocsSnapshotRef.current,
-                    currentSettings,
-                    overrideRule
+        // Handle private documents
+        if (doc.status === DocumentStatus.PRIVATE && doc.data?.privatanteil) {
+            try {
+                await supabaseService.savePrivateDocument(
+                    doc.id,
+                    doc.fileName,
+                    doc.fileType,
+                    doc.previewUrl?.split(',')[1] || '',
+                    doc.data,
+                    'Private Positionen erkannt'
                 );
-
-                finalDoc = { ...placeholder, status: outcome.status, data: finalData, error: outcome.error };
-                currentDocsSnapshotRef.current.push(finalDoc); 
-            }
-            
-            if (finalDoc) {
-                processedBatch.push(finalDoc);
-                await storageService.saveDocument(finalDoc);
-                // Optionally sync to Supabase
-                if (supabaseService.isSupabaseConfigured()) {
-                  try {
-                    await supabaseService.saveDocument(finalDoc);
-                  } catch (e) {
-                    // Supabase sync failed - document saved locally
-                  }
-                }
+                setPrivateDocNotification({
+                    vendor: doc.data?.lieferantName || 'Unbekannt',
+                    amount: doc.data?.bruttoBetrag || 0,
+                    reason: 'Private Positionen erkannt'
+                });
+            } catch (e) {
+                // Already saved locally
             }
         }
     }
 
+    // Update documents state
     setDocuments(prev => {
-        const cleanPrev = prev.filter(d => !newDocs.some(n => n.id === d.id));
-        const mergedTargetIds = results.filter(r => r.type === 'MERGE').map((r:any) => r.targetId);
-        const updatedOldDocs = cleanPrev.map(d => {
-            if (mergedTargetIds.includes(d.id)) {
-                return currentDocsSnapshotRef.current.find(snap => snap.id === d.id) || d;
-            }
-            return d;
-        });
-        return [...processedBatch, ...updatedOldDocs];
+        const cleanPrev = prev.filter(d => !finalResults.some(n => n.id === d.id));
+        return [...finalResults, ...cleanPrev];
     });
+
+    // Update cost info
+    const status = await documentProcessingPipeline.getStatus();
+    setCostInfo({
+        remaining: status.remaining,
+        budget: status.budget,
+        avgCost: status.avgCost,
+    });
+
+    // Show notifications
+    const errors = processedResults.filter(r => r.document.status === DocumentStatus.ERROR).length;
+    const duplicates = exactDuplicates.length;
+    const privateDocs = processedResults.filter(r => r.document.status === DocumentStatus.PRIVATE).length;
+
+    let notificationMsg = '';
+    if (errors > 0) notificationMsg += `${errors} Fehler, `;
+    if (duplicates > 0) notificationMsg += `${duplicates} Duplikate, `;
+    if (privateDocs > 0) notificationMsg += `${privateDocs} privat, `;
+
+    if (notificationMsg) {
+        setNotification(notificationMsg.slice(0, -2) + ' verarbeitet.');
+    } else {
+        setNotification(`${processedResults.length} Dokumente erfolgreich verarbeitet.`);
+    }
 
     setIsProcessing(false);
-    
-    if (autoMergedCount > 0) {
-        setNotification(`${autoMergedCount} Duplikat(e) automatisch zusammengeführt.`);
-    }
+    setPipelineProgress(null);
 
-    if (processedBatch.length > 0) setSelectedDocId(processedBatch[0].id);
+    // Select first document
+    if (finalResults.length > 0) {
+        setSelectedDocId(finalResults[0].id);
+    }
   };
 
   const handleSaveDocument = async (updatedDoc: DocumentRecord) => {
@@ -620,27 +557,66 @@ export default function App() {
 
   const handleRetryOCR = async (doc: DocumentRecord) => {
     if (!doc.previewUrl) return;
-        setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, status: DocumentStatus.PROCESSING, error: undefined } : d));
+
+    setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, status: DocumentStatus.PROCESSING, error: undefined } : d));
+
     try {
       const base64 = doc.previewUrl.split(',')[1];
-            const extractedRaw = await analyzeDocumentWithGemini(base64, doc.fileType);
-            const extracted = normalizeExtractedData(extractedRaw);
       const currentSettings = settings || await storageService.getSettings();
-      const existingId = doc.data?.eigeneBelegNummer;
-      let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
-      if (extracted.lieferantName) {
-           const rule = await storageService.getVendorRule(extracted.lieferantName);
-           if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
-      }
-            const finalData = applyAccountingRules(extracted, documents, currentSettings, overrideRule);
-      finalData.eigeneBelegNummer = existingId || generateZoeInvoiceId(finalData.belegDatum, documents);
-            const outcome = classifyOcrOutcome(finalData);
-            const updated = { ...doc, status: outcome.status, data: finalData, error: outcome.error };
+      const currentDocs = await storageService.getAllDocuments();
+
+      // Process single document through pipeline
+      const fileData = {
+        id: doc.id,
+        base64,
+        file: { name: doc.fileName, type: doc.fileType } as File,
+        url: doc.previewUrl,
+      };
+
+      setPipelineProgress({
+        phase: 'starting',
+        completed: 0,
+        total: 6,
+        message: 'Neuer Versuch gestartet...',
+        batchIndex: 0,
+        currentFile: doc.fileName,
+      });
+
+      const result = await documentProcessingPipeline.processDocument(
+        fileData,
+        currentDocs,
+        currentSettings,
+        (progress) => {
+          setPipelineProgress({
+            phase: progress.phase,
+            completed: progress.completed,
+            total: progress.total,
+            message: progress.message,
+            batchIndex: 0,
+            currentFile: doc.fileName,
+          });
+        }
+      );
+
+      const updated = { ...doc, ...result.document };
       await handleSaveDocument(updated);
+
+      // Update cost info
+      const status = await documentProcessingPipeline.getStatus();
+      setCostInfo({
+        remaining: status.remaining,
+        budget: status.budget,
+        avgCost: status.avgCost,
+      });
+
+      setNotification('Dokument erfolgreich erneut verarbeitet.');
+      setPipelineProgress(null);
+
     } catch (e) {
-            const msg = e instanceof Error ? e.message : 'Retry fehlgeschlagen';
-            const errDoc = { ...doc, status: DocumentStatus.ERROR, error: msg };
+      const msg = e instanceof Error ? e.message : 'Retry fehlgeschlagen';
+      const errDoc = { ...doc, status: DocumentStatus.ERROR, error: msg };
       await handleSaveDocument(errDoc);
+      setPipelineProgress(null);
     }
   };
 
@@ -756,8 +732,46 @@ export default function App() {
                   <h2 className="text-2xl md:text-3xl font-bold text-center mb-8 text-slate-800 tracking-tight">
                       <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">ZOE Solar</span> Accounting
                   </h2>
+
+                  {/* Pipeline Progress Indicator */}
+                  {pipelineProgress && (
+                    <div className="mb-6 p-4 bg-white rounded-2xl shadow-lg border border-blue-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-semibold text-slate-700">{pipelineProgress.message}</span>
+                        <span className="text-xs text-slate-500">{pipelineProgress.completed}/{pipelineProgress.total}</span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-2 mb-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${(pipelineProgress.completed / pipelineProgress.total) * 100}%` }}
+                        ></div>
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        Phase: {pipelineProgress.phase} | Datei: {pipelineProgress.currentFile}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cost Info */}
+                  {costInfo && (
+                    <div className="mb-6 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-600">Budget verbleibend:</span>
+                        <span className={`font-bold ${costInfo.remaining < 1 ? 'text-red-600' : 'text-green-600'}`}>
+                          ${costInfo.remaining.toFixed(2)} / ${costInfo.budget.toFixed(2)}
+                        </span>
+                      </div>
+                      {costInfo.avgCost > 0 && (
+                        <div className="flex justify-between text-xs mt-1">
+                          <span className="text-slate-600">Ø Kosten/Doc:</span>
+                          <span className="font-mono">${costInfo.avgCost.toFixed(4)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <UploadArea onFilesSelected={handleFilesSelect} isProcessing={isProcessing} />
-                  
+
                   {/* Quick stats for mobile on empty state */}
                   <div className="mt-8 flex justify-center gap-6 text-slate-400 text-xs md:hidden">
                       <div className="text-center">
