@@ -123,55 +123,55 @@ export const DesignOSDemo: React.FC = () => {
             value={values.filled}
             onChange={(e) => setValues({ ...values, filled: e.target.value })}
             label="Filled Input"
-            size="md"
+            inputSize="md"
           />
           <OutlineInput
             placeholder="Outline Input"
             value={values.outline}
             onChange={(e) => setValues({ ...values, outline: e.target.value })}
             label="Outline Input"
-            size="md"
+            inputSize="md"
           />
           <UnderlineInput
             placeholder="Underline Input"
             value={values.underline}
             onChange={(e) => setValues({ ...values, underline: e.target.value })}
             label="Underline Input"
-            size="md"
+            inputSize="md"
           />
           
-          <Grid cols={3} gap="md">
+          <Grid columns={3} gap="md">
             <FilledInput
               placeholder="Small"
-              size="sm"
+              inputSize="sm"
               label="Small Input"
             />
             <FilledInput
               placeholder="Medium"
-              size="md"
+              inputSize="md"
               label="Medium Input"
             />
             <FilledInput
               placeholder="Large"
-              size="lg"
+              inputSize="lg"
               label="Large Input"
             />
           </Grid>
 
-          <Grid cols={3} gap="md">
+          <Grid columns={3} gap="md">
             <OutlineInput
               placeholder="Success"
-              validationState="success"
+              validation="success"
               label="Success State"
             />
             <OutlineInput
               placeholder="Warning"
-              validationState="warning"
+              validation="warning"
               label="Warning State"
             />
             <OutlineInput
               placeholder="Error"
-              validationState="error"
+              validation="error"
               label="Error State"
             />
           </Grid>
@@ -184,7 +184,7 @@ export const DesignOSDemo: React.FC = () => {
   const CardDemo = () => (
     <Card variant="elevated" padding="lg">
       <h3 style={{ marginBottom: 'var(--spacing-md)', color: 'var(--color-text)' }}>Cards</h3>
-      <Grid cols={2} gap="md">
+      <Grid columns={2} gap="md">
         <ElevatedCard padding="md">
           <h4 style={{ margin: 0, color: 'var(--color-text)' }}>Elevated Card</h4>
           <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
@@ -282,10 +282,15 @@ export const DesignOSDemo: React.FC = () => {
       { id: '3', name: 'scan.png', size: 890123, type: 'png' as const, documentId: 'ZOE-2024-002' },
     ]);
 
+    // Mock File objects for the queue
+    const mockFile1 = new File([''], 'upload1.pdf', { type: 'application/pdf' });
+    const mockFile2 = new File([''], 'upload2.jpg', { type: 'image/jpeg' });
+    const mockFile3 = new File([''], 'upload3.pdf', { type: 'application/pdf' });
+
     const [queue, setQueue] = useState([
-      { id: 'q1', file: { name: 'upload1.pdf', size: 1000000 }, status: 'uploading' as const, progress: 45 },
-      { id: 'q2', file: { name: 'upload2.jpg', size: 2000000 }, status: 'processing' as const, progress: 80 },
-      { id: 'q3', file: { name: 'upload3.pdf', size: 1500000 }, status: 'error' as const, progress: 0, error: 'Netzwerkfehler' },
+      { id: 'q1', file: mockFile1, status: 'uploading' as const, progress: 45 },
+      { id: 'q2', file: mockFile2, status: 'processing' as const, progress: 80 },
+      { id: 'q3', file: mockFile3, status: 'error' as const, progress: 0, error: 'Netzwerkfehler' },
     ]);
 
     return (
@@ -366,7 +371,7 @@ export const DesignOSDemo: React.FC = () => {
 
         <div>
           <h4 style={{ margin: '0 0 var(--spacing-sm) 0', color: 'var(--color-text)' }}>Grid (2 Columns)</h4>
-          <Grid cols={2} gap="sm">
+          <Grid columns={2} gap="sm">
             <Card variant="outline" padding="sm">Grid 1</Card>
             <Card variant="outline" padding="sm">Grid 2</Card>
             <Card variant="outline" padding="sm">Grid 3</Card>
@@ -429,7 +434,7 @@ export const DesignOSDemo: React.FC = () => {
           </Center>
 
           {/* Component Demos */}
-          <Grid cols={1} gap="xl">
+          <Grid columns={1} gap="xl">
             <ButtonDemo />
             <InputDemo />
             <CardDemo />
