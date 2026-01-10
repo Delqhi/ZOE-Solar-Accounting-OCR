@@ -1,18 +1,32 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { 
+  Button, 
+  Card, 
+  Input, 
+  Stack, 
+  Grid, 
+  Flex, 
+  Center, 
+  Container 
+} from './components/designOS';
 import { UploadArea } from './components/UploadArea';
+import { DatabaseView } from './components/DatabaseView';
 import { DatabaseGrid } from './components/database-grid';
 import { DocumentDetail } from './components/DetailModal';
 import { DuplicateCompareModal } from './components/DuplicateCompareModal';
 import { SettingsView } from './components/SettingsView';
+import { AuthView } from './components/AuthView';
+import { BackupView } from './components/BackupView';
+import { FilterBar } from './components/FilterBar';
+import { analyzeDocumentWithGemini } from './services/geminiService';
 import { applyAccountingRules, generateZoeInvoiceId } from './services/ruleEngine';
 import * as storageService from './services/storageService';
 import * as supabaseService from './services/supabaseService';
 import { detectPrivateDocument } from './services/privateDocumentDetection';
 import { DocumentRecord, DocumentStatus, AppSettings, ExtractedData, Attachment } from './types';
 import { normalizeExtractedData } from './services/extractedDataNormalization';
-import { documentProcessingPipeline } from './services/pipeline/documentProcessingPipeline';
-import { costOptimizer } from './services/optimization/costOptimizer';
-import { pipelineErrorHandler } from './services/errors/pipelineErrorHandler';
+import { formatPreflightForDialog, runExportPreflight } from './services/exportPreflight';
+import { User } from './services/supabaseService';
 
 const computeFileHash = async (file: File): Promise<string> => {
   const buffer = await file.arrayBuffer();
@@ -182,10 +196,18 @@ export default function App() {
     reason: string;
   } | null>(null);
 
+  // Auth State
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   // Filter State
   const [filterYear, setFilterYear] = useState<string>('all');
-  const [filterQuarter] = useState<string>('all');
+  const [filterQuarter, setFilterQuarter] = useState<string>('all');
   const [filterMonth, setFilterMonth] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterVendor, setFilterVendor] = useState<string>('all');
+  const [filterAccount, setFilterAccount] = useState<string>('all');
+  const [filterTaxCategory, setFilterTaxCategory] = useState<string>('all');
   
   // Drag State for Sidebar
   const [sidebarDragTarget, setSidebarDragTarget] = useState<string | null>(null);
@@ -199,23 +221,6 @@ export default function App() {
   const [compareDoc, setCompareDoc] = useState<DocumentRecord | null>(null);
   const [originalDoc, setOriginalDoc] = useState<DocumentRecord | null>(null);
 
-  // Pipeline Progress State
-  const [pipelineProgress, setPipelineProgress] = useState<{
-    phase: string;
-    completed: number;
-    total: number;
-    message: string;
-    batchIndex: number;
-    currentFile: string;
-  } | null>(null);
-
-  // Cost Tracking State
-  const [costInfo, setCostInfo] = useState<{
-    remaining: number;
-    budget: number;
-    avgCost: number;
-  } | null>(null);
-
   useEffect(() => {
     const initData = async () => {
       try {
@@ -226,14 +231,6 @@ export default function App() {
         ]);
         setDocuments(localDocs.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()));
         setSettings(localSettings);
-
-        // Load cost info
-        const status = await documentProcessingPipeline.getStatus();
-        setCostInfo({
-          remaining: status.remaining,
-          budget: status.budget,
-          avgCost: status.avgCost,
-        });
 
         // Optionally sync with Supabase if configured
         if (supabaseService.isSupabaseConfigured()) {
@@ -258,10 +255,11 @@ export default function App() {
               setSettings(cloudSettings);
             }
           } catch (syncError) {
-            // Supabase sync failed, using local data
+            console.warn('Supabase sync failed, using local data:', syncError);
           }
         }
       } catch (e) {
+        console.error("Init Error:", e);
         setNotification('Fehler beim Laden der Daten. IndexedDB oder Supabase prüfen.');
       }
     };
@@ -307,9 +305,7 @@ export default function App() {
     if (files.length === 0) return;
     setIsProcessing(true);
     setViewMode('document');
-    setPipelineProgress(null);
 
-    // Prepare file data
     const newDocs: DocumentRecord[] = [];
     const fileData: {id: string, file: File, hash: string, base64: string, url: string}[] = [];
 
@@ -332,124 +328,217 @@ export default function App() {
     setDocuments(prev => [...newDocs, ...prev]);
 
     const currentSettings = settings || await storageService.getSettings();
-    const currentDocs = await storageService.getAllDocuments();
-
-    // Check for exact duplicates first
-    const exactDuplicates: DocumentRecord[] = [];
-    const filesToProcess: typeof fileData = [];
-
-    for (const item of fileData) {
-        const isExactDuplicate = currentDocs.some(d => d.fileHash === item.hash);
-        if (isExactDuplicate) {
-            const original = currentDocs.find(d => d.fileHash === item.hash);
-            exactDuplicates.push({
-                id: item.id,
-                fileName: item.file.name,
-                fileType: item.file.type,
-                uploadDate: new Date().toISOString(),
-                status: DocumentStatus.DUPLICATE,
-                data: null,
-                duplicateReason: "Datei identisch (Hash)",
-                duplicateOfId: original?.id,
-                duplicateConfidence: 1,
-                previewUrl: item.url,
-                fileHash: item.hash
-            });
-        } else {
-            filesToProcess.push(item);
-        }
-    }
-
-    // Process remaining files through the pipeline
-    const processedResults = await documentProcessingPipeline.processBatch(
-        filesToProcess,
-        currentDocs,
-        currentSettings,
-        (progress) => {
-            setPipelineProgress({
-                phase: progress.phase,
-                completed: progress.completed,
-                total: progress.total,
-                message: progress.message,
-                batchIndex: progress.batchIndex,
-                currentFile: filesToProcess[progress.batchIndex]?.file.name || '',
-            });
-        }
-    );
-
-    // Combine results
-    const finalResults = [...exactDuplicates, ...processedResults.map(r => r.document)];
-
-    // Save all documents
-    for (const doc of finalResults) {
-        await storageService.saveDocument(doc);
-        if (supabaseService.isSupabaseConfigured()) {
-            try {
-                await supabaseService.saveDocument(doc);
-            } catch (e) {
-                // Supabase sync failed - document saved locally
-            }
-        }
-
-        // Handle private documents
-        if (doc.status === DocumentStatus.PRIVATE && doc.data?.privatanteil) {
-            try {
-                await supabaseService.savePrivateDocument(
-                    doc.id,
-                    doc.fileName,
-                    doc.fileType,
-                    doc.previewUrl?.split(',')[1] || '',
-                    doc.data,
-                    'Private Positionen erkannt'
-                );
-                setPrivateDocNotification({
-                    vendor: doc.data?.lieferantName || 'Unbekannt',
-                    amount: doc.data?.bruttoBetrag || 0,
-                    reason: 'Private Positionen erkannt'
-                });
-            } catch (e) {
-                // Already saved locally
-            }
-        }
-    }
-
-    // Update documents state
+    const processedBatch: DocumentRecord[] = [];
+    // Use functional state access to get the current documents
+    const currentDocsSnapshotRef: { current: DocumentRecord[] } = { current: [] };
     setDocuments(prev => {
-        const cleanPrev = prev.filter(d => !finalResults.some(n => n.id === d.id));
-        return [...finalResults, ...cleanPrev];
+        currentDocsSnapshotRef.current = [...prev];
+        return prev;
+    });
+    let autoMergedCount = 0;
+
+    const processingPromises = fileData.map(async (item) => {
+        const isExactDuplicate = currentDocsSnapshotRef.current.some(d => d.id !== item.id && d.fileHash === item.hash);
+        if (isExactDuplicate) {
+                         const original = currentDocsSnapshotRef.current.find(d => d.fileHash === item.hash);
+             return { 
+                 type: 'DOC', 
+                                 doc: { 
+                                     id: item.id,
+                                     status: DocumentStatus.DUPLICATE,
+                                     error: undefined,
+                                     data: null,
+                                     duplicateReason: "Datei identisch (Hash)",
+                                     duplicateOfId: original?.id,
+                                     duplicateConfidence: 1
+                                 } 
+             };
+        }
+
+        try {
+            const extractedRaw = await analyzeDocumentWithGemini(item.base64, item.file.type);
+            const extracted = normalizeExtractedData(extractedRaw);
+            
+            // Check for Semantic Duplicate using Extracted Data
+            const semanticDup = findSemanticDuplicate(extracted, currentDocsSnapshotRef.current);
+            
+            if (semanticDup && semanticDup.doc.id !== item.id) {
+                 // OPTION A: Auto-Merge if it was a file upload that matches an existing one perfectly?
+                 // Current logic: Create a NEW doc entry but mark as DUPLICATE so user sees it.
+                 // This is safer than silently merging.
+                 return {
+                     type: 'DOC',
+                     doc: {
+                         id: item.id,
+                         status: DocumentStatus.DUPLICATE,
+                         data: extracted,
+                         duplicateReason: semanticDup.reason || "Inhaltliches Duplikat erkannt",
+                         duplicateOfId: semanticDup.doc.id,
+                         duplicateConfidence: semanticDup.confidence
+                     }
+                 };
+            }
+
+            // --- Private Document Detection ---
+            const privateCheck = detectPrivateDocument(extracted);
+            if (privateCheck.isPrivate && privateCheck.detectedVendor) {
+                return {
+                    type: 'PRIVATE_DOC',
+                    id: item.id,
+                    base64: item.base64,
+                    fileName: item.file.name,
+                    fileType: item.file.type,
+                    data: extracted,
+                    vendor: privateCheck.detectedVendor,
+                    reason: privateCheck.reason || 'Private Positionen erkannt'
+                };
+            }
+
+            const outcome = classifyOcrOutcome(extracted);
+            return { type: 'DOC', data: extracted, id: item.id, outcome };
+        } catch (e) {
+            return { 
+                type: 'DOC', 
+                doc: { id: item.id, status: DocumentStatus.ERROR, error: "KI Analyse fehlgeschlagen", data: null, duplicateReason: undefined } 
+            };
+        }
     });
 
-    // Update cost info
-    const status = await documentProcessingPipeline.getStatus();
-    setCostInfo({
-        remaining: status.remaining,
-        budget: status.budget,
-        avgCost: status.avgCost,
-    });
+    const results = await Promise.all(processingPromises);
 
-    // Show notifications
-    const errors = processedResults.filter(r => r.document.status === DocumentStatus.ERROR).length;
-    const duplicates = exactDuplicates.length;
-    const privateDocs = processedResults.filter(r => r.document.status === DocumentStatus.PRIVATE).length;
+    for (const res of results) {
+        // --- Handle Private Documents ---
+        if (res.type === 'PRIVATE_DOC') {
+            const privateRes = res as any;
+            try {
+                // Upload to belege_privat table
+                await supabaseService.savePrivateDocument(
+                    privateRes.id,
+                    privateRes.fileName,
+                    privateRes.fileType,
+                    privateRes.base64,
+                    privateRes.data,
+                    privateRes.reason
+                );
 
-    let notificationMsg = '';
-    if (errors > 0) notificationMsg += `${errors} Fehler, `;
-    if (duplicates > 0) notificationMsg += `${duplicates} Duplikate, `;
-    if (privateDocs > 0) notificationMsg += `${privateDocs} privat, `;
+                // Show notification to user
+                setPrivateDocNotification({
+                    vendor: privateRes.vendor,
+                    amount: privateRes.data?.bruttoBetrag || 0,
+                    reason: privateRes.reason
+                });
 
-    if (notificationMsg) {
-        setNotification(notificationMsg.slice(0, -2) + ' verarbeitet.');
-    } else {
-        setNotification(`${processedResults.length} Dokumente erfolgreich verarbeitet.`);
+                // Don't add to processedBatch (won't show in UI)
+            } catch (e) {
+                console.error('Failed to save private document:', e);
+                // Fallback: save as normal document with PRIVATE status
+                const fallbackDoc: DocumentRecord = {
+                    id: privateRes.id,
+                    fileName: privateRes.fileName,
+                    fileType: privateRes.fileType,
+                    uploadDate: new Date().toISOString(),
+                    status: DocumentStatus.PRIVATE,
+                    data: { ...privateRes.data, privatanteil: true }
+                };
+                processedBatch.push(fallbackDoc);
+                await supabaseService.saveDocument(fallbackDoc);
+            }
+            continue;
+        }
+
+        if (res.type === 'MERGE') {
+             // Logic kept for potential future use, currently findSemanticDuplicate mainly flags as DUPLICATE
+             // Use type assertion because currently no path returns MERGE, so TS infers only DOC types
+             const mergeRes = res as any;
+             const targetDoc = currentDocsSnapshotRef.current.find(d => d.id === mergeRes.targetId);
+             if (targetDoc) {
+                 const updatedDoc = {
+                     ...targetDoc,
+                     attachments: [...(targetDoc.attachments || []), mergeRes.attachment]
+                 };
+                 await supabaseService.saveDocument(updatedDoc);
+                 currentDocsSnapshotRef.current = currentDocsSnapshotRef.current.map(d => d.id === targetDoc.id ? updatedDoc : d);
+                 autoMergedCount++;
+             }
+        } else if (res.type === 'DOC') {
+            let finalDoc: DocumentRecord | undefined;
+
+            if ('doc' in res && res.doc) {
+                // It's either an Error or a Duplicate
+                const resultDoc = res.doc;
+                const placeholder = newDocs.find(d => d.id === resultDoc.id);
+                if (!placeholder) continue;
+                
+                // If it's a duplicate, we still save the extracted data so the user can verify WHY it's a duplicate
+                finalDoc = { ...placeholder, ...resultDoc } as DocumentRecord;
+
+                if (finalDoc.status === DocumentStatus.DUPLICATE && finalDoc.data) {
+                     // Apply rules even for duplicates so they look nice in the UI
+                     const zoeId = generateZoeInvoiceId(finalDoc.data.belegDatum || '', currentDocsSnapshotRef.current);
+                     finalDoc.data.eigeneBelegNummer = zoeId;
+                }
+
+            } else if ('data' in res && res.data && res.id) {
+                // Success Case
+                const { id, data } = res as any;
+                const placeholder = newDocs.find(d => d.id === id);
+                if (!placeholder) continue;
+
+                const zoeId = generateZoeInvoiceId(data.belegDatum || '', currentDocsSnapshotRef.current);
+                let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
+                
+                if (data.lieferantName) {
+                    const rule = await storageService.getVendorRule(data.lieferantName);
+                    if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
+                }
+                
+                const normalized = normalizeExtractedData(data);
+                const outcome = (res as any).outcome || classifyOcrOutcome(normalized);
+                const finalData = applyAccountingRules(
+                    { ...normalized, eigeneBelegNummer: zoeId },
+                    currentDocsSnapshotRef.current,
+                    currentSettings,
+                    overrideRule
+                );
+
+                finalDoc = { ...placeholder, status: outcome.status, data: finalData, error: outcome.error };
+                currentDocsSnapshotRef.current.push(finalDoc); 
+            }
+            
+            if (finalDoc) {
+                processedBatch.push(finalDoc);
+                await storageService.saveDocument(finalDoc);
+                // Optionally sync to Supabase
+                if (supabaseService.isSupabaseConfigured()) {
+                  try {
+                    await supabaseService.saveDocument(finalDoc);
+                  } catch (e) {
+                    console.warn('Failed to sync document to Supabase:', e);
+                  }
+                }
+            }
+        }
     }
+
+    setDocuments(prev => {
+        const cleanPrev = prev.filter(d => !newDocs.some(n => n.id === d.id));
+        const mergedTargetIds = results.filter(r => r.type === 'MERGE').map((r:any) => r.targetId);
+        const updatedOldDocs = cleanPrev.map(d => {
+            if (mergedTargetIds.includes(d.id)) {
+                return currentDocsSnapshotRef.current.find(snap => snap.id === d.id) || d;
+            }
+            return d;
+        });
+        return [...processedBatch, ...updatedOldDocs];
+    });
 
     setIsProcessing(false);
-    setPipelineProgress(null);
-
-    // Select first document
-    if (finalResults.length > 0) {
-        setSelectedDocId(finalResults[0].id);
+    
+    if (autoMergedCount > 0) {
+        setNotification(`${autoMergedCount} Duplikat(e) automatisch zusammengeführt.`);
     }
+
+    if (processedBatch.length > 0) setSelectedDocId(processedBatch[0].id);
   };
 
   const handleSaveDocument = async (updatedDoc: DocumentRecord) => {
@@ -461,7 +550,7 @@ export default function App() {
       try {
         await supabaseService.saveDocument(updatedDoc);
       } catch (e) {
-        // Supabase sync failed - document saved locally
+        console.warn('Failed to sync document to Supabase:', e);
       }
     }
     // Save vendor rule if applicable
@@ -471,7 +560,7 @@ export default function App() {
         try {
           await supabaseService.saveVendorRule(updatedDoc.data.lieferantName, updatedDoc.data.kontierungskonto, updatedDoc.data.steuerkategorie);
         } catch (e) {
-          // Supabase sync failed - vendor rule saved locally
+          console.warn('Failed to sync vendor rule to Supabase:', e);
         }
       }
     }
@@ -487,7 +576,7 @@ export default function App() {
       try {
         await supabaseService.deleteDocument(id);
       } catch (e) {
-        // Supabase delete failed - document deleted locally
+        console.warn('Failed to delete document from Supabase:', e);
       }
     }
   };
@@ -544,7 +633,7 @@ export default function App() {
         await supabaseService.saveDocument(updatedTarget);
         await supabaseService.deleteDocument(sourceId);
       } catch (e) {
-        // Supabase sync failed - merge saved locally
+        console.warn('Failed to sync merge to Supabase:', e);
       }
     }
     
@@ -557,66 +646,27 @@ export default function App() {
 
   const handleRetryOCR = async (doc: DocumentRecord) => {
     if (!doc.previewUrl) return;
-
-    setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, status: DocumentStatus.PROCESSING, error: undefined } : d));
-
+        setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, status: DocumentStatus.PROCESSING, error: undefined } : d));
     try {
       const base64 = doc.previewUrl.split(',')[1];
+            const extractedRaw = await analyzeDocumentWithGemini(base64, doc.fileType);
+            const extracted = normalizeExtractedData(extractedRaw);
       const currentSettings = settings || await storageService.getSettings();
-      const currentDocs = await storageService.getAllDocuments();
-
-      // Process single document through pipeline
-      const fileData = {
-        id: doc.id,
-        base64,
-        file: { name: doc.fileName, type: doc.fileType } as File,
-        url: doc.previewUrl,
-      };
-
-      setPipelineProgress({
-        phase: 'starting',
-        completed: 0,
-        total: 6,
-        message: 'Neuer Versuch gestartet...',
-        batchIndex: 0,
-        currentFile: doc.fileName,
-      });
-
-      const result = await documentProcessingPipeline.processDocument(
-        fileData,
-        currentDocs,
-        currentSettings,
-        (progress) => {
-          setPipelineProgress({
-            phase: progress.phase,
-            completed: progress.completed,
-            total: progress.total,
-            message: progress.message,
-            batchIndex: 0,
-            currentFile: doc.fileName,
-          });
-        }
-      );
-
-      const updated = { ...doc, ...result.document };
+      const existingId = doc.data?.eigeneBelegNummer;
+      let overrideRule: { accountId?: string, taxCategoryValue?: string } | undefined = undefined;
+      if (extracted.lieferantName) {
+           const rule = await storageService.getVendorRule(extracted.lieferantName);
+           if (rule) overrideRule = { accountId: rule.accountId, taxCategoryValue: rule.taxCategoryValue };
+      }
+            const finalData = applyAccountingRules(extracted, documents, currentSettings, overrideRule);
+      finalData.eigeneBelegNummer = existingId || generateZoeInvoiceId(finalData.belegDatum, documents);
+            const outcome = classifyOcrOutcome(finalData);
+            const updated = { ...doc, status: outcome.status, data: finalData, error: outcome.error };
       await handleSaveDocument(updated);
-
-      // Update cost info
-      const status = await documentProcessingPipeline.getStatus();
-      setCostInfo({
-        remaining: status.remaining,
-        budget: status.budget,
-        avgCost: status.avgCost,
-      });
-
-      setNotification('Dokument erfolgreich erneut verarbeitet.');
-      setPipelineProgress(null);
-
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Retry fehlgeschlagen';
-      const errDoc = { ...doc, status: DocumentStatus.ERROR, error: msg };
+            const msg = e instanceof Error ? e.message : 'Retry fehlgeschlagen';
+            const errDoc = { ...doc, status: DocumentStatus.ERROR, error: msg };
       await handleSaveDocument(errDoc);
-      setPipelineProgress(null);
     }
   };
 
@@ -677,7 +727,7 @@ export default function App() {
 
   const renderContent = () => {
       if (viewMode === 'settings' && settings) {
-          return <SettingsView settings={settings} _onSave={async (s) => {
+          return <SettingsView settings={settings} onSave={async (s) => {
             setSettings(s);
             // Local-first: Save to IndexedDB first
             await storageService.saveSettings(s);
@@ -686,12 +736,41 @@ export default function App() {
               try {
                 await supabaseService.saveSettings(s);
               } catch (e) {
-                // Supabase sync failed - settings saved locally
+                console.warn('Failed to sync settings to Supabase:', e);
               }
             }
           }} onClose={() => setViewMode('document')} />;
       }
       if (viewMode === 'database') {
+          const handleExportSQLWithPreflight = async () => {
+              const currentSettings = settings || await storageService.getSettings();
+              const docsToExport = filteredDocuments;
+              const preflight = runExportPreflight(docsToExport, currentSettings);
+              const dialog = formatPreflightForDialog(preflight);
+
+              if (preflight.blockers.length > 0) {
+                  alert(`${dialog.title}\n\n${dialog.body}`);
+                  return;
+              }
+
+              if (preflight.warnings.length > 0) {
+                  const ok = confirm(`${dialog.title}\n\n${dialog.body}\n\nTrotzdem exportieren?`);
+                  if (!ok) return;
+              }
+
+              const sql = supabaseService.exportDocumentsToSQL(docsToExport, currentSettings);
+              const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+              const y = filterYear === 'all' ? 'all' : filterYear;
+              const q = filterQuarter === 'all' ? 'all' : filterQuarter;
+              const m = filterMonth === 'all' ? 'all' : filterMonth;
+              const fileName = `zoe_belege_${y}_${q}_${m}_${timestamp}.sql`;
+              const url = URL.createObjectURL(new Blob([sql], { type: 'text/sql' }));
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = fileName;
+              a.click();
+          };
+
           return <DatabaseGrid
               documents={filteredDocuments}
               onOpen={(d) => { setSelectedDocId(d.id); }}
@@ -721,116 +800,82 @@ export default function App() {
           />;
       }
       return (
-          <div className="h-full flex flex-col items-center justify-center p-6 md:p-8 bg-white/50 relative">
-              {/* Modern Background Decor */}
-              <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                   <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/10 rounded-full blur-[100px]"></div>
-                   <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-400/10 rounded-full blur-[100px]"></div>
-              </div>
+        <Center className="h-full bg-background relative">
+            {/* Modern Background Decor */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#0066FF]/10 rounded-full blur-[100px]"></div>
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#FF6B00]/10 rounded-full blur-[100px]"></div>
+            </div>
 
-              <div className="max-w-xl w-full z-10">
-                  <h2 className="text-2xl md:text-3xl font-bold text-center mb-8 text-slate-800 tracking-tight">
-                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">ZOE Solar</span> Accounting
-                  </h2>
-
-                  {/* Pipeline Progress Indicator */}
-                  {pipelineProgress && (
-                    <div className="mb-6 p-4 bg-white rounded-2xl shadow-lg border border-blue-100">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-semibold text-slate-700">{pipelineProgress.message}</span>
-                        <span className="text-xs text-slate-500">{pipelineProgress.completed}/{pipelineProgress.total}</span>
-                      </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2 mb-2">
-                        <div
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${(pipelineProgress.completed / pipelineProgress.total) * 100}%` }}
-                        ></div>
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        Phase: {pipelineProgress.phase} | Datei: {pipelineProgress.currentFile}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Cost Info */}
-                  {costInfo && (
-                    <div className="mb-6 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-600">Budget verbleibend:</span>
-                        <span className={`font-bold ${costInfo.remaining < 1 ? 'text-red-600' : 'text-green-600'}`}>
-                          ${costInfo.remaining.toFixed(2)} / ${costInfo.budget.toFixed(2)}
-                        </span>
-                      </div>
-                      {costInfo.avgCost > 0 && (
-                        <div className="flex justify-between text-xs mt-1">
-                          <span className="text-slate-600">Ø Kosten/Doc:</span>
-                          <span className="font-mono">${costInfo.avgCost.toFixed(4)}</span>
+            <Container className="max-w-xl w-full z-10">
+                <Stack gap="xl" align="center">
+                    <h2 className="text-2xl md:text-3xl font-bold text-center text-text">
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0066FF] to-[#00D4FF]">ZOE Solar</span> Accounting
+                    </h2>
+                    <UploadArea onUploadComplete={(result) => console.log('Upload complete:', result)} />
+                    
+                    {/* Quick stats for mobile on empty state */}
+                    <div className="flex justify-center gap-6 text-text-muted text-xs md:hidden">
+                        <div className="text-center">
+                            <div className="font-bold text-text text-lg">{documents.length}</div>
+                            <div>Belege</div>
                         </div>
-                      )}
+                        <div className="text-center">
+                            <div className="font-bold text-text text-lg">{availableYears[0] || new Date().getFullYear()}</div>
+                            <div>Aktuelles Jahr</div>
+                        </div>
                     </div>
-                  )}
-
-                  <UploadArea onFilesSelected={handleFilesSelect} isProcessing={isProcessing} />
-
-                  {/* Quick stats for mobile on empty state */}
-                  <div className="mt-8 flex justify-center gap-6 text-slate-400 text-xs md:hidden">
-                      <div className="text-center">
-                          <div className="font-bold text-slate-600 text-lg">{documents.length}</div>
-                          <div>Belege</div>
-                      </div>
-                      <div className="text-center">
-                          <div className="font-bold text-slate-600 text-lg">{availableYears[0] || new Date().getFullYear()}</div>
-                          <div>Aktuelles Jahr</div>
-                      </div>
-                  </div>
-              </div>
-          </div>
-      );
+                </Stack>
+            </Container>
+        </Center>
+    );
   };
 
   const SidebarItem = ({ active, label, icon, onClick }: { active: boolean, label: string, icon: React.ReactNode, onClick: () => void }) => (
       <button 
         onClick={onClick} 
-        className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-3 transition-all ${
-            active 
-                ? 'bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-100' 
-                : 'text-slate-600 hover:bg-slate-100'
-        }`}
+        className={`
+          w-full text-left px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-3 transition-all
+          ${active 
+            ? 'bg-surface-hover text-primary ring-1 ring-primary/20' 
+            : 'text-text-muted hover:bg-surface-hover'
+          }
+        `}
       >
-        <span className={`${active ? 'text-blue-600' : 'text-slate-400'}`}>{icon}</span>
+        <span className={`${active ? 'text-primary' : 'text-text-muted'}`}>{icon}</span>
         {label}
       </button>
   );
 
   return (
-    <div className="h-[100dvh] flex bg-white text-slate-900 font-sans text-sm antialiased relative overflow-hidden">
+    <div className="h-[100dvh] flex bg-background text-text font-sans text-sm antialiased relative overflow-hidden">
       
       {/* Toast Notification */}
       {notification && (
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-900/90 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
-              <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[60] bg-surface border border-border text-text px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
+              <svg className="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
               <span className="font-medium">{notification}</span>
           </div>
       )}
 
       {/* Private Document Toast */}
       {privateDocNotification && (
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[60] bg-amber-50/90 backdrop-blur-md border border-amber-200 text-amber-900 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300 max-w-md">
-              <svg className="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[60] bg-surface border border-warning text-text px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300 max-w-md">
+              <svg className="w-5 h-5 text-warning flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
               </svg>
               <div className="flex flex-col min-w-0">
                   <span className="font-medium">Privatbeleg erkannt</span>
-                  <span className="text-xs opacity-75 truncate">
+                  <span className="text-xs text-text-muted truncate">
                     {privateDocNotification.vendor} - {privateDocNotification.amount.toFixed(2)} EUR
                   </span>
-                  <span className="text-[10px] opacity-60 truncate">
+                  <span className="text-[10px] text-text-muted truncate">
                     {privateDocNotification.reason}
                   </span>
               </div>
               <button
                 onClick={() => setPrivateDocNotification(null)}
-                className="ml-2 text-amber-600 hover:text-amber-800 flex-shrink-0"
+                className="ml-2 text-warning hover:text-warning/80 flex-shrink-0"
               >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
@@ -843,16 +888,16 @@ export default function App() {
       <aside 
         ref={sidebarRef}
         style={{ width: sidebarWidth }}
-        className="hidden md:flex bg-slate-50/50 border-r border-slate-200/60 flex-col z-20 flex-shrink-0 relative group backdrop-blur-xl"
+        className="hidden md:flex bg-surface/50 border-r border-border/30 flex-col z-20 flex-shrink-0 relative group backdrop-blur-xl"
       >
           <div 
             className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue-500/50 z-50 transition-colors"
             onMouseDown={startResizing}
           ></div>
 
-          <div className="h-16 flex items-center px-5 border-b border-slate-200/60 flex-none">
-              <div className="font-bold text-lg flex items-center gap-2 text-slate-800 tracking-tight">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+          <div className="h-16 flex items-center px-5 border-b border-border/30 flex-none bg-surface">
+              <div className="font-bold text-lg flex items-center gap-2 text-text tracking-tight">
+                  <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-text-inverted shadow-lg shadow-primary/30">
                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                   </div>
                   <span>ZOE</span>
@@ -876,9 +921,9 @@ export default function App() {
              </div>
 
              <div className="relative group">
-                 <svg className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                 <svg className="absolute left-3 top-2.5 text-text-muted w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                  <input 
-                    className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm" 
+                    className="w-full bg-surface border border-border rounded-xl pl-9 pr-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-text placeholder-text-muted" 
                     placeholder="Suchen..." 
                     value={searchQuery} 
                     onChange={e => setSearchQuery(e.target.value)} 
@@ -889,7 +934,7 @@ export default function App() {
                  <select 
                     value={filterYear}
                     onChange={(e) => setFilterYear(e.target.value)}
-                    className="bg-white border border-slate-200 rounded-lg text-xs py-1.5 px-2 flex-1 outline-none focus:border-blue-500 cursor-pointer text-slate-600 font-medium"
+                    className="bg-surface border border-border rounded-lg text-xs py-1.5 px-2 flex-1 outline-none focus:border-primary cursor-pointer text-text font-medium"
                  >
                     <option value="all">Jahr</option>
                     {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
@@ -897,7 +942,7 @@ export default function App() {
                  <select 
                     value={filterMonth}
                     onChange={(e) => setFilterMonth(e.target.value)}
-                    className="bg-white border border-slate-200 rounded-lg text-xs py-1.5 px-2 w-16 outline-none focus:border-blue-500 cursor-pointer text-slate-600 font-medium"
+                    className="bg-surface border border-border rounded-lg text-xs py-1.5 px-2 w-16 outline-none focus:border-primary cursor-pointer text-text font-medium"
                  >
                     <option value="all">Mon</option>
                     {Array.from({length: 12}, (_, i) => i + 1).map(m => (
@@ -954,9 +999,11 @@ export default function App() {
                             }}
                             className={`
                                 flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all relative
-                                ${isActive ? 'bg-white shadow-md shadow-blue-500/5 text-blue-700 ring-1 ring-blue-100' : 'text-slate-600 hover:bg-slate-100/80'}
-                                ${isDragTarget ? 'ring-2 ring-blue-500 bg-blue-50' : ''}
-                                ${isDup && !isActive ? 'bg-red-50 text-red-600' : ''}
+                                ${isActive 
+                                    ? 'bg-surface shadow-md shadow-primary/10 text-primary ring-1 ring-primary/20' 
+                                    : 'text-text hover:bg-surface-hover'}
+                                ${isDragTarget ? 'ring-2 ring-primary bg-surface-hover' : ''}
+                                ${isDup && !isActive ? 'bg-error/10 text-error' : ''}
                                 ${(isDup || isErr || isReview) ? 'opacity-80' : ''}
                             `}
                         >
@@ -999,7 +1046,7 @@ export default function App() {
              </div>
           </div>
 
-          <div className="p-4 border-t border-slate-200/60 bg-slate-50/30">
+          <div className="p-4 border-t border-border/30">
                <SidebarItem 
                  active={viewMode === 'settings'} 
                  label="Einstellungen" 
@@ -1010,38 +1057,38 @@ export default function App() {
       </aside>
 
       {/* --- MOBILE BOTTOM NAVIGATION (Visible only on Mobile) --- */}
-      <nav className="md:hidden fixed bottom-6 left-4 right-4 h-16 bg-white/80 backdrop-blur-2xl border border-white/20 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-2xl z-50 flex items-center justify-around px-2">
+      <nav className="md:hidden fixed bottom-6 left-4 right-4 h-16 bg-surface border border-border shadow-lg backdrop-blur-xl rounded-2xl z-50 flex items-center justify-around px-2">
           <button 
              onClick={() => { setSelectedDocId(null); setViewMode('document'); }}
-             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${viewMode === 'document' && !selectedDocId ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
+             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${viewMode === 'document' && !selectedDocId ? 'text-primary bg-surface-hover ring-1 ring-primary/20' : 'text-text-muted hover:bg-surface-hover'}`}
           >
              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
           </button>
           
           <button 
              onClick={() => { if(documents.length > 0) setSelectedDocId(documents[0].id); else setViewMode('document'); }}
-             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${selectedDocId ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
+             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${selectedDocId ? 'text-primary bg-surface-hover ring-1 ring-primary/20' : 'text-text-muted hover:bg-surface-hover'}`}
           >
              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           </button>
 
           <button 
              onClick={() => { setSelectedDocId(null); setViewMode('database'); }}
-             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${viewMode === 'database' ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
+             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${viewMode === 'database' ? 'text-primary bg-surface-hover ring-1 ring-primary/20' : 'text-text-muted hover:bg-surface-hover'}`}
           >
              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           </button>
 
           <button 
              onClick={() => { setSelectedDocId(null); setViewMode('settings'); }}
-             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${viewMode === 'settings' ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
+             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${viewMode === 'settings' ? 'text-primary bg-surface-hover ring-1 ring-primary/20' : 'text-text-muted hover:bg-surface-hover'}`}
           >
              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2-2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
       </nav>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col relative overflow-hidden bg-white/50 min-w-0 md:mb-0 mb-20">
+      <main className="flex-1 flex flex-col relative overflow-hidden bg-background min-w-0 md:mb-0 mb-20">
           {renderContent()}
       </main>
 

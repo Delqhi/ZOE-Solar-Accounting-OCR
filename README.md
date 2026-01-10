@@ -418,9 +418,7 @@ type DocumentStatus =
 
 ---
 
-## 🧪 Testing & Validation
-
-### Unit Tests
+## 🧪 Testing
 
 | Framework | vitest ^4.0.16 |
 |-----------|----------------|
@@ -428,7 +426,7 @@ type DocumentStatus =
 | **Test-Count** | 160 Unit Tests |
 | **Coverage** | 12 Test-Dateien |
 
-#### Test-Dateien
+### Test-Dateien
 
 | Test | Was getestet wird |
 |------|-------------------|
@@ -437,115 +435,6 @@ type DocumentStatus =
 | `extractedDataNormalization.test.ts` | Daten-Normalisierung |
 | `datevExport.test.ts` | DATEV Format-Generierung |
 | `elsterExport.test.ts` | ELSTER XML-Generierung |
-
-### Visual & Console Testing (Claude CLI)
-
-Dieses Projekt verfügt über umfassende **Claude CLI Testing Tools** für 100% Fehlerfreiheit:
-
-#### 🚀 Schnell-Validation
-```bash
-# Alle Checks in einem Befehl
-./validate.sh
-
-# Oder manuell:
-npm run build && npx tsc --noEmit && npm run lint
-```
-
-#### 🎯 `/console-check` Command
-**Browser-Konsolen- und Visual-Testing für Web-Apps**
-
-```bash
-# Installiere Playwright (einmalig)
-npx playwright install chromium
-
-# Teste localhost
-node .claude/commands/console-check.js
-
-# Teste mit sichtbarem Browser
-node .claude/commands/console-check.js --visible
-
-# Teste Produktion
-node .claude/commands/console-check.js https://zoe-solar-accounting-ocr.vercel.app
-```
-
-**Was der Command prüft:**
-- ✅ Alle Browser-Konsolen-Nachrichten (Logs, Warnings, Errors)
-- ✅ JavaScript-Fehler und Page-Errors
-- ✅ Fehlgeschlagene API-Requests
-- ✅ DOM-Fehler (rote Texte, Error-Meldungen)
-- ✅ Tailwind CSS Funktionalität
-- ✅ Favicon-Loading
-- ✅ React Error Boundaries
-- ✅ Screenshot-Dokumentation
-
-**Output Beispiel:**
-```
-🔍 Starting Console Check...
-🌐 Navigating to http://localhost:5173...
-✅ [LOG] Security checks passed
-❌ [ERROR] Failed to fetch: Connection refused
-📸 Screenshot: console-check-1704567890123.png
-
-📊 CONSOLE CHECK REPORT
-==================================================
-📄 Page Title: ZOE Solar Accounting
-📨 Console Messages: 15 (Logs: 8, Warnings: 0, Errors: 7)
-🔍 Validation Checks:
-   DOM Errors: ❌ (2 found)
-   Tailwind CSS: ✅
-   Favicon: ✅
-   React Errors: ✅
-
-🎯 FINAL VERDICT:
-   ❌ Issues detected - fix before deployment
-```
-
-#### 📊 Visual Testing Script
-```bash
-# Erstellt visuellen Test mit Playwright
-node test-visual.js
-
-# Oder mit sichtbarem Browser
-node test-visual.js --headless=false
-```
-
-### 🤖 Claude Automatisierung
-
-Wenn Claude Code auf dieses Projekt trifft, führt es automatisch folgende Checks aus:
-
-1. **Build & Type Check** → `npm run build && npx tsc --noEmit`
-2. **Lint Check** → `npm run lint`
-3. **Visual Test** → `node test-visual.js` (falls vorhanden)
-4. **Console Check** → `node .claude/commands/console-check.js`
-
-**Ziel:** 100% Fehlerfreiheit vor jedem Commit.
-
-### 📋 Validierungs-Checkliste
-
-Vor Deployment muss alles grün sein:
-
-- [ ] Build: 0 Fehler
-- [ ] TypeScript: 0 Fehler
-- [ ] ESLint: 0 Fehler (Warnings OK)
-- [ ] Visual Test: Clean
-- [ ] Console Check: Clean
-- [ ] Alle Features funktionieren
-
-### 📁 Claude Konfiguration
-
-```
-.claude/
-├── README.md                    # Übersicht
-├── claude-config.md            # Universelle Regeln
-├── universal-testing-instructions.md  # Detaillierte Anleitung
-├── commands/
-│   ├── console-check.js        # Executable Command
-│   └── console-check.md        # Command Docs
-└── scripts/
-    └── visual-test.js          # Visual Testing
-```
-
-Siehe `.claude/README.md` für Details.
 
 ### Test-Kommandos
 
