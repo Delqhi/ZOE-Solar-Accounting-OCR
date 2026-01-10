@@ -1,24 +1,5 @@
-import { supabase, Beleg, Steuerkategorie, Kontierungskonto, LieferantenRegel, Einstellung, isSupabaseConfigured, testSupabaseConnection } from './supabaseClient';
+import { supabase, Beleg, BelegPosition, Steuerkategorie, Kontierungskonto, LieferantenRegel, Einstellung } from './supabaseClient';
 import { ExtractedData, DocumentStatus } from '../types';
-
-// Helper to ensure Supabase is available
-function ensureSupabase(): void {
-  if (!isSupabaseConfigured()) {
-    throw new Error('Supabase not configured');
-  }
-}
-
-// Helper to handle Supabase errors gracefully
-async function safeSupabaseQuery<T>(queryFn: () => Promise<T>, defaultValue: T, operationName: string): Promise<T> {
-  try {
-    const result = await queryFn();
-    return result;
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn(`Supabase ${operationName} unavailable (returning default):`, (err as Error).message);
-    return defaultValue;
-  }
-}
 
 // Convert extracted data to database format
 function belegToDb(data: ExtractedData, fileInfo: {
@@ -69,8 +50,8 @@ function belegToDb(data: ExtractedData, fileInfo: {
   };
 }
 
-// Convert database format to extracted data (exported for testing)
-export function dbToBeleg(beleg: Beleg): Partial<ExtractedData> {
+// Convert database format to extracted data
+function dbToBeleg(beleg: Beleg): Partial<ExtractedData> {
   return {
     documentType: beleg.document_type || undefined,
     belegDatum: beleg.beleg_datum || '',
@@ -117,7 +98,6 @@ export const belegeService = {
     limit?: number;
     offset?: number;
   }): Promise<{ data: Beleg[]; count: number }> {
-    ensureSupabase();
     let query = supabase
       .from('belege')
       .select('*', { count: 'exact' })
@@ -142,38 +122,18 @@ export const belegeService = {
       query = query.range(options.offset, options.offset + (options.limit || 50) - 1);
     }
 
-    try {
-      const { data, error, count } = await query;
+    const { data, error, count } = await query;
 
-      if (error) {
-        // eslint-disable-next-line no-console
-        console.warn('Supabase query warning (returning empty):', error.message);
-        return { data: [], count: 0 };
-      }
-
-      return { data: data as Beleg[], count: count || 0 };
-    } catch (err) {
-      // Handle network errors when Supabase is unreachable
-      // Import monitoring service to log the error properly
-      try {
-        const { monitoringService } = await import('./monitoringService');
-        monitoringService.captureError(err, {
-          operation: 'belegeService.getAll',
-          url: 'supabase://belege',
-          context: options,
-        });
-      } catch (importErr) {
-        // Fallback if monitoring service import fails
-        // eslint-disable-next-line no-console
-        console.warn('Supabase connection unavailable (returning empty):', (err as Error).message);
-      }
-      return { data: [], count: 0 };
+    if (error) {
+      console.error('Error fetching belege:', error);
+      throw error;
     }
+
+    return { data: data as Beleg[], count: count || 0 };
   },
 
   // Get single document by ID
   async getById(id: string): Promise<Beleg | null> {
-    ensureSupabase();
     const { data, error } = await supabase
       .from('belege')
       .select('*, positionen(*)')
@@ -184,7 +144,6 @@ export const belegeService = {
       if (error.code === 'PGRST116') {
         return null; // Not found
       }
-      // eslint-disable-next-line no-console
       console.error('Error fetching beleg:', error);
       throw error;
     }
@@ -200,7 +159,6 @@ export const belegeService = {
     file_hash?: string;
     gitlab_storage_url?: string;
   }): Promise<Beleg> {
-    ensureSupabase();
     const belegData = belegToDb(data, fileInfo);
 
     const { data: beleg, error } = await supabase
@@ -210,7 +168,6 @@ export const belegeService = {
       .single();
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error('Error creating beleg:', error);
       throw error;
     }
@@ -225,7 +182,6 @@ export const belegeService = {
 
   // Update document
   async update(id: string, data: Partial<ExtractedData>): Promise<Beleg> {
-    ensureSupabase();
     // Build update object with only defined fields
     const updateData: Partial<Beleg> = {};
 
@@ -266,7 +222,6 @@ export const belegeService = {
       .single();
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error('Error updating beleg:', error);
       throw error;
     }
@@ -281,7 +236,6 @@ export const belegeService = {
 
   // Update status
   async updateStatus(id: string, status: DocumentStatus, error?: string): Promise<Beleg> {
-    ensureSupabase();
     const updateData: Partial<Beleg> = {
       status,
       processed_at: new Date().toISOString(),
@@ -299,7 +253,6 @@ export const belegeService = {
       .single();
 
     if (updateError) {
-      // eslint-disable-next-line no-console
       console.error('Error updating beleg status:', updateError);
       throw updateError;
     }
@@ -309,14 +262,12 @@ export const belegeService = {
 
   // Delete document
   async delete(id: string): Promise<void> {
-    ensureSupabase();
     const { error } = await supabase
       .from('belege')
       .delete()
       .eq('id', id);
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error('Error deleting beleg:', error);
       throw error;
     }
@@ -324,7 +275,6 @@ export const belegeService = {
 
   // Check for duplicate by file hash
   async findByFileHash(fileHash: string): Promise<Beleg | null> {
-    ensureSupabase();
     const { data, error } = await supabase
       .from('belege')
       .select('*')
@@ -337,7 +287,6 @@ export const belegeService = {
       if (error.code === 'PGRST116') {
         return null;
       }
-      // eslint-disable-next-line no-console
       console.error('Error checking for duplicate:', error);
       throw error;
     }
@@ -347,7 +296,6 @@ export const belegeService = {
 
   // Check for semantic duplicates (same invoice number + supplier + amount)
   async findSemanticDuplicates(belegNummer: string, lieferant: string, betrag: number): Promise<Beleg[]> {
-    ensureSupabase();
     const { data, error } = await supabase
       .from('belege')
       .select('*')
@@ -359,7 +307,6 @@ export const belegeService = {
       .limit(5);
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error('Error checking for semantic duplicates:', error);
       throw error;
     }
@@ -369,7 +316,6 @@ export const belegeService = {
 
   // Create positionen (line items)
   async createPositionen(belegId: string, positionen: ExtractedData['lineItems']): Promise<void> {
-    ensureSupabase();
     const positionData = positionen.map((pos, index) => ({
       beleg_id: belegId,
       position_index: index,
@@ -387,7 +333,6 @@ export const belegeService = {
       .insert(positionData);
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error('Error creating positionen:', error);
       throw error;
     }
@@ -395,14 +340,12 @@ export const belegeService = {
 
   // Delete positionen
   async deletePositionen(belegId: string): Promise<void> {
-    ensureSupabase();
     const { error } = await supabase
       .from('beleg_positionen')
       .delete()
       .eq('beleg_id', belegId);
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error('Error deleting positionen:', error);
       throw error;
     }
@@ -410,7 +353,6 @@ export const belegeService = {
 
   // Update positionen
   async updatePositionen(belegId: string, positionen: ExtractedData['lineItems']): Promise<void> {
-    ensureSupabase();
     // Delete existing
     await this.deletePositionen(belegId);
 
@@ -426,13 +368,11 @@ export const belegeService = {
     byStatus: Record<string, number>;
     totalAmount: number;
   }> {
-    ensureSupabase();
     const { data: allData, error } = await supabase
       .from('belege')
       .select('status, brutto_betrag');
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error('Error fetching stats:', error);
       throw error;
     }
@@ -458,7 +398,6 @@ export const belegeService = {
 // Steuerkategorien Service
 export const steuerkategorienService = {
   async getAll(): Promise<Steuerkategorie[]> {
-    ensureSupabase();
     const { data, error } = await supabase
       .from('steuerkategorien')
       .select('*')
@@ -466,7 +405,6 @@ export const steuerkategorienService = {
       .order('label');
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error('Error fetching steuerkategorien:', error);
       throw error;
     }
@@ -475,7 +413,6 @@ export const steuerkategorienService = {
   },
 
   async create(kategorie: Omit<Steuerkategorie, 'id'>): Promise<Steuerkategorie> {
-    ensureSupabase();
     const { data, error } = await supabase
       .from('steuerkategorien')
       .insert(kategorie)
@@ -483,7 +420,6 @@ export const steuerkategorienService = {
       .single();
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error('Error creating steuerkategorie:', error);
       throw error;
     }
@@ -492,7 +428,6 @@ export const steuerkategorienService = {
   },
 
   async seedDefault(): Promise<void> {
-    ensureSupabase();
     const defaultCategories = [
       { wert: '19_pv', label: '19% Vorsteuer', ust_satz: 0.19, vorsteuer: true, reverse_charge: false, aktiv: true },
       { wert: '7_pv', label: '7% Vorsteuer', ust_satz: 0.07, vorsteuer: true, reverse_charge: false, aktiv: true },
@@ -508,7 +443,6 @@ export const steuerkategorienService = {
         .upsert(cat, { onConflict: 'wert' });
 
       if (error) {
-        // eslint-disable-next-line no-console
         console.error('Error seeding steuerkategorie:', error);
       }
     }
@@ -518,7 +452,6 @@ export const steuerkategorienService = {
 // Kontierungskonten Service
 export const kontierungskontenService = {
   async getAll(): Promise<Kontierungskonto[]> {
-    ensureSupabase();
     const { data, error } = await supabase
       .from('kontierungskonten')
       .select('*')
@@ -526,7 +459,6 @@ export const kontierungskontenService = {
       .order('konto_nr');
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error('Error fetching kontierungskonten:', error);
       throw error;
     }
@@ -535,7 +467,6 @@ export const kontierungskontenService = {
   },
 
   async create(konto: Omit<Kontierungskonto, 'id'>): Promise<Kontierungskonto> {
-    ensureSupabase();
     const { data, error } = await supabase
       .from('kontierungskonten')
       .insert(konto)
@@ -543,7 +474,6 @@ export const kontierungskontenService = {
       .single();
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error('Error creating kontierungskonto:', error);
       throw error;
     }
@@ -552,7 +482,6 @@ export const kontierungskontenService = {
   },
 
   async seedDefault(): Promise<void> {
-    ensureSupabase();
     const defaultKonten = [
       { konto_nr: '3400', name: 'Wareneingang (SKR03)', steuerkategorie: '19_pv', aktiv: true },
       { konto_nr: '3100', name: 'Fremdleistung (SKR03)', steuerkategorie: '19_pv', aktiv: true },
@@ -580,7 +509,6 @@ export const kontierungskontenService = {
         .upsert(konto, { onConflict: 'konto_nr' });
 
       if (error) {
-        // eslint-disable-next-line no-console
         console.error('Error seeding kontierungskonto:', error);
       }
     }
@@ -590,7 +518,6 @@ export const kontierungskontenService = {
 // LieferantenRegeln Service
 export const lieferantenRegelnService = {
   async getAll(): Promise<LieferantenRegel[]> {
-    ensureSupabase();
     const { data, error } = await supabase
       .from('lieferanten_regeln')
       .select('*')
@@ -598,7 +525,6 @@ export const lieferantenRegelnService = {
       .order('prioritaet', { ascending: true });
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error('Error fetching lieferanten_regeln:', error);
       throw error;
     }
@@ -607,7 +533,6 @@ export const lieferantenRegelnService = {
   },
 
   async create(regel: Omit<LieferantenRegel, 'id' | 'created_at'>): Promise<LieferantenRegel> {
-    ensureSupabase();
     const { data, error } = await supabase
       .from('lieferanten_regeln')
       .insert(regel)
@@ -615,7 +540,6 @@ export const lieferantenRegelnService = {
       .single();
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error('Error creating lieferanten_regel:', error);
       throw error;
     }
@@ -624,7 +548,6 @@ export const lieferantenRegelnService = {
   },
 
   async findMatching(lieferantName: string): Promise<LieferantenRegel | null> {
-    ensureSupabase();
     const { data, error } = await supabase
       .from('lieferanten_regeln')
       .select('*')
@@ -638,7 +561,6 @@ export const lieferantenRegelnService = {
       if (error.code === 'PGRST116') {
         return null;
       }
-      // eslint-disable-next-line no-console
       console.error('Error finding matching regel:', error);
       throw error;
     }
@@ -650,29 +572,24 @@ export const lieferantenRegelnService = {
 // Einstellungen Service
 export const einstellungenService = {
   async get(schluessel: string): Promise<string | null> {
-    ensureSupabase();
-    return safeSupabaseQuery(async () => {
-      const { data, error } = await supabase
-        .from('einstellungen')
-        .select('wert')
-        .eq('schluessel', schluessel)
-        .single();
+    const { data, error } = await supabase
+      .from('einstellungen')
+      .select('wert')
+      .eq('schluessel', schluessel)
+      .single();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          return null;
-        }
-        // eslint-disable-next-line no-console
-        console.error('Error fetching einstellung:', error);
-        throw error;
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null;
       }
+      console.error('Error fetching einstellung:', error);
+      throw error;
+    }
 
-      return data?.wert || null;
-    }, null, `get(${schluessel})`);
+    return data?.wert || null;
   },
 
   async set(schluessel: string, wert: string, typ: string = 'string'): Promise<Einstellung> {
-    ensureSupabase();
     const { data, error } = await supabase
       .from('einstellungen')
       .upsert({ schluessel, wert, typ }, { onConflict: 'schluessel' })
@@ -680,7 +597,6 @@ export const einstellungenService = {
       .single();
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error('Error setting einstellung:', error);
       throw error;
     }
@@ -689,14 +605,12 @@ export const einstellungenService = {
   },
 
   async getAll(): Promise<Einstellung[]> {
-    ensureSupabase();
     const { data, error } = await supabase
       .from('einstellungen')
       .select('*')
       .order('schluessel');
 
     if (error) {
-      // eslint-disable-next-line no-console
       console.error('Error fetching all einstellungen:', error);
       throw error;
     }

@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { DocumentRecord, ExtractedData, LineItem, Attachment, AppSettings } from '../../../types';
 import { getSettings } from '../../../services/storageService';
-import { getErrorNextSteps } from '../../../services/validation';
+import { isPresent, getErrorNextSteps } from '../../../services/validation';
 
 export interface UseDocumentEditorProps {
   document: DocumentRecord;

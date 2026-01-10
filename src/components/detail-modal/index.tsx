@@ -3,7 +3,7 @@
  * Split into smaller components + custom hook for logic
  */
 import React, { useState, useEffect } from 'react';
-import { DocumentRecord } from '../../types';
+import { DocumentRecord, ExtractedData, AppSettings } from '../../types';
 
 // Hooks
 import { useDocumentEditor } from './hooks/useDocumentEditor';

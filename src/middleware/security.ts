@@ -79,7 +79,6 @@ export function validateEnvironmentVariables(): void {
 
   if (missing.length > 0) {
     const error = `Missing required environment variables: ${missing.join(', ')}`;
-    // eslint-disable-next-line no-console
     console.error('❌ Security Error:', error);
 
     // Don't throw in dev mode
@@ -172,7 +171,6 @@ export function generateSecureId(length: number = 16): string {
  * Security check on app initialization
  */
 export function performSecurityCheck(): void {
-  // eslint-disable-next-line no-console
   console.log('🔒 Running security checks...');
 
   // Validate environment
@@ -189,11 +187,8 @@ export function performSecurityCheck(): void {
   }
 
   // Log security info
-  // eslint-disable-next-line no-console
   console.log('✅ Security checks passed');
-  // eslint-disable-next-line no-console
   console.log(`🚀 Environment: ${import.meta.env.MODE}`);
-  // eslint-disable-next-line no-console
   console.log(`🔒 Version: ${import.meta.env.VITE_APP_VERSION || 'dev'}`);
 }
 
@@ -210,8 +205,7 @@ export function createOperationProtector(
     canExecute: () => {
       const now = Date.now();
       if (now - lastExecution < cooldownMs) {
-        // eslint-disable-next-line no-console
-      console.warn(`Operation "${operation}" blocked by cooldown`);
+        console.warn(`Operation "${operation}" blocked by cooldown`);
         return false;
       }
       lastExecution = now;
@@ -228,12 +222,10 @@ export function createOperationProtector(
  */
 export function secureLog(message: string, data?: any): void {
   if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
     console.log(`[SECURE] ${message}`, data);
   } else {
     // In production, mask sensitive data
     const masked = data ? '[REDACTED]' : '';
-    // eslint-disable-next-line no-console
     console.log(`[SECURE] ${message} ${masked}`);
   }
 }

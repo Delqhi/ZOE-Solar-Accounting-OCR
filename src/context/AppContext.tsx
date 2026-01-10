@@ -144,7 +144,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       dispatch({ type: 'SET_ERROR', payload: null });
     } catch (error: any) {
-      // eslint-disable-next-line no-console
       console.error('Init error:', error);
       dispatch({ type: 'SET_ERROR', payload: 'Failed to load data' });
       toast.error('Daten konnten nicht geladen werden');
@@ -161,7 +160,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dispatch({ type: 'ADD_DOCUMENT', payload: saved as any });
       toast.success('Dokument gespeichert');
     } catch (error: any) {
-      // eslint-disable-next-line no-console
       console.error('Add error:', error);
       toast.error('Speichern fehlgeschlagen');
     } finally {
@@ -175,7 +173,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dispatch({ type: 'UPDATE_DOCUMENT', payload: saved as any });
       toast.success('Aktualisiert');
     } catch (error: any) {
-      // eslint-disable-next-line no-console
       console.error('Update error:', error);
       toast.error('Aktualisierung fehlgeschlagen');
     }
@@ -186,7 +183,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await deleteDocument(id);
       dispatch({ type: 'DELETE_DOCUMENT', payload: id });
     } catch (error: any) {
-      // eslint-disable-next-line no-console
       console.error('Delete error:', error);
       toast.error('Löschen fehlgeschlagen');
     }
@@ -199,7 +195,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dispatch({ type: 'UPDATE_SETTINGS', payload: updates });
       toast.success('Einstellungen gespeichert');
     } catch (error: any) {
-      // eslint-disable-next-line no-console
       console.error('Settings error:', error);
       toast.error('Einstellungen konnten nicht gespeichert werden');
     }
@@ -218,7 +213,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // Retry OCR
-  const retryOCR = useCallback(async (_doc: DocumentRecord) => {
+  const retryOCR = useCallback(async (doc: DocumentRecord) => {
     try {
       // Call OCR service (placeholder - would integrate actual service)
       toast.success('OCR wird erneut gestartet...');
@@ -249,7 +244,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       toast.success('Dokumente erfolgreich verbunden');
     } catch (error: any) {
-      // eslint-disable-next-line no-console
       console.error('Merge error:', error);
       toast.error('Verbinden fehlgeschlagen');
     }

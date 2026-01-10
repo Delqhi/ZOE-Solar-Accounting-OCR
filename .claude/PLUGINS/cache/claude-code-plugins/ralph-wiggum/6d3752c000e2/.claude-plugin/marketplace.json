@@ -1,0 +1,13 @@
+{
+  "name": "ralph-wiggum-local",
+  "owner": {
+    "name": "local",
+    "email": "local@local"
+  },
+  "plugins": [
+    {
+      "name": "ralph-wiggum",
+      "source": "./"
+    }
+  ]
+}

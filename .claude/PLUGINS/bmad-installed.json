@@ -1,0 +1,31 @@
+{
+  "module": "setup-bmad.js",
+  "version": "1.0",
+  "installed": "2026-01-10T04:36:04.576Z",
+  "status": "active",
+  "features": [
+    "BMAD Method (B→M→A→D)",
+    "4-phase workflow",
+    "Phase executors",
+    "Workflow templates",
+    "Auto-detection system"
+  ],
+  "triggers": [
+    "bmad",
+    "BMAD",
+    "business analysis",
+    "technical specification",
+    "architecture design",
+    "systematic development",
+    "brd",
+    "tsd",
+    "phase 1-4"
+  ],
+  "templates": [
+    "Authentication System",
+    "E-commerce Platform",
+    "Analytics Dashboard",
+    "Mobile Backend",
+    "AI/ML Pipeline"
+  ]
+}

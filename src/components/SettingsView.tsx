@@ -5,11 +5,11 @@ import { AppSettings } from '../types';
 
 interface SettingsViewProps {
   settings: AppSettings;
-  _onSave: (settings: AppSettings) => Promise<void>;
+  onSave: (settings: AppSettings) => Promise<void>;
   onClose: () => void;
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ settings, _onSave, onClose }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onClose }) => {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">

@@ -1,0 +1,148 @@
+{
+  "name": "Ralph-Loop Integration",
+  "version": "1.0",
+  "description": "Complete Ralph-Loop workflow with ACP compliance and censorship handling",
+  "phases": [
+    {
+      "name": "Setup Ralph-Loop",
+      "tasks": [
+        {
+          "name": "Fix plugin conflicts",
+          "script": "setup-ralph-loop.js",
+          "step": 1
+        },
+        {
+          "name": "Enable command access",
+          "script": "setup-ralph-loop.js",
+          "step": 2
+        },
+        {
+          "name": "Create handover log",
+          "script": "setup-ralph-loop.js",
+          "step": 3
+        },
+        {
+          "name": "Create config file",
+          "script": "setup-ralph-loop.js",
+          "step": 4
+        },
+        {
+          "name": "Verify infrastructure",
+          "script": "setup-ralph-loop.js",
+          "step": 5
+        }
+      ]
+    },
+    {
+      "name": "ACP Adapter Configuration",
+      "tasks": [
+        {
+          "name": "Configure Claude adapter",
+          "config": "adapters.claude.enabled = true"
+        },
+        {
+          "name": "Configure Gemini adapter",
+          "config": "adapters.gemini.enabled = true"
+        },
+        {
+          "name": "Configure ACP protocol",
+          "config": "adapters.acp.enabled = true"
+        },
+        {
+          "name": "Set permission mode",
+          "config": "auto_approve"
+        }
+      ]
+    },
+    {
+      "name": "Censorship Handling",
+      "tasks": [
+        {
+          "name": "Define triggers",
+          "config": "7 censorship triggers"
+        },
+        {
+          "name": "Set fallback model",
+          "config": "zen/big-pickle"
+        },
+        {
+          "name": "Configure handover log",
+          "config": "/Users/jeremy/.claude/handover-log.md"
+        },
+        {
+          "name": "Set retry limits",
+          "config": "max_retries: 3"
+        }
+      ]
+    },
+    {
+      "name": "Quality Gates",
+      "tasks": [
+        {
+          "name": "Vision quality threshold",
+          "config": "8.5/10"
+        },
+        {
+          "name": "Task completion rate",
+          "config": "95%"
+        },
+        {
+          "name": "Handover success rate",
+          "config": "95%"
+        },
+        {
+          "name": "Deployment success rate",
+          "config": "98%"
+        }
+      ]
+    },
+    {
+      "name": "Workflow Integration",
+      "tasks": [
+        {
+          "name": "Analysis phase",
+          "trigger": "/ralph-loop:ralph-loop \"Analyze\""
+        },
+        {
+          "name": "Planning phase",
+          "trigger": "/ralph-loop:ralph-loop \"Plan\""
+        },
+        {
+          "name": "Implementation",
+          "trigger": "/ralph-loop:ralph-loop \"Build\""
+        },
+        {
+          "name": "Testing",
+          "trigger": "/ralph-loop:ralph-loop \"Test\""
+        },
+        {
+          "name": "Deployment",
+          "trigger": "/ralph-loop:ralph-loop \"Deploy\""
+        }
+      ]
+    }
+  ],
+  "metrics": {
+    "taskCompletionRate": 95,
+    "handoverSuccessRate": 95,
+    "qualityScoreMin": 8.5,
+    "deploymentSuccessRate": 98,
+    "maxRetries": 3
+  },
+  "triggers": [
+    "Baue",
+    "Fix",
+    "Create",
+    "Entwickle",
+    "Master Loop für",
+    "Deploy",
+    "/ralph-loop"
+  ],
+  "handoverWorkflow": [
+    "1. Claude attempts code generation",
+    "2. If censored → Auto-handover to Big Pickle",
+    "3. Big Pickle generates uncensored code",
+    "4. Continue normal workflow",
+    "5. Log in handover-log.md"
+  ]
+}

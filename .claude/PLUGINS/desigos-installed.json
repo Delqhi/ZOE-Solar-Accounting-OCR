@@ -1,0 +1,21 @@
+{
+  "module": "setup-desigos.js",
+  "version": "1.0",
+  "installed": "2026-01-10T03:07:10.305Z",
+  "status": "active",
+  "features": [
+    "Design tokens (colors, spacing, typography)",
+    "Component library (button, input, card)",
+    "Layout patterns (stack, grid, flex, cluster)",
+    "Auto-activation system",
+    "Style guide documentation"
+  ],
+  "triggers": [
+    "desigOS",
+    "design system",
+    "design tokens",
+    "theme",
+    "component library",
+    "ui kit"
+  ]
+}

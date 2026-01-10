@@ -13,8 +13,8 @@ export interface SubmissionResult {
 }
 
 export async function submitToElster(
-  _documents: DocumentRecord[],
-  _settings: AppSettings
+  documents: DocumentRecord[],
+  settings: AppSettings
 ): Promise<SubmissionResult> {
   // Placeholder implementation
   return {
@@ -25,8 +25,8 @@ export async function submitToElster(
 }
 
 export async function submitToDatev(
-  _documents: DocumentRecord[],
-  _settings: AppSettings
+  documents: DocumentRecord[],
+  settings: AppSettings
 ): Promise<SubmissionResult> {
   // Placeholder implementation
   return {
@@ -38,7 +38,7 @@ export async function submitToDatev(
 
 export async function validateForSubmission(
   documents: DocumentRecord[],
-  _settings: AppSettings
+  settings: AppSettings
 ): Promise<{ valid: boolean; errors: string[] }> {
   const errors: string[] = [];
 

@@ -28,7 +28,6 @@ export class Analytics {
    */
   track(event: string, properties?: Record<string, any>): void {
     if (!import.meta.env.PROD) {
-      // eslint-disable-next-line no-console
       console.log(`[Analytics] ${event}`, properties);
     }
 
@@ -163,11 +162,9 @@ export class Analytics {
 
       // For now, just log in dev
       if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
         console.log(`[Backend Analytics] Would send:`, event);
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.warn('Analytics send failed:', error);
     }
   }

@@ -1,8 +1,9 @@
 /** useUpload Hook - Placeholder */
 
 import { useState } from 'react';
-import { DocumentRecord, DocumentStatus } from '../types';
+import { DocumentRecord, ExtractedData, DocumentStatus } from '../types';
 import { analyzeDocumentWithGemini } from '../services/geminiService';
+import { applyAccountingRules, generateZoeInvoiceId } from '../services/ruleEngine';
 import { normalizeExtractedData } from '../services/extractedDataNormalization';
 import { detectPrivateDocument } from '../services/privateDocumentDetection';
 

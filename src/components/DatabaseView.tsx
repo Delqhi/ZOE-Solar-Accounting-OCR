@@ -4,10 +4,10 @@ import React from 'react';
 
 interface DatabaseViewProps {
   documents: any[];
-  _settings: any;
+  settings: any;
 }
 
-export const DatabaseView: React.FC<DatabaseViewProps> = ({ documents, _settings }) => {
+export const DatabaseView: React.FC<DatabaseViewProps> = ({ documents, settings }) => {
   return (
     <div className="p-4">
       <h2 className="text-xl font-bold mb-4">Datenbank Ansicht</h2>

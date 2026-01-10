@@ -1,0 +1,21 @@
+{
+  "module": "setup-designOS.js",
+  "version": "1.0",
+  "installed": "2026-01-10T11:05:13.790Z",
+  "status": "active",
+  "features": [
+    "Design tokens (colors, spacing, typography)",
+    "Component library (button, input, card)",
+    "Layout patterns (stack, grid, flex, cluster)",
+    "Auto-activation system",
+    "Style guide documentation"
+  ],
+  "triggers": [
+    "designOS",
+    "design system",
+    "design tokens",
+    "theme",
+    "component library",
+    "ui kit"
+  ]
+}

@@ -35,7 +35,6 @@ async function getProjectId(): Promise<number | null> {
   });
 
   if (!response.ok) {
-    // eslint-disable-next-line no-console
     console.error('Failed to get GitLab project:', await response.text());
     return null;
   }
@@ -73,7 +72,6 @@ async function createOrUpdateFile(
 
   if (!response.ok) {
     const error = await response.text();
-    // eslint-disable-next-line no-console
     console.error('Failed to upload file to GitLab:', error);
     return {
       success: false,

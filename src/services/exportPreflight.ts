@@ -7,7 +7,7 @@ export interface PreflightResult {
   warnings: string[];
 }
 
-export function runExportPreflight(documents: DocumentRecord[], _settings: AppSettings | null): PreflightResult {
+export function runExportPreflight(documents: DocumentRecord[], settings: AppSettings | null): PreflightResult {
   const blockers: string[] = [];
   const warnings: string[] = [];
 

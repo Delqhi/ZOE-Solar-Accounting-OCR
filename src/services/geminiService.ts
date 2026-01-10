@@ -2,7 +2,7 @@
 
 import { ExtractedData } from '../types';
 
-export async function analyzeDocumentWithGemini(_base64: string, _mimeType: string): Promise<Partial<ExtractedData>> {
+export async function analyzeDocumentWithGemini(base64: string, mimeType: string): Promise<Partial<ExtractedData>> {
   // Placeholder implementation
   return {
     lieferantName: 'Test Lieferant',

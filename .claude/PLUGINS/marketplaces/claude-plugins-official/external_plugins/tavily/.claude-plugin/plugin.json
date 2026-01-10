@@ -1,0 +1,7 @@
+{
+  "name": "tavily",
+  "description": "Tavily MCP server for intelligent web search. Provides real-time web search capabilities using Tavily's search API.",
+  "author": {
+    "name": "ModelContextProtocol"
+  }
+}

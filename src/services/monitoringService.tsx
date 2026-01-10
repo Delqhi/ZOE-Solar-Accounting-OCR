@@ -27,38 +27,10 @@ class MonitoringService {
   /**
    * Capture error
    */
-  captureError(error: Error | string | any, context?: any): void {
-    let errorMessage: string;
-    let errorStack: string | undefined;
-
-    // Handle different error types
-    if (typeof error === 'string') {
-      errorMessage = error;
-      errorStack = undefined;
-    } else if (error instanceof Error) {
-      errorMessage = error.message;
-      errorStack = error.stack;
-    } else if (typeof error === 'object' && error !== null && error.message) {
-      // Object with a message property (like Supabase errors)
-      errorMessage = error.message;
-      errorStack = error.stack; // May or may not exist
-    } else if (typeof error === 'object' && error !== null) {
-      // Generic object, try to stringify it
-      try {
-        errorMessage = JSON.stringify(error);
-      } catch (e) {
-        errorMessage = `[Non-stringifiable Object] Type: ${typeof error}`;
-      }
-      errorStack = undefined;
-    } else {
-      // Other primitive types
-      errorMessage = String(error);
-      errorStack = undefined;
-    }
-
+  captureError(error: Error | string, context?: any): void {
     const errorInfo: ErrorInfo = {
-      message: errorMessage,
-      stack: errorStack,
+      message: typeof error === 'string' ? error : error.message,
+      stack: typeof error === 'string' ? undefined : error.stack,
       context,
       timestamp: Date.now(),
     };
@@ -69,7 +41,6 @@ class MonitoringService {
       this.errors = this.errors.slice(-this.maxLogs);
     }
 
-    // eslint-disable-next-line no-console
     console.error('🚨 Captured Error:', errorInfo);
 
     // In production, send to external service
@@ -94,7 +65,6 @@ class MonitoringService {
       this.metrics = this.metrics.slice(-this.maxLogs);
     }
 
-    // eslint-disable-next-line no-console
     console.log(`⚡ Metric: ${name} = ${duration.toFixed(2)}ms`);
   }
 
@@ -111,7 +81,7 @@ class MonitoringService {
     } catch (error) {
       const duration = performance.now() - start;
       this.captureMetric(`${name}_failed`, duration);
-      this.captureError(error, { operation: name });
+      this.captureError(error as Error, { operation: name });
       throw error;
     }
   }
@@ -169,11 +139,9 @@ class MonitoringService {
       // });
 
       if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
         console.log('[Monitoring] Would send error to external service:', errorInfo);
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.warn('Failed to send to monitoring service:', error);
     }
   }
@@ -254,7 +222,7 @@ export class MonitoredErrorBoundary extends React.Component<
  * Hook for monitoring
  */
 export function useMonitoring() {
-  const logError = (error: Error | string | any, context?: any) => {
+  const logError = (error: Error | string, context?: any) => {
     monitoringService.captureError(error, context);
   };
 

@@ -1,0 +1,96 @@
+{
+  "version": 2,
+  "plugins": {
+    "ralph-wiggum@claude-code-plugins": [
+      {
+        "scope": "user",
+        "installPath": "/Users/jeremy/.claude/plugins/cache/claude-code-plugins/ralph-wiggum/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-01-03T02:38:25.395Z",
+        "lastUpdated": "2026-01-10T11:05:09.038Z"
+      }
+    ],
+    "feature-dev@claude-code-plugins": [
+      {
+        "scope": "local",
+        "projectPath": "/Users/jeremy/conductor/repos/magicrebuild",
+        "installPath": "/Users/jeremy/.claude/plugins/cache/claude-code-plugins/feature-dev/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-01-03T02:25:49.823Z",
+        "lastUpdated": "2026-01-10T04:15:30.837Z"
+      }
+    ],
+    "context7@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/jeremy/.claude/plugins/cache/claude-plugins-official/context7/113b335d11ae",
+        "version": "113b335d11ae",
+        "installedAt": "2026-01-05T19:51:13.901Z",
+        "lastUpdated": "2026-01-10T04:15:30.837Z",
+        "gitCommitSha": "15b07b46dab33aa07efb447e1b592297b9eaa17c"
+      }
+    ],
+    "frontend-design@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/jeremy/.claude/plugins/cache/claude-plugins-official/frontend-design/113b335d11ae",
+        "version": "113b335d11ae",
+        "installedAt": "2026-01-05T19:51:13.901Z",
+        "lastUpdated": "2026-01-10T04:15:30.837Z",
+        "gitCommitSha": "15b07b46dab33aa07efb447e1b592297b9eaa17c"
+      }
+    ],
+    "feature-dev@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/jeremy/.claude/plugins/cache/claude-plugins-official/feature-dev/113b335d11ae",
+        "version": "113b335d11ae",
+        "installedAt": "2026-01-05T19:51:13.901Z",
+        "lastUpdated": "2026-01-10T04:15:30.837Z",
+        "gitCommitSha": "15b07b46dab33aa07efb447e1b592297b9eaa17c"
+      }
+    ],
+    "serena@claude-plugins-official": [
+      {
+        "scope": "local",
+        "projectPath": "/Users/jeremy/conductor/repos/magicrebuild",
+        "installPath": "/Users/jeremy/.claude/plugins/cache/claude-plugins-official/serena/113b335d11ae",
+        "version": "113b335d11ae",
+        "installedAt": "2026-01-05T19:51:13.901Z",
+        "lastUpdated": "2026-01-10T03:44:01.991Z",
+        "gitCommitSha": "15b07b46dab33aa07efb447e1b592297b9eaa17c"
+      }
+    ],
+    "ralph-wiggum@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/jeremy/.claude/plugins/cache/claude-plugins-official/ralph-wiggum/bf48ae6c75e7",
+        "version": "bf48ae6c75e7",
+        "installedAt": "2026-01-05T19:51:13.901Z",
+        "lastUpdated": "2026-01-10T04:15:30.837Z",
+        "gitCommitSha": "15b07b46dab33aa07efb447e1b592297b9eaa17c"
+      }
+    ],
+    "pr-review-toolkit@claude-code-plugins": [
+      {
+        "scope": "user",
+        "installPath": "/Users/jeremy/.claude/plugins/cache/claude-code-plugins/pr-review-toolkit/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-01-09T12:24:15.634Z",
+        "lastUpdated": "2026-01-10T00:33:03.285Z",
+        "gitCommitSha": "6ebc8555ed9914102273678051e203f98803d18d"
+      }
+    ],
+    "frontend-design@claude-code-plugins": [
+      {
+        "scope": "local",
+        "projectPath": "/Users/jeremy/conductor/repos/magicrebuild",
+        "installPath": "/Users/jeremy/.claude/plugins/cache/claude-code-plugins/frontend-design/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-01-09T13:54:52.499Z",
+        "lastUpdated": "2026-01-10T04:15:30.837Z",
+        "gitCommitSha": "5aac2b1b6aa23b65cd146b7eac8af30bc858d6eb"
+      }
+    ]
+  }
+}
