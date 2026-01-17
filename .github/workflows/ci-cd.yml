@@ -3,7 +3,7 @@ name: ZOE CI/CD Pipeline 2026
 
 on:
   push:
-    branches: [main, DeepthinkAI2025/**]
+    branches: [main, Delqhi/**]
   pull_request:
     branches: [main]
 
