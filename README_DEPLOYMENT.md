@@ -83,7 +83,7 @@ Then deployment happens automatically via GitHub Actions.
 **Workflow**: Ready, blocked by missing secrets
 **Code**: Production-ready
 
-**Latest workflow**: https://github.com/DeepthinkAI2025/ZOE-Solar-Accounting-OCR/actions
+**Latest workflow**: https://github.com/Delqhi/ZOE-Solar-Accounting-OCR/actions
 
 ---
 
