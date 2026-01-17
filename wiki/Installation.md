@@ -11,7 +11,7 @@
 ### 1. Repository klonen
 
 ```bash
-git clone https://github.com/DeepthinkAI2025/ZOE-Solar-Accounting-OCR.git
+git clone https://github.com/Delqhi/ZOE-Solar-Accounting-OCR.git
 cd ZOE-Solar-Accounting-OCR
 ```
 
