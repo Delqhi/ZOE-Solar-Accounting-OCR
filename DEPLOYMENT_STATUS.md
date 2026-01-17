@@ -70,7 +70,7 @@ To enable automated deployment, the following secrets must be added to GitHub:
    - Copy the token value
 
 2. Add GitHub Secrets:
-   - Go to: https://github.com/DeepthinkAI2025/ZOE-Solar-Accounting-OCR/settings/secrets/actions
+   - Go to: https://github.com/Delqhi/ZOE-Solar-Accounting-OCR/settings/secrets/actions
    - Click "New repository secret"
    - Add these three:
      - `VERCEL_TOKEN` = [your token from step 1]
@@ -78,7 +78,7 @@ To enable automated deployment, the following secrets must be added to GitHub:
      - `VERCEL_PROJECT_ID` = `prj_mZIqzJ5k65Di3pQF1Ge9UXCWtjxf`
 
 3. Re-run the workflow:
-   - Go to: https://github.com/DeepthinkAI2025/ZOE-Solar-Accounting-OCR/actions
+   - Go to: https://github.com/Delqhi/ZOE-Solar-Accounting-OCR/actions
    - Find the latest workflow run
    - Click "Re-run all jobs"
 
