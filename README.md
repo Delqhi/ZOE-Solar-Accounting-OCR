@@ -181,7 +181,7 @@ sequenceDiagram
 
 ```bash
 # Repository klonen
-git clone https://github.com/DeepthinkAI2025/ZOE-Solar-Accounting-OCR.git
+git clone https://github.com/Delqhi/ZOE-Solar-Accounting-OCR.git
 cd ZOE-Solar-Accounting-OCR
 
 # Abhängigkeiten installieren
@@ -498,7 +498,7 @@ Die Nutzung ist ausschließlich für ZOE Solar gestattet.
 
 ---
 
-[📖 Wiki](https://github.com/DeepthinkAI2025/ZOE-Solar-Accounting-OCR.wiki) • [🐛 Issues](https://github.com/DeepthinkAI2025/ZOE-Solar-Accounting-OCR/issues) • [📧 Support](mailto:support@zoe-solar.de)
+[📖 Wiki](https://github.com/Delqhi/ZOE-Solar-Accounting-OCR.wiki) • [🐛 Issues](https://github.com/Delqhi/ZOE-Solar-Accounting-OCR/issues) • [📧 Support](mailto:support@zoe-solar.de)
 
 ---
 
