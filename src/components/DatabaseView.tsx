@@ -70,12 +70,14 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   }, [documents, searchQuery, selectedStatus, sortBy, sortOrder]);
 
   // Event handlers
-  const handleDocumentOpen = useCallback((doc: DocumentRecord) => {
-    // TODO: Implement document open handler
+  const handleDocumentOpen = useCallback((_doc: DocumentRecord) => {
+    // Open detail modal with document
+    console.warn('[DatabaseView] handleDocumentOpen not implemented');
   }, []);
 
-  const handleDocumentDelete = useCallback((doc: DocumentRecord) => {
-    // TODO: Implement document delete handler
+  const handleDocumentDelete = useCallback((_doc: DocumentRecord) => {
+    // Confirm and delete from Supabase
+    console.warn('[DatabaseView] handleDocumentDelete not implemented');
   }, []);
 
   return (
@@ -113,6 +115,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           </select>
 
           <button
+            type="button"
             onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
             className="sort-order"
           >
@@ -127,8 +130,12 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
               <span className="doc-status">{doc.status}</span>
               <span className="doc-date">{new Date(doc.uploadDate).toLocaleDateString()}</span>
               <div className="doc-actions">
-                <button onClick={() => handleDocumentOpen(doc)}>Open</button>
-                <button onClick={() => handleDocumentDelete(doc)}>Delete</button>
+                <button type="button" onClick={() => handleDocumentOpen(doc)}>
+                  Open
+                </button>
+                <button type="button" onClick={() => handleDocumentDelete(doc)}>
+                  Delete
+                </button>
               </div>
             </div>
           ))}
