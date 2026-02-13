@@ -23,12 +23,7 @@ export const useResizeObserver = (
   callback: (entry: ResizeObserverEntry) => void,
   options: ResizeObserverOptions = {}
 ) => {
-  const {
-    debounceMs = 16,
-    throttleMs = 100,
-    trackChildren = false,
-    enabled = true
-  } = options;
+  const { debounceMs = 16, throttleMs = 100, trackChildren = false, enabled = true } = options;
 
   const observerRef = useRef<ResizeObserver | null>(null);
   const callbackRef = useRef(callback);
@@ -65,7 +60,7 @@ export const useResizeObserver = (
         if (rect) {
           debouncedCallback({
             contentRect: rect,
-            target: targetElement
+            target: targetElement,
           });
         }
       };
@@ -91,14 +86,14 @@ export const useResizeObserver = (
     });
 
     observerRef.current.observe(targetElement, {
-      box: trackChildren ? 'border-box' : 'content-box'
+      box: trackChildren ? 'border-box' : 'content-box',
     });
 
     // Initial callback
     const initialRect = targetElement.getBoundingClientRect();
     debouncedCallback({
       contentRect: initialRect,
-      target: targetElement
+      target: targetElement,
     });
 
     return () => {
@@ -134,13 +129,13 @@ export const useElementSize = (elementRef: React.RefObject<HTMLElement> | HTMLEl
       width: entry.contentRect.width,
       height: entry.contentRect.height,
       left: entry.contentRect.left,
-      top: entry.contentRect.top
+      top: entry.contentRect.top,
     });
   }, []);
 
   useResizeObserver(elementRef, handleResize, {
     debounceMs: 16,
-    enabled: !!elementRef
+    enabled: !!elementRef,
   });
 
   return size;
@@ -154,27 +149,30 @@ export const useBreakpoint = (
   const [currentBreakpoint, setCurrentBreakpoint] = useState<string | null>(null);
   const [breakpointValues, setBreakpointValues] = useState<{ [key: string]: boolean }>({});
 
-  const handleResize = useCallback((entry: ResizeObserverEntry) => {
-    const width = entry.contentRect.width;
-    let activeBreakpoint: string | null = null;
-    const values: { [key: string]: boolean } = {};
+  const handleResize = useCallback(
+    (entry: ResizeObserverEntry) => {
+      const width = entry.contentRect.width;
+      let activeBreakpoint: string | null = null;
+      const values: { [key: string]: boolean } = {};
 
-    for (const [name, minWidth] of Object.entries(breakpoints)) {
-      const isActive = width >= minWidth;
-      values[name] = isActive;
+      for (const [name, minWidth] of Object.entries(breakpoints)) {
+        const isActive = width >= minWidth;
+        values[name] = isActive;
 
-      if (isActive && (!activeBreakpoint || minWidth > (breakpoints[activeBreakpoint] || 0))) {
-        activeBreakpoint = name;
+        if (isActive && (!activeBreakpoint || minWidth > (breakpoints[activeBreakpoint] || 0))) {
+          activeBreakpoint = name;
+        }
       }
-    }
 
-    setCurrentBreakpoint(activeBreakpoint);
-    setBreakpointValues(values);
-  }, [breakpoints]);
+      setCurrentBreakpoint(activeBreakpoint);
+      setBreakpointValues(values);
+    },
+    [breakpoints]
+  );
 
   useResizeObserver(elementRef, handleResize, {
     debounceMs: 50,
-    enabled: !!elementRef
+    enabled: !!elementRef,
   });
 
   return { currentBreakpoint, breakpointValues };
@@ -185,12 +183,7 @@ export const useIntersectionObserver = (
   elementRef: React.RefObject<HTMLElement> | HTMLElement | null,
   options: IntersectionObserverInit & { enabled?: boolean } = {}
 ) => {
-  const {
-    threshold = 0.1,
-    root = null,
-    rootMargin = '0px',
-    enabled = true
-  } = options;
+  const { threshold = 0.1, root = null, rootMargin = '0px', enabled = true } = options;
 
   const [isIntersecting, setIsIntersecting] = useState(false);
   const [intersectionRatio, setIntersectionRatio] = useState(0);
@@ -206,15 +199,15 @@ export const useIntersectionObserver = (
     if (!targetElement || !window.IntersectionObserver) return;
 
     observerRef.current = new IntersectionObserver(
-      ([entry]) => {
-        setIsIntersecting(entry.isIntersecting);
-        setIntersectionRatio(entry.intersectionRatio);
-        setEntry(entry);
+      ([observerEntry]) => {
+        setIsIntersecting(observerEntry.isIntersecting);
+        setIntersectionRatio(observerEntry.intersectionRatio);
+        setEntry(observerEntry);
       },
       {
         threshold,
         root,
-        rootMargin
+        rootMargin,
       }
     );
 
@@ -232,29 +225,34 @@ export const useIntersectionObserver = (
 };
 
 // Hook for performance monitoring resize events
-export const useResizePerformance = (elementRef: React.RefObject<HTMLElement> | HTMLElement | null) => {
+export const useResizePerformance = (
+  elementRef: React.RefObject<HTMLElement> | HTMLElement | null
+) => {
   const [resizeCount, setResizeCount] = useState(0);
   const [lastResizeTime, setLastResizeTime] = useState(0);
   const [averageResizeTime, setAverageResizeTime] = useState(0);
 
-  const handleResize = useCallback((entry: ResizeObserverEntry) => {
-    const now = performance.now();
-    setResizeCount(prev => prev + 1);
-    setLastResizeTime(now);
+  const handleResize = useCallback(
+    (entry: ResizeObserverEntry) => {
+      const now = performance.now();
+      setResizeCount((prev) => prev + 1);
+      setLastResizeTime(now);
 
-    // Calculate average resize time (simplified)
-    if (resizeCount > 0) {
-      const timeDiff = now - lastResizeTime;
-      setAverageResizeTime(prev => {
-        const newAverage = (prev * resizeCount + timeDiff) / (resizeCount + 1);
-        return newAverage;
-      });
-    }
-  }, [resizeCount, lastResizeTime]);
+      // Calculate average resize time (simplified)
+      if (resizeCount > 0) {
+        const timeDiff = now - lastResizeTime;
+        setAverageResizeTime((prev) => {
+          const newAverage = (prev * resizeCount + timeDiff) / (resizeCount + 1);
+          return newAverage;
+        });
+      }
+    },
+    [resizeCount, lastResizeTime]
+  );
 
   useResizeObserver(elementRef, handleResize, {
     debounceMs: 16,
-    enabled: !!elementRef
+    enabled: !!elementRef,
   });
 
   return {
@@ -265,12 +263,14 @@ export const useResizePerformance = (elementRef: React.RefObject<HTMLElement> | 
       setResizeCount(0);
       setLastResizeTime(0);
       setAverageResizeTime(0);
-    }
+    },
   };
 };
 
 // Hook for detecting container scroll capabilities
-export const useScrollDetection = (elementRef: React.RefObject<HTMLElement> | HTMLElement | null) => {
+export const useScrollDetection = (
+  elementRef: React.RefObject<HTMLElement> | HTMLElement | null
+) => {
   const [canScrollX, setCanScrollX] = useState(false);
   const [canScrollY, setCanScrollY] = useState(false);
   const [scrollWidth, setScrollWidth] = useState(0);
@@ -297,7 +297,7 @@ export const useScrollDetection = (elementRef: React.RefObject<HTMLElement> | HT
 
   useResizeObserver(elementRef, handleResize, {
     debounceMs: 16,
-    enabled: !!elementRef
+    enabled: !!elementRef,
   });
 
   return {
@@ -306,7 +306,7 @@ export const useScrollDetection = (elementRef: React.RefObject<HTMLElement> | HT
     scrollWidth,
     scrollHeight,
     clientWidth,
-    clientHeight
+    clientHeight,
   };
 };
 
@@ -316,5 +316,5 @@ export default {
   useBreakpoint,
   useIntersectionObserver,
   useResizePerformance,
-  useScrollDetection
+  useScrollDetection,
 };

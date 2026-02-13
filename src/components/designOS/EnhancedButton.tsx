@@ -203,13 +203,7 @@ export const EnhancedButton: React.FC<EnhancedButtonProps> = ({
       loading && 'cursor-wait',
     ].filter(Boolean);
 
-    return clsx(
-      base,
-      sizeClasses[size],
-      variantClasses[variant],
-      stateClasses,
-      className
-    );
+    return clsx(base, sizeClasses[size], variantClasses[variant], stateClasses, className);
   };
 
   const handleMouseDown = () => {
@@ -243,9 +237,9 @@ export const EnhancedButton: React.FC<EnhancedButtonProps> = ({
     if (!buttonRef.current || disabled || loading) return;
 
     const rect = buttonRef.current.getBoundingClientRect();
-    const size = Math.max(rect.width, rect.height);
-    const x = e.clientX - rect.left - size / 2;
-    const y = e.clientY - rect.top - size / 2;
+    const rippleSize = Math.max(rect.width, rect.height);
+    const x = e.clientX - rect.left - rippleSize / 2;
+    const y = e.clientY - rect.top - rippleSize / 2;
 
     const newRipple = {
       id: ++rippleIdRef.current,
@@ -253,11 +247,11 @@ export const EnhancedButton: React.FC<EnhancedButtonProps> = ({
       y,
     };
 
-    setRipples(prev => [...prev, newRipple]);
+    setRipples((prev) => [...prev, newRipple]);
 
     // Remove ripple after animation
     setTimeout(() => {
-      setRipples(prev => prev.filter(ripple => ripple.id !== newRipple.id));
+      setRipples((prev) => prev.filter((r) => r.id !== newRipple.id));
     }, 600);
   };
 
@@ -352,13 +346,13 @@ export const EnhancedButton: React.FC<EnhancedButtonProps> = ({
       {/* Ripple Effect */}
       {ripple && ripples.length > 0 && (
         <span className="absolute inset-0 overflow-hidden rounded-lg">
-          {ripples.map((ripple) => (
+          {ripples.map((r) => (
             <span
-              key={ripple.id}
+              key={r.id}
               className="absolute bg-white/30 rounded-full transform -translate-x-1/2 -translate-y-1/2 animate-ripple"
               style={{
-                left: ripple.x,
-                top: ripple.y,
+                left: r.x,
+                top: r.y,
                 width: '20px',
                 height: '20px',
                 animationDuration: '0.6s',
@@ -387,10 +381,7 @@ export const EnhancedButton: React.FC<EnhancedButtonProps> = ({
 
   // Render as button
   return (
-    <Component
-      {...commonProps}
-      type={type}
-    >
+    <Component {...commonProps} type={type}>
       {content}
     </Component>
   );

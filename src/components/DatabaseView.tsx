@@ -15,7 +15,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   documents,
   settings,
   onViewModeChange,
-  viewMode
+  viewMode,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
@@ -29,8 +29,9 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
 
   // Filter documents
   const filteredDocuments = useMemo(() => {
-    const filtered = documents.filter(doc => {
-      const matchesSearch = searchQuery === '' ||
+    const filtered = documents.filter((doc) => {
+      const matchesSearch =
+        searchQuery === '' ||
         doc.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (doc.data?.lieferantName || '').toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -70,19 +71,11 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
 
   // Event handlers
   const handleDocumentOpen = useCallback((doc: DocumentRecord) => {
-    console.log('Opening document:', doc.id);
+    // TODO: Implement document open handler
   }, []);
 
   const handleDocumentDelete = useCallback((doc: DocumentRecord) => {
-    console.log('Deleting document:', doc.id);
-  }, []);
-
-  const handleDocumentMerge = useCallback((primary: DocumentRecord, secondary: DocumentRecord) => {
-    console.log('Merging documents:', primary.id, secondary.id);
-  }, []);
-
-  const handleDuplicateCompare = useCallback((doc: DocumentRecord) => {
-    console.log('Comparing duplicate:', doc.id);
+    // TODO: Implement document delete handler
   }, []);
 
   return (
@@ -102,11 +95,13 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
             className="status-filter"
           >
             <option value="">All Statuses</option>
-            {Object.values(DocumentStatus).map(status => (
-              <option key={status} value={status}>{status}</option>
+            {Object.values(DocumentStatus).map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
             ))}
           </select>
-          
+
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as 'date' | 'name' | 'size')}
@@ -116,9 +111,9 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
             <option value="name">Sort by Name</option>
             <option value="size">Sort by Size</option>
           </select>
-          
+
           <button
-            onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+            onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
             className="sort-order"
           >
             {sortOrder === 'asc' ? '↑' : '↓'}
@@ -126,7 +121,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         </div>
 
         <div className="document-list">
-          {filteredDocuments.map(doc => (
+          {filteredDocuments.map((doc) => (
             <div key={doc.id} className="document-item">
               <span className="doc-name">{doc.fileName}</span>
               <span className="doc-status">{doc.status}</span>

@@ -26,7 +26,7 @@ export function App() {
   });
   const [isProcessing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error] = useState<string | null>(null);
   const [selectedDocuments] = useState<Set<string>>(new Set());
   const [privateDocuments, setPrivateDocuments] = useState<ProcessedDocument[]>([]);
   const [notification] = useState<unknown>(null);
@@ -89,7 +89,7 @@ export function App() {
       {showSettings && (
         <div className="settings-modal">
           <h2>Settings</h2>
-          <button onClick={() => setShowSettings(false)}>Close</button>
+          <button type="button" onClick={() => setShowSettings(false)}>Close</button>
         </div>
       )}
     </div>
