@@ -2,7 +2,7 @@
  * App Context - Centralized State Management
  * Replaces prop drilling with React Context + useReducer
  */
-import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
+import { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import { DocumentRecord, AppSettings, AppContextType, AppState } from '../types';
 import { getAllDocuments, saveDocument, deleteDocument, saveSettings, getSettings } from '../services/storageService';
 import { toast } from 'react-hot-toast';

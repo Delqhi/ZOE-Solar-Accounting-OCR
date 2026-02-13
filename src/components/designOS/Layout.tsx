@@ -2,7 +2,7 @@
  * designOS Layout Components
  * Stack, Grid, and Flex patterns for consistent layouts
  */
-import React from 'react';
+
 
 type Spacing = 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
 type GridColumns = 1 | 2 | 3 | 4 | 6 | 12;

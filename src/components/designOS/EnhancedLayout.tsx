@@ -2,7 +2,7 @@
  * Enhanced Layout Component - 2026 UX Standards
  * Features: Responsive grids, focus management, accessibility, performance
  */
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import clsx from 'clsx';
 
 interface EnhancedLayoutProps {

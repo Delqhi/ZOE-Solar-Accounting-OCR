@@ -3,7 +3,7 @@
  * Comprehensive showcase of all designOS components
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   // Buttons
   Button,

@@ -1,6 +1,6 @@
 /** DuplicateCompareModal Component - Placeholder */
 
-import React from 'react';
+
 import { DocumentRecord } from '../types';
 
 interface DuplicateCompareModalProps {

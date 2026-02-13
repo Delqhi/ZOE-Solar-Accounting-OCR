@@ -2,7 +2,7 @@
  * designOS Button Component
  * Dark-first button with variants and sizes
  */
-import React from 'react';
+
 
 export type ButtonVariant = 'primary' | 'secondary' | 'accent' | 'ghost' | 'outline';
 export type ButtonSize = 'sm' | 'md' | 'lg';

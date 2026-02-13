@@ -1,6 +1,6 @@
 /** AuthView Component - Placeholder */
 
-import React from 'react';
+
 
 interface AuthViewProps {
   // Add props as needed

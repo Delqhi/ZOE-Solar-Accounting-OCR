@@ -2,7 +2,7 @@
  * designOS Card Component
  * Surface components with elevation and padding
  */
-import React from 'react';
+
 
 export type CardVariant = 'elevated' | 'filled' | 'outline' | 'ghost';
 export type CardPadding = 'none' | 'sm' | 'md' | 'lg' | 'xl';

@@ -4,7 +4,7 @@
  * Version: 2026.0 | Source: 2026 Best Practices
  */
 
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { InteractiveButton, InteractiveInput, InteractiveCard, LoadingSpinner, Toast } from './InteractiveComponents';
 import { useHapticFeedback } from '../../utils/hapticFeedback';
 import { DepthContainer, DepthCard, FloatingElement } from './depth3D';

@@ -3,7 +3,7 @@
  * Dark/Light mode toggle with designOS styling
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './Button';
 
 export type Theme = 'dark' | 'light' | 'system';

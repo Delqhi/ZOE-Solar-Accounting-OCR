@@ -2,7 +2,7 @@
  * DetailModal - Refactored (2026 Best Practices)
  * Split into smaller components + custom hook for logic
  */
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { DocumentRecord, ExtractedData, AppSettings } from '../../types';
 
 // Hooks

@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { DocumentRecord, Attachment } from '../../types';
 import { PdfViewer } from './PdfViewer';
 

@@ -3,7 +3,7 @@
  * Upload progress tracking with designOS styling
  */
 
-import React from 'react';
+
 
 export type ProgressVariant = 'primary' | 'secondary' | 'accent' | 'success' | 'error';
 export type ProgressSize = 'sm' | 'md' | 'lg';

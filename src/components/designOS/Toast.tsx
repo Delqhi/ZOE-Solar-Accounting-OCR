@@ -3,7 +3,7 @@
  * Toast notifications with variants and animations
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
 export type ToastVariant = 'success' | 'error' | 'warning' | 'info';

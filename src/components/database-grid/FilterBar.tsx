@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { FilterState } from './hooks/useTableState';
 
 interface FilterBarProps {

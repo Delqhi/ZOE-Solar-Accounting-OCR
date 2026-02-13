@@ -3,7 +3,7 @@ import { User } from '../../services/supabaseService';
 import * as supabaseService from '../../services/supabaseService';
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
+  const [_user, _setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

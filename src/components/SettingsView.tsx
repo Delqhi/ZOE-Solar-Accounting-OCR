@@ -2,7 +2,7 @@
  * Settings with AI Cost Monitoring integration
  */
 
-import React from 'react';
+
 import { AppSettings } from '../types';
 import { AICostDashboardCompact } from './AICostDashboard';
 import { useAuth } from '@/hooks/useAuth';

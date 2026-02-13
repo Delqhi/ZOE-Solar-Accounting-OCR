@@ -2,7 +2,7 @@
  * Enhanced Upload Area Component - 2026 UX Standards
  * Features: Drag & drop, validation, progress tracking, accessibility, micro-interactions
  */
-import React, { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import clsx from 'clsx';
 
 interface EnhancedUploadAreaProps {

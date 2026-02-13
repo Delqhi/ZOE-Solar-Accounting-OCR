@@ -4,7 +4,7 @@
  * Version: 2026.0 | Source: 2026 Best Practices
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DepthContainer, DepthCard, FloatingElement } from './depth3D';

@@ -2,7 +2,7 @@
  * ErrorBoundary Component
  * Catches React component errors and displays fallback UI
  */
-import React, { Component, ReactNode, ErrorInfo } from 'react';
+import { Component, ReactNode, ErrorInfo } from 'react';
 import { toast } from 'react-hot-toast';
 
 interface Props {

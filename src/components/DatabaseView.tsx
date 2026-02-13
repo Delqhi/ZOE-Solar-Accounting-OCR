@@ -1,6 +1,6 @@
 /** DatabaseView Component - Enhanced with 2026 Glassmorphism 2.0 */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { VirtualizedDatabaseGrid } from './VirtualizedDatabaseGrid';
 import { VirtualizedDocumentList } from './VirtualizedDatabaseGrid';
 import { DepthCard, FloatingElement } from './designOS/depth3D';

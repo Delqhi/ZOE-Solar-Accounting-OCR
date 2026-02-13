@@ -4,7 +4,7 @@
  * Version: 2026.0 | Source: 2026 Best Practices
  */
 
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Button, Stack, Grid, Center, Container } from './components/designOS';
 import { UploadArea3D } from './components/designOS/UploadArea3D';
 import { DatabaseGrid } from './components/database-grid';
@@ -50,7 +50,7 @@ const readFileToBase64 = (file: File): Promise<{ base64: string; url: string }> 
 };
 
 export const App: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const [_user, _setUser] = useState<User | null>(null);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [viewMode, setViewMode] = useState<

@@ -2,7 +2,7 @@
  * designOS Input Component
  * Form inputs with validation states and variants
  */
-import React from 'react';
+
 
 export type InputVariant = 'filled' | 'outline' | 'underline';
 export type InputSize = 'sm' | 'md' | 'lg';

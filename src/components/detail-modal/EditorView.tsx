@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { ExtractedData, LineItem } from '../../types';
 import { validateSumCheck } from '../../services/validation';
 

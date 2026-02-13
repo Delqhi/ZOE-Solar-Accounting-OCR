@@ -2,7 +2,7 @@
  * Enhanced Button Component - 2026 UX Standards
  * Features: Multiple variants, loading states, micro-interactions, accessibility
  */
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import clsx from 'clsx';
 
 interface EnhancedButtonProps {

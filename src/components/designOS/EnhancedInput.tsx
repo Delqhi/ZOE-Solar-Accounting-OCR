@@ -2,7 +2,7 @@
  * Enhanced Input Component - 2026 UX Standards
  * Features: Floating labels, validation states, micro-interactions, accessibility
  */
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import clsx from 'clsx';
 
 interface EnhancedInputProps {

@@ -4,7 +4,7 @@
  * Version: 2026.0 | Source: 2026 Best Practices
  */
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 
 export interface AccessibilityConfig {
   skipLinks: boolean;

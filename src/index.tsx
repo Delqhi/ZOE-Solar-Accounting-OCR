@@ -2,7 +2,7 @@
  * ZOE Solar Accounting OCR - Main Entry Point
  * Integrates: Error Boundaries, Context, Monitoring, Security
  */
-import React from 'react';
+
 import ReactDOM from 'react-dom/client';
 
 // Components

@@ -1,6 +1,6 @@
 /** FilterBar Component - Placeholder */
 
-import React from 'react';
+
 
 interface FilterBarProps {
   filterStatus?: string;

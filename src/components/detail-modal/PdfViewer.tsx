@@ -3,7 +3,7 @@
  * Displays PDF documents in the detail modal
  */
 
-import React from 'react';
+
 
 interface PdfViewerProps {
   url?: string;

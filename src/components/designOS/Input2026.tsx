@@ -3,7 +3,7 @@
  * Next-generation input components with advanced styling and micro-interactions
  */
 
-import React, { forwardRef, useState } from 'react';
+import { forwardRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Types

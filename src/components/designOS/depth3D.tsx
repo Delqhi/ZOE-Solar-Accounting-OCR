@@ -4,7 +4,7 @@
  * Version: 2026.0 | Source: 2026 Best Practices
  */
 
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   use3DDepth,
   useParallax,

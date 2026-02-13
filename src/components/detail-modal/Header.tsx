@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { DocumentRecord } from '../../types';
 
 interface HeaderProps {

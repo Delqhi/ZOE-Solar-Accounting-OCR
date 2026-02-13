@@ -4,7 +4,7 @@
  * Version: 2026.0 | Source: 2026 Best Practices
  */
 
-import React, { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useMicroInteractions } from '../../hooks/useMicroInteractions';
 
 export interface InteractiveButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {

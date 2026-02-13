@@ -2,7 +2,7 @@
  * Enhanced Empty State Component - 2026 UX Standards
  * Features: Animated illustrations, contextual actions, progressive disclosure
  */
-import React from 'react';
+
 import clsx from 'clsx';
 
 interface EnhancedEmptyStateProps {

@@ -4,7 +4,7 @@
  * Version: 2026.0 | Source: 2026 Best Practices
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { AccessibleButton, AccessibleInput, AccessibleModal } from './Accessibility';
 import { TypographyHeading, TypographyBody, TypographyGradient } from './typography';
 import { DepthContainer, DepthCard, FloatingElement } from './depth3D';

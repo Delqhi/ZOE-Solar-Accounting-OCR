@@ -4,7 +4,7 @@
  * Version: 2026.0 | Source: 2026 Best Practices
  */
 
-import React from 'react';
+
 
 export interface TypographyProps extends React.HTMLAttributes<HTMLElement> {
   children: React.ReactNode;

@@ -2,7 +2,7 @@
  * DatabaseGrid - Refactored (2026 Best Practices)
  * Split into smaller components + custom hook for logic
  */
-import React from 'react';
+
 import { DocumentRecord } from '../../types';
 
 // Hooks

@@ -2,7 +2,7 @@
  * Enhanced Card Component - 2026 UX Standards
  * Features: Multiple variants, hover states, depth effects, accessibility
  */
-import React, { useState } from 'react';
+import { useState } from 'react';
 import clsx from 'clsx';
 
 interface EnhancedCardProps {

@@ -2,7 +2,7 @@
  * designOS UploadArea Component
  * File upload with drag-and-drop, progress tracking, and error handling
  */
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import {
   Card,
   GhostButton,

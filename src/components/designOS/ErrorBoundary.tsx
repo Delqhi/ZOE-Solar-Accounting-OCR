@@ -3,7 +3,7 @@
  * Graceful error handling with designOS styling
  */
 
-import React, { Component, ReactNode } from 'react';
+import { Component, ReactNode } from 'react';
 import { Card } from './Card';
 import { Button } from './Button';
 import { Stack } from './Layout';

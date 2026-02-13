@@ -3,7 +3,7 @@
  * Preview uploaded files with thumbnails and metadata
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card } from './Card';
 import { Button } from './Button';
 import { Stack } from './Layout';

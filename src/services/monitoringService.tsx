@@ -3,7 +3,7 @@
  * Error tracking and performance monitoring
  */
 
-import React from 'react';
+
 
 interface ErrorInfo {
   message: string;

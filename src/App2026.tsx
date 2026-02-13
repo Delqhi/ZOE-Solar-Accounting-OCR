@@ -2,7 +2,7 @@
  * Optimized Main App Component - 2026 UX Standards
  * Features: Improved layout, better empty states, enhanced accessibility, performance optimizations
  */
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { analyzeDocumentWithGemini } from '../services/geminiService';
 import { applyAccountingRules, generateZoeInvoiceId } from '../services/ruleEngine';
 import * as storageService from '../services/storageService';
@@ -192,21 +192,21 @@ export default function App() {
   } | null>(null);
 
   // Auth state
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [_user, _setUser] = useState<User | null>(null);
+  const [_authLoading, _setAuthLoading] = useState(true);
 
   // Filter state
-  const [filterYear, setFilterYear] = useState<string>('all');
-  const [filterQuarter, setFilterQuarter] = useState<string>('all');
-  const [filterMonth, setFilterMonth] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterVendor, setFilterVendor] = useState<string>('all');
-  const [filterAccount, setFilterAccount] = useState<string>('all');
-  const [filterTaxCategory, setFilterTaxCategory] = useState<string>('all');
+  const [filterYear, _setFilterYear] = useState<string>('all');
+  const [filterQuarter, _setFilterQuarter] = useState<string>('all');
+  const [filterMonth, _setFilterMonth] = useState<string>('all');
+  const [filterStatus, _setFilterStatus] = useState<string>('all');
+  const [filterVendor, _setFilterVendor] = useState<string>('all');
+  const [filterAccount, _setFilterAccount] = useState<string>('all');
+  const [filterTaxCategory, _setFilterTaxCategory] = useState<string>('all');
 
   // Sidebar state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(300);
+  const [sidebarCollapsed, _setSidebarCollapsed] = useState(false);
+  const [sidebarWidth, _setSidebarWidth] = useState(300);
 
   // Focus management
   const { containerRef } = useFocusManagement();
