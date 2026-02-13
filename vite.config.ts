@@ -4,7 +4,7 @@
  */
 
 import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, ConfigEnv, PluginOption } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
@@ -12,7 +12,7 @@ import tailwindcss from '@tailwindcss/vite';
  * Service Worker Plugin for Vite
  * Builds and injects service worker during production builds
  */
-function serviceWorkerPlugin() {
+function serviceWorkerPlugin(): PluginOption {
   return {
     name: 'service-worker',
     apply: 'build',
@@ -36,8 +36,7 @@ function serviceWorkerPlugin() {
   };
 }
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
+export default defineConfig(({ mode }: ConfigEnv) => {
   return {
     server: {
       port: 3000,
@@ -45,10 +44,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       // React with Compiler for automatic memoization
-      react({
-        // Enable fast refresh
-        fastRefresh: true,
-      }),
+      react({}),
       tailwindcss(),
       // Service worker builder for production
       serviceWorkerPlugin(),
@@ -56,7 +52,7 @@ export default defineConfig(({ mode }) => {
     define: {
       // Only expose non-sensitive build info
       'import.meta.env.VITE_APP_VERSION': JSON.stringify(
-        process.env.npm_package_version || '1.0.0'
+        process.env['npm_package_version'] || '1.0.0'
       ),
       'import.meta.env.VITE_BUILD_TIME': JSON.stringify(new Date().toISOString()),
     },
@@ -113,7 +109,6 @@ export default defineConfig(({ mode }) => {
             pdf: ['jspdf', 'jspdf-autotable'],
 
             // PDF rendering
-            'pdf-render': ['pdfjs-dist'],
           },
 
           // Prevent circular dependencies
@@ -127,13 +122,6 @@ export default defineConfig(({ mode }) => {
             return 'assets/[name]-[hash][extname]';
           },
         },
-
-        // Performance optimizations
-        performance: {
-          maxAssetSize: 500 * 1024, // 500KB per chunk
-          maxEntrypointSize: 1000 * 1024, // 1MB total
-          hints: mode === 'production' ? 'warning' : false,
-        },
       },
     },
 
@@ -145,14 +133,7 @@ export default defineConfig(({ mode }) => {
 
     // Optimize dependencies
     optimizeDeps: {
-      include: [
-        'react',
-        'react-dom',
-        '@tanstack/react-query',
-        'zod',
-        'zustand',
-        'pdfjs-dist', // Include pdfjs-dist for proper resolution
-      ],
+      include: ['react', 'react-dom', '@tanstack/react-query', 'zod', 'zustand'],
     },
 
     // Worker configuration

@@ -59,24 +59,9 @@ export const EnhancedLayout: React.FC<EnhancedLayoutProps> = ({
         'gap-6',
         'min-h-screen',
       ],
-      form: [
-        'max-w-2xl',
-        'mx-auto',
-        'space-y-6',
-      ],
-      list: [
-        'grid',
-        'grid-cols-1',
-        'md:grid-cols-2',
-        'lg:grid-cols-3',
-        'gap-4',
-        'auto-rows-fr',
-      ],
-      detail: [
-        'max-w-4xl',
-        'mx-auto',
-        'space-y-6',
-      ],
+      form: ['max-w-2xl', 'mx-auto', 'space-y-6'],
+      list: ['grid', 'grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-3', 'gap-4', 'auto-rows-fr'],
+      detail: ['max-w-4xl', 'mx-auto', 'space-y-6'],
     };
 
     return clsx(
@@ -89,10 +74,7 @@ export const EnhancedLayout: React.FC<EnhancedLayoutProps> = ({
   };
 
   return (
-    <Component
-      className={getLayoutClasses()}
-      {...props}
-    >
+    <Component className={getLayoutClasses()} {...props}>
       {children}
     </Component>
   );
@@ -114,14 +96,9 @@ export const EnhancedHeader: React.FC<{
       <nav className="flex items-center gap-2 text-sm text-text-muted">
         {breadcrumbs.map((crumb, index) => (
           <React.Fragment key={index}>
-            {index > 0 && (
-              <span className="text-text-muted/60">/</span>
-            )}
+            {index > 0 && <span className="text-text-muted/60">/</span>}
             {crumb.href ? (
-              <a
-                href={crumb.href}
-                className="hover:text-text transition-colors"
-              >
+              <a href={crumb.href} className="hover:text-text transition-colors">
                 {crumb.label}
               </a>
             ) : (
@@ -148,26 +125,28 @@ export const EnhancedHeader: React.FC<{
           viewBox="0 0 24 24"
           fill="none"
         >
-          <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
-          <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2" />
+          <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </div>
     );
   };
 
   return (
-    <header className={clsx(
-      'bg-surface/40',
-      'border-b',
-      'border-border/40',
-      'backdrop-blur-sm',
-      'sticky',
-      'top-0',
-      'z-40',
-      'p-4',
-      'md:p-6',
-      className
-    )}>
+    <header
+      className={clsx(
+        'bg-surface/40',
+        'border-b',
+        'border-border/40',
+        'backdrop-blur-sm',
+        'sticky',
+        'top-0',
+        'z-40',
+        'p-4',
+        'md:p-6',
+        className
+      )}
+    >
       <div className="max-w-7xl mx-auto">
         {/* Breadcrumbs */}
         {renderBreadcrumbs()}
@@ -176,17 +155,11 @@ export const EnhancedHeader: React.FC<{
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mt-2">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-text">{title}</h1>
-            {subtitle && (
-              <p className="text-text-muted mt-1">{subtitle}</p>
-            )}
+            {subtitle && <p className="text-text-muted mt-1">{subtitle}</p>}
           </div>
 
           {/* Actions */}
-          {variant === 'with-actions' && (
-            <div className="flex items-center gap-3">
-              {actions}
-            </div>
-          )}
+          {variant === 'with-actions' && <div className="flex items-center gap-3">{actions}</div>}
         </div>
 
         {/* Search Bar */}
@@ -222,43 +195,14 @@ export const EnhancedSidebar: React.FC<{
     ];
 
     const variantClasses = {
-      navigation: [
-        'w-72',
-        'md:w-80',
-        'lg:w-96',
-        'p-4',
-        'md:p-6',
-      ],
-      filters: [
-        'w-64',
-        'md:w-80',
-        'lg:w-96',
-        'p-4',
-        'md:p-6',
-      ],
-      details: [
-        'w-80',
-        'md:w-96',
-        'lg:w-[36rem]',
-        'p-4',
-        'md:p-6',
-      ],
+      navigation: ['w-72', 'md:w-80', 'lg:w-96', 'p-4', 'md:p-6'],
+      filters: ['w-64', 'md:w-80', 'lg:w-96', 'p-4', 'md:p-6'],
+      details: ['w-80', 'md:w-96', 'lg:w-[36rem]', 'p-4', 'md:p-6'],
     };
 
-    const collapsedClasses = isCollapsed ? [
-      'w-20',
-      'md:w-24',
-      'lg:w-28',
-      'px-2',
-      'md:px-3',
-    ] : [];
+    const collapsedClasses = isCollapsed ? ['w-20', 'md:w-24', 'lg:w-28', 'px-2', 'md:px-3'] : [];
 
-    return clsx(
-      base,
-      variantClasses[variant],
-      collapsedClasses,
-      className
-    );
+    return clsx(base, variantClasses[variant], collapsedClasses, className);
   };
 
   const renderTitle = () => {
@@ -271,17 +215,20 @@ export const EnhancedSidebar: React.FC<{
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="p-2 hover:bg-surface rounded-lg transition-colors"
-            aria-label={isCollapsed ? "Seitenleiste ausklappen" : "Seitenleiste zuklappen"}
+            aria-label={isCollapsed ? 'Seitenleiste ausklappen' : 'Seitenleiste zuklappen'}
           >
             <svg
-              className={clsx(
-                'w-5 h-5 text-text-muted',
-                isCollapsed && 'rotate-180'
-              )}
+              className={clsx('w-5 h-5 text-text-muted', isCollapsed && 'rotate-180')}
               viewBox="0 0 24 24"
               fill="none"
             >
-              <path d="M15 19l-7-7 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path
+                d="M15 19l-7-7 7-7"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
         )}
@@ -293,12 +240,7 @@ export const EnhancedSidebar: React.FC<{
     <aside className={getSidebarClasses()}>
       {renderTitle()}
 
-      <div className={clsx(
-        'space-y-4',
-        isCollapsed && 'text-center'
-      )}>
-        {children}
-      </div>
+      <div className={clsx('space-y-4', isCollapsed && 'text-center')}>{children}</div>
     </aside>
   );
 };
@@ -310,42 +252,18 @@ export const EnhancedMain: React.FC<{
   className?: string;
 }> = ({ children, variant = 'default', className }) => {
   const getMainClasses = () => {
-    const base = [
-      'min-h-screen',
-      'bg-background',
-    ];
+    const base = ['min-h-screen', 'bg-background'];
 
     const variantClasses = {
-      default: [
-        'p-4',
-        'md:p-6',
-        'lg:p-8',
-      ],
-      full-width: [
-        'p-0',
-        'm-0',
-      ],
-      centered: [
-        'px-4',
-        'md:px-6',
-        'lg:px-8',
-        'max-w-4xl',
-        'mx-auto',
-      ],
+      default: ['p-4', 'md:p-6', 'lg:p-8'],
+      'full-width': ['p-0', 'm-0'],
+      centered: ['px-4', 'md:px-6', 'lg:px-8', 'max-w-4xl', 'mx-auto'],
     };
 
-    return clsx(
-      base,
-      variantClasses[variant],
-      className
-    );
+    return clsx(base, variantClasses[variant], className);
   };
 
-  return (
-    <main className={getMainClasses()}>
-      {children}
-    </main>
-  );
+  return <main className={getMainClasses()}>{children}</main>;
 };
 
 // Enhanced Footer Component
@@ -367,33 +285,81 @@ export const EnhancedFooter: React.FC<{
           <div>
             <h3 className="font-semibold text-text mb-4">Produkt</h3>
             <ul className="space-y-2 text-text-muted">
-              <li><a href="#" className="hover:text-text transition-colors">Features</a></li>
-              <li><a href="#" className="hover:text-text transition-colors">Preise</a></li>
-              <li><a href="#" className="hover:text-text transition-colors">API</a></li>
+              <li>
+                <a href="#" className="hover:text-text transition-colors">
+                  Features
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-text transition-colors">
+                  Preise
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-text transition-colors">
+                  API
+                </a>
+              </li>
             </ul>
           </div>
           <div>
             <h3 className="font-semibold text-text mb-4">Unternehmen</h3>
             <ul className="space-y-2 text-text-muted">
-              <li><a href="#" className="hover:text-text transition-colors">Über uns</a></li>
-              <li><a href="#" className="hover:text-text transition-colors">Blog</a></li>
-              <li><a href="#" className="hover:text-text transition-colors">Karriere</a></li>
+              <li>
+                <a href="#" className="hover:text-text transition-colors">
+                  Über uns
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-text transition-colors">
+                  Blog
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-text transition-colors">
+                  Karriere
+                </a>
+              </li>
             </ul>
           </div>
           <div>
             <h3 className="font-semibold text-text mb-4">Support</h3>
             <ul className="space-y-2 text-text-muted">
-              <li><a href="#" className="hover:text-text transition-colors">Hilfe</a></li>
-              <li><a href="#" className="hover:text-text transition-colors">Kontakt</a></li>
-              <li><a href="#" className="hover:text-text transition-colors">Status</a></li>
+              <li>
+                <a href="#" className="hover:text-text transition-colors">
+                  Hilfe
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-text transition-colors">
+                  Kontakt
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-text transition-colors">
+                  Status
+                </a>
+              </li>
             </ul>
           </div>
           <div>
             <h3 className="font-semibold text-text mb-4">Rechtliches</h3>
             <ul className="space-y-2 text-text-muted">
-              <li><a href="#" className="hover:text-text transition-colors">AGB</a></li>
-              <li><a href="#" className="hover:text-text transition-colors">Datenschutz</a></li>
-              <li><a href="#" className="hover:text-text transition-colors">Impressum</a></li>
+              <li>
+                <a href="#" className="hover:text-text transition-colors">
+                  AGB
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-text transition-colors">
+                  Datenschutz
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-text transition-colors">
+                  Impressum
+                </a>
+              </li>
             </ul>
           </div>
         </div>
@@ -411,8 +377,20 @@ export const EnhancedFooter: React.FC<{
           <div>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-text-inverted">
-                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="text-text-inverted"
+                >
+                  <path
+                    d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </div>
               <div>
@@ -421,13 +399,11 @@ export const EnhancedFooter: React.FC<{
               </div>
             </div>
             <p className="text-text-muted text-sm leading-relaxed">
-              Intelligente Dokumentenverarbeitung für moderne Unternehmen.
-              Sparen Sie Zeit, reduzieren Sie Fehler und optimieren Sie Ihre Buchhaltung.
+              Intelligente Dokumentenverarbeitung für moderne Unternehmen. Sparen Sie Zeit,
+              reduzieren Sie Fehler und optimieren Sie Ihre Buchhaltung.
             </p>
           </div>
-          <div className="md:col-span-2">
-            {children}
-          </div>
+          <div className="md:col-span-2">{children}</div>
         </div>
       </div>
     </footer>
@@ -445,14 +421,16 @@ export const EnhancedFooter: React.FC<{
   };
 
   return (
-    <footer className={clsx(
-      'bg-surface/40',
-      'border-t',
-      'border-border/40',
-      'backdrop-blur-sm',
-      'mt-auto',
-      className
-    )}>
+    <footer
+      className={clsx(
+        'bg-surface/40',
+        'border-t',
+        'border-border/40',
+        'backdrop-blur-sm',
+        'mt-auto',
+        className
+      )}
+    >
       {getFooterContent()}
     </footer>
   );
@@ -488,19 +466,10 @@ export const EnhancedGrid: React.FC<{
       xl: 'gap-8',
     };
 
-    return clsx(
-      base,
-      Object.values(colClasses).filter(Boolean),
-      gapClasses[gap],
-      className
-    );
+    return clsx(base, Object.values(colClasses).filter(Boolean), gapClasses[gap], className);
   };
 
-  return (
-    <div className={getGridClasses()}>
-      {children}
-    </div>
-  );
+  return <div className={getGridClasses()}>{children}</div>;
 };
 
 // Focus Management Hook

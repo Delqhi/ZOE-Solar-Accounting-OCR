@@ -41,7 +41,7 @@ export const classifyOcrOutcome = (
     return { status: DocumentStatus.REVIEW_NEEDED, error: rationale || 'Bitte Daten prüfen.' };
   }
 
-  return { status: DocumentStatus.COMPLETED, error: undefined };
+  return { status: DocumentStatus.COMPLETED };
 };
 
 export const findSemanticDuplicate = (

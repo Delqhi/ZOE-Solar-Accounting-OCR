@@ -4,49 +4,40 @@
  * Version: 2026.0 | Source: 2026 Best Practices
  */
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import {
-  Button,
-  Card,
-  Input,
-  Stack,
-  Grid,
-  Flex,
-  Center,
-  Container
-} from './components/designOS';
-import { UploadArea } from './components/UploadArea';
+import React, { useState, useMemo } from 'react';
+import { Button, Stack, Grid, Center, Container } from './components/designOS';
 import { UploadArea3D } from './components/designOS/UploadArea3D';
-import { DatabaseView } from './components/DatabaseView';
 import { DatabaseGrid } from './components/database-grid';
 import { DocumentDetail } from './components/DetailModal';
-import { DuplicateCompareModal } from './components/DuplicateCompareModal';
 import { SettingsView } from './components/SettingsView';
-import { AuthView } from './components/AuthView';
-import { BackupView } from './components/BackupView';
+
 import { FilterBar } from './components/FilterBar';
 import { analyzeDocumentWithGemini } from './services/geminiService';
-import { applyAccountingRules, generateZoeInvoiceId } from './services/ruleEngine';
+import { generateZoeInvoiceId } from './services/ruleEngine';
 import * as storageService from './services/storageService';
 import * as supabaseService from './services/supabaseService';
 import { detectPrivateDocument } from './services/privateDocumentDetection';
-import { DocumentRecord, DocumentStatus, AppSettings, ExtractedData, Attachment } from './types';
+import { DocumentRecord, DocumentStatus, AppSettings, ExtractedData } from './types';
 import { normalizeExtractedData } from './services/extractedDataNormalization';
-import { formatPreflightForDialog, runExportPreflight } from './services/exportPreflight';
 import { User } from './services/supabaseService';
 import { App3D } from './components/designOS/App3D';
 import { DepthContainer, DepthCard, FloatingElement } from './components/designOS/depth3D';
-import { TypographyHeading, TypographyBody, TypographyGradient } from './components/designOS/typography';
-import { Input2026 } from './components/designOS/Input2026';
+import {
+  TypographyHeading,
+  TypographyBody,
+  TypographyGradient,
+} from './components/designOS/typography';
 import { use3DDepth, useFloating } from './hooks/use3D';
 
 const computeFileHash = async (file: File): Promise<string> => {
   const buffer = await file.arrayBuffer();
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 };
 
-const readFileToBase64 = (file: File): Promise<{ base64: string, url: string }> => {
+const readFileToBase64 = (file: File): Promise<{ base64: string; url: string }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -58,13 +49,13 @@ const readFileToBase64 = (file: File): Promise<{ base64: string, url: string }> 
   });
 };
 
-type DuplicateMatch = { doc: DocumentRecord; reason: string; confidence: number };
-
 export const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [viewMode, setViewMode] = useState<'document' | 'database' | 'settings' | 'auth' | 'backup'>('document');
+  const [viewMode, setViewMode] = useState<
+    'document' | 'database' | 'settings' | 'auth' | 'backup'
+  >('document');
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -72,19 +63,26 @@ export const App: React.FC = () => {
     status: 'all',
     search: '',
     dateRange: { from: '', to: '' },
-    dateFilter: 'all'
+    dateFilter: 'all',
   });
   const [dragCount, setDragCount] = useState(0);
   const [uploadStats, setUploadStats] = useState({ today: 0, total: 0 });
-  const [systemHealth, setSystemHealth] = useState({ lastBackup: null as Date | null, syncStatus: 'synced' });
-  const [activeSection, setActiveSection] = useState<'overview' | 'analytics' | 'settings'>('overview');
+  const [systemHealth, setSystemHealth] = useState({
+    lastBackup: null as Date | null,
+    syncStatus: 'synced',
+  });
+  const [activeSection, setActiveSection] = useState<'overview' | 'analytics' | 'settings'>(
+    'overview'
+  );
+  const [originalDoc, setOriginalDoc] = useState<DocumentRecord | null>(null);
+  const [compareDoc, setCompareDoc] = useState<DocumentRecord | null>(null);
 
   // Initialize 3D effects
   const depthHook = use3DDepth({ layers: 5, baseZ: 0, spacing: 8 });
   const floatingHook = useFloating({
     height: 12,
     duration: 6000,
-    enabled: true
+    enabled: true,
   });
 
   const handleUpload = async (files: File[]) => {
@@ -94,14 +92,14 @@ export const App: React.FC = () => {
     }
 
     setIsUploading(true);
-    setDragCount(prev => prev + 1);
+    setDragCount((prev) => prev + 1);
 
     try {
       for (const file of files) {
         const hash = await computeFileHash(file);
-        const existing = documents.find(d => d.fileHash === hash);
+        const existing = documents.find((d) => d.fileHash === hash);
         if (existing) {
-          alert(`Datei bereits hochgeladen: ${existing.filename}`);
+          alert(`Datei bereits hochgeladen: ${existing.fileName}`);
           continue;
         }
 
@@ -134,13 +132,13 @@ export const App: React.FC = () => {
           metadata: {
             version: 1,
             extractedAt: new Date().toISOString(),
-            extractor: 'gemini'
-          }
+            extractor: 'gemini',
+          },
         };
 
         await supabaseService.saveDocument(newDoc);
         await storageService.addDocument(newDoc);
-        setDocuments(prev => [...prev, newDoc]);
+        setDocuments((prev) => [...prev, newDoc]);
       }
     } catch (error) {
       console.error('Upload failed:', error);
@@ -153,19 +151,22 @@ export const App: React.FC = () => {
   const handleSaveDocument = async (doc: DocumentRecord) => {
     await supabaseService.saveDocument(doc);
     await storageService.updateDocument(doc);
-    setDocuments(prev => prev.map(d => d.id === doc.id ? doc : d));
+    setDocuments((prev) => prev.map((d) => (d.id === doc.id ? doc : d)));
     setSelectedDocId(null);
   };
 
   const handleDeleteDocument = async (doc: DocumentRecord) => {
     await supabaseService.deleteDocument(doc.id);
     await storageService.deleteDocument(doc.id);
-    setDocuments(prev => prev.filter(d => d.id !== doc.id));
+    setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
     setSelectedDocId(null);
   };
 
   const handleMergeDocuments = async (primary: DocumentRecord, secondary: DocumentRecord) => {
-    const merged = { ...secondary, attachments: [...(primary.attachments || []), ...(secondary.attachments || [])] };
+    const merged = {
+      ...secondary,
+      attachments: [...(primary.attachments || []), ...(secondary.attachments || [])],
+    };
     await handleSaveDocument(merged);
     await handleDeleteDocument(primary);
   };
@@ -181,19 +182,22 @@ export const App: React.FC = () => {
     let filtered = documents;
 
     if (filter.status !== 'all') {
-      filtered = filtered.filter(d => d.status === filter.status);
+      filtered = filtered.filter((d) => d.status === filter.status);
     }
 
     if (filter.search) {
       const searchLower = filter.search.toLowerCase();
-      filtered = filtered.filter(d =>
-        d.filename.toLowerCase().includes(searchLower) ||
-        (d.extractedData?.supplier?.toLowerCase() || '').includes(searchLower) ||
-        (d.extractedData?.invoiceNumber?.toLowerCase() || '').includes(searchLower)
+      filtered = filtered.filter(
+        (d) =>
+          d.filename.toLowerCase().includes(searchLower) ||
+          (d.extractedData?.supplier?.toLowerCase() || '').includes(searchLower) ||
+          (d.extractedData?.invoiceNumber?.toLowerCase() || '').includes(searchLower)
       );
     }
 
-    return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return filtered.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   }, [documents, filter]);
 
   const renderContent = () => {
@@ -217,11 +221,13 @@ export const App: React.FC = () => {
         <FloatingElement height={10} duration={5000} delay={1000}>
           <DatabaseGrid
             documents={filteredDocuments}
-            onOpen={(d) => { setSelectedDocId(d.id); }}
+            onOpen={(d) => {
+              setSelectedDocId(d.id);
+            }}
             onDelete={handleDeleteDocument}
             onMerge={handleMergeDocuments}
             onDuplicateCompare={(d) => {
-              const original = documents.find(doc => doc.id === d.duplicateOfId);
+              const original = documents.find((doc) => doc.id === d.duplicateOfId);
               if (original) {
                 setOriginalDoc(original);
                 setCompareDoc(d);
@@ -233,22 +239,23 @@ export const App: React.FC = () => {
     }
 
     if (selectedDocId) {
-      const doc = documents.find(d => d.id === selectedDocId);
-      if (doc) return (
-        <FloatingElement height={12} duration={4000} delay={0}>
-          <DocumentDetail
-            document={doc}
-            allDocuments={documents}
-            isOpen={true}
-            onSave={handleSaveDocument}
-            onDelete={handleDeleteDocument}
-            onRetryOCR={handleRetryOCR}
-            onSelectDocument={(d) => setSelectedDocId(d.id)}
-            onClose={() => setSelectedDocId(null)}
-            onMerge={handleMergeDocuments}
-          />
-        </FloatingElement>
-      );
+      const doc = documents.find((d) => d.id === selectedDocId);
+      if (doc)
+        return (
+          <FloatingElement height={12} duration={4000} delay={0}>
+            <DocumentDetail
+              document={doc}
+              allDocuments={documents}
+              isOpen={true}
+              onSave={handleSaveDocument}
+              onDelete={handleDeleteDocument}
+              onRetryOCR={handleRetryOCR}
+              onSelectDocument={(d) => setSelectedDocId(d.id)}
+              onClose={() => setSelectedDocId(null)}
+              onMerge={handleMergeDocuments}
+            />
+          </FloatingElement>
+        );
     }
 
     return (
@@ -257,7 +264,10 @@ export const App: React.FC = () => {
           <Container className="max-w-xl w-full z-10">
             <Stack gap="xl" align="center">
               <FloatingElement height={15} duration={10000} delay={0}>
-                <TypographyHeading level="h2" className="text-2xl md:text-3xl font-bold text-center text-text">
+                <TypographyHeading
+                  level="h2"
+                  className="text-2xl md:text-3xl font-bold text-center text-text"
+                >
                   <TypographyGradient type="primary">ZOE Solar</TypographyGradient> Accounting
                 </TypographyHeading>
               </FloatingElement>
@@ -269,7 +279,9 @@ export const App: React.FC = () => {
               </FloatingElement>
 
               {/* 3D Enhanced Upload Area */}
-              <UploadArea3D onUploadComplete={(result) => console.log('Upload complete:', result)} />
+              <UploadArea3D
+                onUploadComplete={(result) => console.log('Upload complete:', result)}
+              />
 
               {/* Quick Stats */}
               <FloatingElement height={8} duration={4000} delay={2000}>
@@ -278,11 +290,12 @@ export const App: React.FC = () => {
                   style={{
                     padding: '1rem',
                     borderRadius: '16px',
-                    border: '1px solid rgba(255, 255, 255, 0.2)'
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
                   }}
                 >
                   <TypographyBody style={{ fontSize: '0.875rem', color: '#00D4FF' }}>
-                    {dragCount} uploads today • {documents.length} total documents • 3D effects active
+                    {dragCount} uploads today • {documents.length} total documents • 3D effects
+                    active
                   </TypographyBody>
                 </DepthCard>
               </FloatingElement>
@@ -315,7 +328,7 @@ export const App: React.FC = () => {
             borderRadius: '16px',
             padding: '1rem',
             margin: '20px auto',
-            maxWidth: '800px'
+            maxWidth: '800px',
           }}
         >
           <Grid columns={4} gap="md" align="center">
@@ -354,18 +367,12 @@ export const App: React.FC = () => {
       {/* Filter Bar */}
       {viewMode === 'database' && (
         <FloatingElement height={8} duration={4000} delay={1000}>
-          <FilterBar
-            filter={filter}
-            onFilterChange={setFilter}
-            documentCount={documents.length}
-          />
+          <FilterBar filter={filter} onFilterChange={setFilter} documentCount={documents.length} />
         </FloatingElement>
       )}
 
       {/* Main Content */}
-      <main style={{ minHeight: '60vh' }}>
-        {renderContent()}
-      </main>
+      <main style={{ minHeight: '60vh' }}>{renderContent()}</main>
 
       {/* Status Footer */}
       <FloatingElement height={6} duration={3000} delay={3000} zIndex={10}>
@@ -377,11 +384,13 @@ export const App: React.FC = () => {
             padding: '1rem',
             borderRadius: '12px',
             border: '1px solid rgba(255, 255, 255, 0.1)',
-            textAlign: 'center'
+            textAlign: 'center',
           }}
         >
           <TypographyBody style={{ fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.6)' }}>
-            System Status: {systemHealth.syncStatus} • Last Backup: {systemHealth.lastBackup ? systemHealth.lastBackup.toLocaleString() : 'Never'} • 3D Effects: Active
+            System Status: {systemHealth.syncStatus} • Last Backup:{' '}
+            {systemHealth.lastBackup ? systemHealth.lastBackup.toLocaleString() : 'Never'} • 3D
+            Effects: Active
           </TypographyBody>
         </DepthContainer>
       </FloatingElement>

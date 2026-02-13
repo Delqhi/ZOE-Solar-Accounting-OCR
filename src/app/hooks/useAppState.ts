@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
-import { DocumentRecord, AppSettings, DocumentStatus } from '../types';
+import { useState, useMemo } from 'react';
+import { DocumentRecord, AppSettings } from '../../types';
 
 export type ViewMode = 'document' | 'settings' | 'database' | 'auth' | 'backup' | 'interactions';
 

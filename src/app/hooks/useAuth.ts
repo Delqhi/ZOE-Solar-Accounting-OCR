@@ -24,8 +24,8 @@ export function useAuth() {
 
   const login = useCallback(async (email: string, password: string) => {
     const result = await supabaseService.signIn(email, password);
-    if (result.user) {
-      setUser(result.user);
+    if (result) {
+      setUser(result);
     }
     return result;
   }, []);

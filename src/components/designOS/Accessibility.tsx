@@ -41,7 +41,7 @@ const AccessibilityContext = createContext<{
   actions: AccessibilityActions;
 } | null>(null);
 
-export const useAccessibility = () => {
+const useAccessibility = () => {
   const context = useContext(AccessibilityContext);
   if (!context) {
     throw new Error('useAccessibility must be used within AccessibilityProvider');
@@ -49,7 +49,7 @@ export const useAccessibility = () => {
   return context;
 };
 
-export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AccessibilityState>({
     config: {
       skipLinks: true,
@@ -58,37 +58,37 @@ export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({
       highContrast: false,
       screenReaderMode: false,
       keyboardNavigation: true,
-      voiceNavigation: false
+      voiceNavigation: false,
     },
     focusVisible: false,
     reducedMotion: false,
     highContrast: false,
     screenReaderActive: false,
     keyboardNavigation: false,
-    voiceNavigation: false
+    voiceNavigation: false,
   });
 
   // Initialize accessibility settings
   useEffect(() => {
     // Check for reduced motion preference
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       reducedMotion: mediaQuery.matches,
-      config: { ...prev.config, reduceMotion: mediaQuery.matches }
+      config: { ...prev.config, reduceMotion: mediaQuery.matches },
     }));
 
     // Check for high contrast mode
     const contrastQuery = window.matchMedia('(prefers-contrast: high)');
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       highContrast: contrastQuery.matches,
-      config: { ...prev.config, highContrast: contrastQuery.matches }
+      config: { ...prev.config, highContrast: contrastQuery.matches },
     }));
 
     // Monitor focus changes
-    const handleFocus = () => setState(prev => ({ ...prev, focusVisible: true }));
-    const handleBlur = () => setState(prev => ({ ...prev, focusVisible: false }));
+    const handleFocus = () => setState((prev) => ({ ...prev, focusVisible: true }));
+    const handleBlur = () => setState((prev) => ({ ...prev, focusVisible: false }));
 
     window.addEventListener('focus', handleFocus, true);
     window.addEventListener('blur', handleBlur, true);
@@ -101,40 +101,39 @@ export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const actions: AccessibilityActions = {
     setConfig: useCallback((config) => {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
-        config: { ...prev.config, ...config }
+        config: { ...prev.config, ...config },
       }));
     }, []),
 
     toggleReducedMotion: useCallback(() => {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         reducedMotion: !prev.reducedMotion,
-        config: { ...prev.config, reduceMotion: !prev.reducedMotion }
+        config: { ...prev.config, reduceMotion: !prev.reducedMotion },
       }));
     }, []),
 
     toggleHighContrast: useCallback(() => {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         highContrast: !prev.highContrast,
-        config: { ...prev.config, highContrast: !prev.highContrast }
+        config: { ...prev.config, highContrast: !prev.highContrast },
       }));
     }, []),
 
     toggleScreenReaderMode: useCallback(() => {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         screenReaderActive: !prev.screenReaderActive,
-        config: { ...prev.config, screenReaderMode: !prev.screenReaderActive }
+        config: { ...prev.config, screenReaderMode: !prev.screenReaderActive },
       }));
     }, []),
 
     focusElement: useCallback((elementOrId) => {
-      const element = typeof elementOrId === 'string'
-        ? document.getElementById(elementOrId)
-        : elementOrId;
+      const element =
+        typeof elementOrId === 'string' ? document.getElementById(elementOrId) : elementOrId;
 
       if (element) {
         element.focus({ preventScroll: false });
@@ -154,16 +153,18 @@ export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     }, []),
 
-    scrollToElement: useCallback((elementOrId, options = { behavior: 'smooth', block: 'center' as const }) => {
-      const element = typeof elementOrId === 'string'
-        ? document.getElementById(elementOrId)
-        : elementOrId;
+    scrollToElement: useCallback(
+      (elementOrId, options = { behavior: 'smooth', block: 'center' as const }) => {
+        const element =
+          typeof elementOrId === 'string' ? document.getElementById(elementOrId) : elementOrId;
 
-      if (element) {
-        element.scrollIntoView(options);
-        element.focus({ preventScroll: true });
-      }
-    }, [])
+        if (element) {
+          element.scrollIntoView(options);
+          element.focus({ preventScroll: true });
+        }
+      },
+      []
+    ),
   };
 
   return (
@@ -174,7 +175,7 @@ export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({
 };
 
 // Accessibility hooks and utilities
-export const useFocusManagement = () => {
+const useFocusManagement = () => {
   const { actions } = useAccessibility();
   const focusRef = useRef<HTMLElement>(null);
 
@@ -187,17 +188,20 @@ export const useFocusManagement = () => {
   return { focusRef };
 };
 
-export const useAriaLive = () => {
+const useAriaLive = () => {
   const { actions } = useAccessibility();
 
-  const announce = useCallback((message: string, priority: 'polite' | 'assertive' = 'polite') => {
-    actions.announce(message, priority);
-  }, [actions]);
+  const announce = useCallback(
+    (message: string, priority: 'polite' | 'assertive' = 'polite') => {
+      actions.announce(message, priority);
+    },
+    [actions]
+  );
 
   return { announce };
 };
 
-export const useKeyboardNavigation = () => {
+const useKeyboardNavigation = () => {
   const { state, actions } = useAccessibility();
   const [activeElement, setActiveElement] = useState<HTMLElement | null>(null);
 
@@ -285,7 +289,7 @@ export const useKeyboardNavigation = () => {
   return { setActiveElement };
 };
 
-export const useScreenReaderSupport = () => {
+const useScreenReaderSupport = () => {
   const { state, actions } = useAccessibility();
   const [srText, setSrText] = useState('');
 
@@ -293,7 +297,7 @@ export const useScreenReaderSupport = () => {
     if (state.screenReaderActive) {
       // Enhance screen reader experience
       const elements = document.querySelectorAll('[aria-label], [title], [data-sr]');
-      elements.forEach(el => {
+      elements.forEach((el) => {
         const target = el as HTMLElement;
         if (!target.getAttribute('aria-label')) {
           const srLabel = target.getAttribute('data-sr') || target.getAttribute('title');
@@ -324,12 +328,12 @@ export const useScreenReaderSupport = () => {
     markAsLoading,
     markAsLoaded,
     srText,
-    setSrText
+    setSrText,
   };
 };
 
 // Accessibility components
-export const SkipLink: React.FC<{ href: string; children: React.ReactNode }> = ({ href, children }) => {
+const SkipLink: React.FC<{ href: string; children: React.ReactNode }> = ({ href, children }) => {
   const { state } = useAccessibility();
 
   if (!state.config.skipLinks) return null;
@@ -351,7 +355,7 @@ export const SkipLink: React.FC<{ href: string; children: React.ReactNode }> = (
         padding: '1rem',
         textDecoration: 'none',
         borderRadius: '4px',
-        transition: 'all 0.3s ease'
+        transition: 'all 0.3s ease',
       }}
       onFocus={(e) => {
         e.currentTarget.style.left = '20px';
@@ -367,18 +371,16 @@ export const SkipLink: React.FC<{ href: string; children: React.ReactNode }> = (
   );
 };
 
-export const FocusIndicator: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const FocusIndicator: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { state } = useAccessibility();
 
   return (
     <div
       className={`focus-indicator ${state.focusVisible ? 'focus-visible' : ''}`}
       style={{
-        outline: state.focusVisible && state.config.focusIndicator
-          ? '2px solid #00D4FF'
-          : 'none',
+        outline: state.focusVisible && state.config.focusIndicator ? '2px solid #00D4FF' : 'none',
         outlineOffset: '2px',
-        borderRadius: '4px'
+        borderRadius: '4px',
       }}
     >
       {children}
@@ -386,7 +388,7 @@ export const FocusIndicator: React.FC<{ children: React.ReactNode }> = ({ childr
   );
 };
 
-export const LiveRegion: React.FC<{
+const LiveRegion: React.FC<{
   children: React.ReactNode;
   priority?: 'polite' | 'assertive';
   id?: string;
@@ -397,14 +399,20 @@ export const LiveRegion: React.FC<{
       role="status"
       aria-live={priority}
       aria-atomic="true"
-      style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}
+      style={{
+        position: 'absolute',
+        left: '-9999px',
+        width: '1px',
+        height: '1px',
+        overflow: 'hidden',
+      }}
     >
       {children}
     </div>
   );
 };
 
-export const AccessibleButton: React.FC<{
+const AccessibleButton: React.FC<{
   children: React.ReactNode;
   onClick: () => void;
   variant?: 'primary' | 'secondary' | 'ghost';
@@ -412,7 +420,15 @@ export const AccessibleButton: React.FC<{
   className?: string;
   ariaLabel?: string;
   keyboardShortcut?: string;
-}> = ({ children, onClick, variant = 'primary', disabled = false, className, ariaLabel, keyboardShortcut }) => {
+}> = ({
+  children,
+  onClick,
+  variant = 'primary',
+  disabled = false,
+  className,
+  ariaLabel,
+  keyboardShortcut,
+}) => {
   const { state } = useAccessibility();
 
   const buttonClass = `
@@ -446,8 +462,8 @@ export const AccessibleButton: React.FC<{
         ...(state.config.highContrast && {
           background: '#000',
           color: '#fff',
-          border: '2px solid #fff'
-        })
+          border: '2px solid #fff',
+        }),
       }}
     >
       {children}
@@ -458,7 +474,7 @@ export const AccessibleButton: React.FC<{
             marginLeft: '8px',
             fontSize: '10px',
             opacity: 0.6,
-            fontFamily: 'monospace'
+            fontFamily: 'monospace',
           }}
           aria-hidden="true"
         >
@@ -469,7 +485,7 @@ export const AccessibleButton: React.FC<{
   );
 };
 
-export const AccessibleInput: React.FC<{
+const AccessibleInput: React.FC<{
   label: string;
   value: string;
   onChange: (value: string) => void;
@@ -490,7 +506,7 @@ export const AccessibleInput: React.FC<{
   error,
   helpText,
   required = false,
-  className
+  className,
 }) => {
   const { state } = useAccessibility();
   const inputId = `input-${Math.random().toString(36).substr(2, 9)}`;
@@ -506,12 +522,14 @@ export const AccessibleInput: React.FC<{
           display: 'block',
           marginBottom: '8px',
           fontWeight: '600',
-          color: state.config.highContrast ? '#fff' : '#333'
+          color: state.config.highContrast ? '#fff' : '#333',
         }}
       >
         {label}
         {required && (
-          <span aria-label="required" style={{ color: '#d32f2f', marginLeft: '4px' }}>*</span>
+          <span aria-label="required" style={{ color: '#d32f2f', marginLeft: '4px' }}>
+            *
+          </span>
         )}
       </label>
 
@@ -531,12 +549,12 @@ export const AccessibleInput: React.FC<{
           width: '100%',
           padding: '12px 16px',
           borderRadius: '8px',
-          border: `2px solid ${error ? '#d32f2f' : (state.config.highContrast ? '#fff' : '#ccc')}`,
+          border: `2px solid ${error ? '#d32f2f' : state.config.highContrast ? '#fff' : '#ccc'}`,
           background: state.config.highContrast ? '#000' : '#fff',
           color: state.config.highContrast ? '#fff' : '#000',
           fontSize: '16px',
           transition: state.reducedMotion ? 'none' : 'all 0.3s ease',
-          outline: 'none'
+          outline: 'none',
         }}
       />
 
@@ -547,7 +565,7 @@ export const AccessibleInput: React.FC<{
           style={{
             marginTop: '4px',
             fontSize: '14px',
-            color: state.config.highContrast ? '#ccc' : '#666'
+            color: state.config.highContrast ? '#ccc' : '#666',
           }}
         >
           {helpText}
@@ -562,7 +580,7 @@ export const AccessibleInput: React.FC<{
           style={{
             marginTop: '4px',
             fontSize: '14px',
-            color: '#d32f2f'
+            color: '#d32f2f',
           }}
         >
           {error}
@@ -572,7 +590,7 @@ export const AccessibleInput: React.FC<{
   );
 };
 
-export const AccessibleModal: React.FC<{
+const AccessibleModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   title: string;
@@ -651,7 +669,7 @@ export const AccessibleModal: React.FC<{
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 9999,
-        padding: '20px'
+        padding: '20px',
       }}
     >
       <div
@@ -664,9 +682,10 @@ export const AccessibleModal: React.FC<{
           boxShadow: state.config.highContrast
             ? '0 0 0 2px #fff'
             : '0 10px 30px rgba(0, 0, 0, 0.3)',
-          maxWidth: size === 'xl' ? '900px' : size === 'lg' ? '700px' : size === 'md' ? '500px' : '300px',
+          maxWidth:
+            size === 'xl' ? '900px' : size === 'lg' ? '700px' : size === 'md' ? '500px' : '300px',
           width: '100%',
-          outline: 'none'
+          outline: 'none',
         }}
       >
         <div
@@ -676,7 +695,7 @@ export const AccessibleModal: React.FC<{
             justifyContent: 'space-between',
             alignItems: 'center',
             padding: '20px',
-            borderBottom: state.config.highContrast ? '2px solid #fff' : '1px solid #eee'
+            borderBottom: state.config.highContrast ? '2px solid #fff' : '1px solid #eee',
           }}
         >
           <h2 id={`modal-title-${title}`} style={{ margin: 0, fontSize: '24px' }}>
@@ -692,10 +711,7 @@ export const AccessibleModal: React.FC<{
             ×
           </AccessibleButton>
         </div>
-        <div
-          className="modal-content"
-          style={{ padding: '20px' }}
-        >
+        <div className="modal-content" style={{ padding: '20px' }}>
           {children}
         </div>
       </div>
@@ -716,5 +732,5 @@ export {
   LiveRegion,
   AccessibleButton,
   AccessibleInput,
-  AccessibleModal
+  AccessibleModal,
 };

@@ -3,6 +3,7 @@
  * Test suite for real-time AI cost monitoring dashboard
  */
 
+import '@vitest/matchers';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { AICostDashboard } from '../AICostDashboard';
@@ -13,7 +14,7 @@ import { type UserId } from '@/lib/ultra';
 vi.mock('@/services/aiService', () => ({
   aiService: {
     getCostReport: vi.fn(),
-  }
+  },
 }));
 
 // Mock useAuth hook
@@ -22,8 +23,8 @@ vi.mock('@/hooks/useAuth', () => ({
     user: {
       id: '123e4567-e89b-12d3-a456-426614174000',
       email: 'test@example.com',
-    }
-  }))
+    },
+  })),
 }));
 
 describe('AICostDashboard', () => {
@@ -37,21 +38,21 @@ describe('AICostDashboard', () => {
     it('should render dashboard title', () => {
       (aiService.getCostReport as any).mockReturnValue({
         total: 0,
-        byProvider: {}
+        byProvider: {},
       });
 
       render(<AICostDashboard />);
-      
+
       expect(screen.getByText('AI Cost Report')).toBeInTheDocument();
     });
 
     it('should display total cost', () => {
       (aiService.getCostReport as any).mockReturnValue({
-        total: 1.50,
+        total: 1.5,
         byProvider: {
-          gemini: 1.00,
-          siliconflow: 0.50,
-        }
+          gemini: 1.0,
+          siliconflow: 0.5,
+        },
       });
 
       render(<AICostDashboard />);
@@ -61,11 +62,11 @@ describe('AICostDashboard', () => {
 
     it('should display provider breakdown', () => {
       (aiService.getCostReport as any).mockReturnValue({
-        total: 1.50,
+        total: 1.5,
         byProvider: {
-          gemini: 1.00,
-          siliconflow: 0.50,
-        }
+          gemini: 1.0,
+          siliconflow: 0.5,
+        },
       });
 
       render(<AICostDashboard />);
@@ -77,7 +78,7 @@ describe('AICostDashboard', () => {
     it('should handle zero costs gracefully', () => {
       (aiService.getCostReport as any).mockReturnValue({
         total: 0,
-        byProvider: {}
+        byProvider: {},
       });
 
       render(<AICostDashboard />);
@@ -88,7 +89,7 @@ describe('AICostDashboard', () => {
     it('should render with empty provider object', () => {
       (aiService.getCostReport as any).mockReturnValue({
         total: 0,
-        byProvider: {}
+        byProvider: {},
       });
 
       render(<AICostDashboard />);
@@ -101,7 +102,7 @@ describe('AICostDashboard', () => {
     it('should have correct container styling', () => {
       (aiService.getCostReport as any).mockReturnValue({
         total: 0,
-        byProvider: {}
+        byProvider: {},
       });
 
       const { container } = render(<AICostDashboard />);
@@ -117,7 +118,7 @@ describe('AICostDashboard', () => {
     it('should have correct title styling', () => {
       (aiService.getCostReport as any).mockReturnValue({
         total: 0,
-        byProvider: {}
+        byProvider: {},
       });
 
       render(<AICostDashboard />);
@@ -130,10 +131,10 @@ describe('AICostDashboard', () => {
 
     it('should have correct cost display styling', () => {
       (aiService.getCostReport as any).mockReturnValue({
-        total: 1.50,
+        total: 1.5,
         byProvider: {
-          gemini: 1.00,
-        }
+          gemini: 1.0,
+        },
       });
 
       render(<AICostDashboard />);
@@ -149,7 +150,7 @@ describe('AICostDashboard', () => {
         total: 1.234,
         byProvider: {
           gemini: 1.234,
-        }
+        },
       });
 
       render(<AICostDashboard />);
@@ -163,7 +164,7 @@ describe('AICostDashboard', () => {
         total: 999.99,
         byProvider: {
           gemini: 999.99,
-        }
+        },
       });
 
       render(<AICostDashboard />);
@@ -176,7 +177,7 @@ describe('AICostDashboard', () => {
         total: 0.001,
         byProvider: {
           gemini: 0.001,
-        }
+        },
       });
 
       render(<AICostDashboard />);
@@ -188,10 +189,10 @@ describe('AICostDashboard', () => {
       (aiService.getCostReport as any).mockReturnValue({
         total: 2.75,
         byProvider: {
-          gemini: 1.50,
+          gemini: 1.5,
           siliconflow: 0.75,
-          openai: 0.50,
-        }
+          openai: 0.5,
+        },
       });
 
       render(<AICostDashboard />);
@@ -206,7 +207,7 @@ describe('AICostDashboard', () => {
     it('should use current user ID for cost report', () => {
       const getCostReportSpy = vi.fn().mockReturnValue({
         total: 0,
-        byProvider: {}
+        byProvider: {},
       });
 
       (aiService.getCostReport as any).mockImplementation(getCostReportSpy);
@@ -218,9 +219,10 @@ describe('AICostDashboard', () => {
     });
 
     it('should update when user changes', async () => {
-      const getCostReportSpy = vi.fn()
-        .mockReturnValueOnce({ total: 1.00, byProvider: { gemini: 1.00 } })
-        .mockReturnValueOnce({ total: 2.00, byProvider: { gemini: 2.00 } });
+      const getCostReportSpy = vi
+        .fn()
+        .mockReturnValueOnce({ total: 1.0, byProvider: { gemini: 1.0 } })
+        .mockReturnValueOnce({ total: 2.0, byProvider: { gemini: 2.0 } });
 
       (aiService.getCostReport as any).mockImplementation(getCostReportSpy);
 
@@ -236,7 +238,7 @@ describe('AICostDashboard', () => {
         user: {
           id: '99999999-9999-9999-9999-999999999999',
           email: 'other@example.com',
-        }
+        },
       });
 
       rerender(<AICostDashboard />);
@@ -250,12 +252,12 @@ describe('AICostDashboard', () => {
   describe('Component Structure', () => {
     it('should render all cost entries', () => {
       (aiService.getCostReport as any).mockReturnValue({
-        total: 3.00,
+        total: 3.0,
         byProvider: {
-          gemini: 1.00,
-          siliconflow: 1.00,
-          openai: 1.00,
-        }
+          gemini: 1.0,
+          siliconflow: 1.0,
+          openai: 1.0,
+        },
       });
 
       render(<AICostDashboard />);
@@ -266,12 +268,12 @@ describe('AICostDashboard', () => {
 
     it('should render provider entries in order', () => {
       (aiService.getCostReport as any).mockReturnValue({
-        total: 1.50,
+        total: 1.5,
         byProvider: {
-          z: 0.50,
-          a: 0.50,
-          m: 0.50,
-        }
+          z: 0.5,
+          a: 0.5,
+          m: 0.5,
+        },
       });
 
       render(<AICostDashboard />);
@@ -291,7 +293,7 @@ describe('AICostDashboard', () => {
 
       (aiService.getCostReport as any).mockReturnValue({
         total: 0,
-        byProvider: {}
+        byProvider: {},
       });
 
       // Should not throw
@@ -300,11 +302,11 @@ describe('AICostDashboard', () => {
 
     it('should handle undefined provider values', () => {
       (aiService.getCostReport as any).mockReturnValue({
-        total: 1.00,
+        total: 1.0,
         byProvider: {
           gemini: undefined,
-          siliconflow: 1.00,
-        }
+          siliconflow: 1.0,
+        },
       });
 
       render(<AICostDashboard />);
@@ -315,11 +317,11 @@ describe('AICostDashboard', () => {
 
     it('should handle provider with zero cost', () => {
       (aiService.getCostReport as any).mockReturnValue({
-        total: 1.00,
+        total: 1.0,
         byProvider: {
-          gemini: 1.00,
-          siliconflow: 0.00,
-        }
+          gemini: 1.0,
+          siliconflow: 0.0,
+        },
       });
 
       render(<AICostDashboard />);
@@ -333,7 +335,7 @@ describe('AICostDashboard', () => {
     it('should call aiService.getCostReport on mount', () => {
       const getCostReportSpy = vi.fn().mockReturnValue({
         total: 0,
-        byProvider: {}
+        byProvider: {},
       });
 
       (aiService.getCostReport as any).mockImplementation(getCostReportSpy);
@@ -346,7 +348,7 @@ describe('AICostDashboard', () => {
     it('should use correct user ID from auth', () => {
       const getCostReportSpy = vi.fn().mockReturnValue({
         total: 0,
-        byProvider: {}
+        byProvider: {},
       });
 
       (aiService.getCostReport as any).mockImplementation(getCostReportSpy);
@@ -369,11 +371,11 @@ describe('AICostDashboard', () => {
   describe('Visual Layout', () => {
     it('should have proper spacing between elements', () => {
       (aiService.getCostReport as any).mockReturnValue({
-        total: 2.00,
+        total: 2.0,
         byProvider: {
-          gemini: 1.00,
-          siliconflow: 1.00,
-        }
+          gemini: 1.0,
+          siliconflow: 1.0,
+        },
       });
 
       const { container } = render(<AICostDashboard />);
@@ -385,11 +387,11 @@ describe('AICostDashboard', () => {
 
     it('should display costs in a list format', () => {
       (aiService.getCostReport as any).mockReturnValue({
-        total: 1.50,
+        total: 1.5,
         byProvider: {
-          gemini: 1.00,
-          siliconflow: 0.50,
-        }
+          gemini: 1.0,
+          siliconflow: 0.5,
+        },
       });
 
       render(<AICostDashboard />);
@@ -404,8 +406,8 @@ describe('AICostDashboard', () => {
     it('should support manual refresh (if implemented)', () => {
       // This test documents the expected behavior for future enhancement
       (aiService.getCostReport as any).mockReturnValue({
-        total: 1.00,
-        byProvider: { gemini: 1.00 }
+        total: 1.0,
+        byProvider: { gemini: 1.0 },
       });
 
       render(<AICostDashboard />);
@@ -417,8 +419,8 @@ describe('AICostDashboard', () => {
 
     it('should display current snapshot of costs', () => {
       const mockReport = {
-        total: 1.00,
-        byProvider: { gemini: 1.00 }
+        total: 1.0,
+        byProvider: { gemini: 1.0 },
       };
 
       (aiService.getCostReport as any).mockReturnValue(mockReport);
@@ -433,12 +435,12 @@ describe('AICostDashboard', () => {
   describe('Accessibility', () => {
     it('should have semantic HTML structure', () => {
       (aiService.getCostReport as any).mockReturnValue({
-        total: 1.00,
-        byProvider: { gemini: 1.00 }
+        total: 1.0,
+        byProvider: { gemini: 1.0 },
       });
 
       const { container } = render(<AICostDashboard />);
-      
+
       // Should have proper heading
       const heading = screen.getByRole('heading', { level: 2 });
       expect(heading).toBeInTheDocument();
@@ -447,11 +449,11 @@ describe('AICostDashboard', () => {
 
     it('should be readable by screen readers', () => {
       (aiService.getCostReport as any).mockReturnValue({
-        total: 1.50,
+        total: 1.5,
         byProvider: {
-          gemini: 1.00,
-          siliconflow: 0.50,
-        }
+          gemini: 1.0,
+          siliconflow: 0.5,
+        },
       });
 
       render(<AICostDashboard />);
@@ -466,19 +468,19 @@ describe('AICostDashboard', () => {
   describe('Performance', () => {
     it('should render quickly with large provider list', () => {
       const largeReport = {
-        total: 10.00,
+        total: 10.0,
         byProvider: {
-          provider1: 1.00,
-          provider2: 1.00,
-          provider3: 1.00,
-          provider4: 1.00,
-          provider5: 1.00,
-          provider6: 1.00,
-          provider7: 1.00,
-          provider8: 1.00,
-          provider9: 1.00,
-          provider10: 1.00,
-        }
+          provider1: 1.0,
+          provider2: 1.0,
+          provider3: 1.0,
+          provider4: 1.0,
+          provider5: 1.0,
+          provider6: 1.0,
+          provider7: 1.0,
+          provider8: 1.0,
+          provider9: 1.0,
+          provider10: 1.0,
+        },
       };
 
       (aiService.getCostReport as any).mockReturnValue(largeReport);
@@ -493,18 +495,18 @@ describe('AICostDashboard', () => {
 
     it('should not cause unnecessary re-renders', () => {
       const getCostReportSpy = vi.fn().mockReturnValue({
-        total: 1.00,
-        byProvider: { gemini: 1.00 }
+        total: 1.0,
+        byProvider: { gemini: 1.0 },
       });
 
       (aiService.getCostReport as any).mockImplementation(getCostReportSpy);
 
       const { rerender } = render(<AICostDashboard />);
-      
+
       const initialCallCount = getCostReportSpy.mock.calls.length;
-      
+
       rerender(<AICostDashboard />);
-      
+
       // Should only be called on mount, not on rerender (unless user changes)
       expect(getCostReportSpy.mock.calls.length).toBeLessThanOrEqual(initialCallCount + 1);
     });
