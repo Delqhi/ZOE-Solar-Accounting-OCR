@@ -21,10 +21,7 @@ function serviceWorkerPlugin() {
       const path = await import('path');
 
       // Read the service worker source
-      const swSource = fs.readFileSync(
-        path.resolve(__dirname, 'src/service-worker.ts'),
-        'utf-8'
-      );
+      const swSource = fs.readFileSync(path.resolve(__dirname, 'src/service-worker.ts'), 'utf-8');
 
       // Write to dist directory
       const distDir = path.resolve(__dirname, 'dist');
@@ -32,10 +29,7 @@ function serviceWorkerPlugin() {
         fs.mkdirSync(distDir, { recursive: true });
       }
 
-      fs.writeFileSync(
-        path.resolve(distDir, 'service-worker.js'),
-        swSource
-      );
+      fs.writeFileSync(path.resolve(distDir, 'service-worker.js'), swSource);
 
       console.log('✅ Service worker built to dist/service-worker.js');
     },
@@ -43,126 +37,128 @@ function serviceWorkerPlugin() {
 }
 
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
-    return {
-      server: {
-        port: 3000,
-        host: '0.0.0.0',
+  const env = loadEnv(mode, '.', '');
+  return {
+    server: {
+      port: 3000,
+      host: '0.0.0.0',
+    },
+    plugins: [
+      // React with Compiler for automatic memoization
+      react({
+        // Enable fast refresh
+        fastRefresh: true,
+      }),
+      tailwindcss(),
+      // Service worker builder for production
+      serviceWorkerPlugin(),
+    ],
+    define: {
+      // Only expose non-sensitive build info
+      'import.meta.env.VITE_APP_VERSION': JSON.stringify(
+        process.env.npm_package_version || '1.0.0'
+      ),
+      'import.meta.env.VITE_BUILD_TIME': JSON.stringify(new Date().toISOString()),
+    },
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
       },
-      plugins: [
-        // React with Compiler for automatic memoization
-        react({
-          // Enable fast refresh
-          fastRefresh: true,
-        }),
-        tailwindcss(),
-        // Service worker builder for production
-        serviceWorkerPlugin(),
+    },
+    build: {
+      // Performance optimization
+      target: 'es2022',
+      minify: false, // Disable minification for now to avoid terser dependency
+      terserOptions: {
+        compress: {
+          drop_console: mode === 'production',
+          drop_debugger: mode === 'production',
+          pure_funcs: ['console.log', 'console.debug'],
+        },
+        format: {
+          comments: false,
+        },
+      },
+
+      // Bundle size optimization
+      chunkSizeWarningLimit: 500, // KB
+      assetsInlineLimit: 4096, // Inline small assets
+
+      // Source maps (disabled in production for security)
+      sourcemap: mode !== 'production',
+
+      rollupOptions: {
+        // Advanced code splitting
+        output: {
+          manualChunks: {
+            // Core libraries
+            'react-core': ['react', 'react-dom', 'react/jsx-runtime'],
+
+            // State management
+            state: ['zustand', '@tanstack/react-query'],
+
+            // Validation & types
+            validation: ['zod'],
+
+            // Supabase
+            supabase: ['@supabase/supabase-js'],
+
+            // AI providers
+            ai: ['@google/genai'],
+
+            // UI utilities
+            ui: ['react-hot-toast', 'uuid'],
+
+            // PDF generation
+            pdf: ['jspdf', 'jspdf-autotable'],
+
+            // PDF rendering
+            'pdf-render': ['pdfjs-dist'],
+          },
+
+          // Prevent circular dependencies
+          preserveModules: false,
+
+          // Optimize asset loading
+          assetFileNames: (assetInfo) => {
+            const ext = assetInfo.name?.split('.').pop();
+            if (ext === 'css') return 'assets/css/[name]-[hash][extname]';
+            if (ext === 'woff2') return 'assets/fonts/[name]-[hash][extname]';
+            return 'assets/[name]-[hash][extname]';
+          },
+        },
+
+        // Performance optimizations
+        performance: {
+          maxAssetSize: 500 * 1024, // 500KB per chunk
+          maxEntrypointSize: 1000 * 1024, // 1MB total
+          hints: mode === 'production' ? 'warning' : false,
+        },
+      },
+    },
+
+    // Preview server configuration
+    preview: {
+      port: 3000,
+      host: '0.0.0.0',
+    },
+
+    // Optimize dependencies
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom',
+        '@tanstack/react-query',
+        'zod',
+        'zustand',
+        'pdfjs-dist', // Include pdfjs-dist for proper resolution
       ],
-      define: {
-        // Only expose non-sensitive build info
-        'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.npm_package_version || '1.0.0'),
-        'import.meta.env.VITE_BUILD_TIME': JSON.stringify(new Date().toISOString()),
-      },
-      resolve: {
-        alias: {
-          '@': path.resolve(__dirname, './src'),
-        }
-      },
-      build: {
-        // Performance optimization
-        target: 'es2022',
-        minify: false, // Disable minification for now to avoid terser dependency
-        terserOptions: {
-          compress: {
-            drop_console: mode === 'production',
-            drop_debugger: mode === 'production',
-            pure_funcs: ['console.log', 'console.debug'],
-          },
-          format: {
-            comments: false,
-          },
-        },
-        
-        // Bundle size optimization
-        chunkSizeWarningLimit: 500, // KB
-        assetsInlineLimit: 4096, // Inline small assets
-        
-        // Source maps (disabled in production for security)
-        sourcemap: mode !== 'production',
-        
-        rollupOptions: {
-          // Advanced code splitting
-          output: {
-            manualChunks: {
-              // Core libraries
-              'react-core': ['react', 'react-dom', 'react/jsx-runtime'],
-              
-              // State management
-              'state': ['zustand', '@tanstack/react-query'],
-              
-              // Validation & types
-              'validation': ['zod'],
-              
-              // Supabase
-              'supabase': ['@supabase/supabase-js'],
-              
-              // AI providers
-              'ai': ['@google/genai'],
-              
-              // UI utilities
-              'ui': ['react-hot-toast', 'uuid'],
-              
-              // PDF generation
-              'pdf': ['jspdf', 'jspdf-autotable'],
-              
-              // PDF rendering
-              'pdf-render': ['pdfjs-dist'],
-            },
-            
-            // Prevent circular dependencies
-            preserveModules: false,
-            
-            // Optimize asset loading
-            assetFileNames: (assetInfo) => {
-              const ext = assetInfo.name?.split('.').pop();
-              if (ext === 'css') return 'assets/css/[name]-[hash][extname]';
-              if (ext === 'woff2') return 'assets/fonts/[name]-[hash][extname]';
-              return 'assets/[name]-[hash][extname]';
-            },
-          },
-          
-          // Performance optimizations
-          performance: {
-            maxAssetSize: 500 * 1024, // 500KB per chunk
-            maxEntrypointSize: 1000 * 1024, // 1MB total
-            hints: mode === 'production' ? 'warning' : false,
-          },
-        },
-      },
-      
-      // Preview server configuration
-      preview: {
-        port: 3000,
-        host: '0.0.0.0',
-      },
-      
-      // Optimize dependencies
-      optimizeDeps: {
-        include: [
-          'react',
-          'react-dom',
-          '@tanstack/react-query',
-          'zod',
-          'zustand',
-        ],
-        exclude: ['pdfjs-dist'], // Exclude PDF.js due to worker issues
-      },
-      
-      // Worker configuration
-      worker: {
-        format: 'es',
-        plugins: () => [react()], // Return function for worker plugins
-      },
-    };
+    },
+
+    // Worker configuration
+    worker: {
+      format: 'es',
+      plugins: () => [react()], // Return function for worker plugins
+    },
+  };
 });

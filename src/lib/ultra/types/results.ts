@@ -25,3 +25,11 @@ export const Result = {
     return defaultValue;
   },
 };
+
+// AI Analysis result type
+export interface AIAnalysis {
+  documentType: string;
+  vendor: string;
+  amount: number;
+  confidence: number;
+}

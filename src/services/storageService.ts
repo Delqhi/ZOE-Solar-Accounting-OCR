@@ -93,7 +93,7 @@ export async function saveDocument(data: Partial<ExtractedData> & { id?: string 
 }
 
 export async function deleteDocument(id: string) {
-  return await belegeService.delete(id);
+  return await belegeService.remove(id);
 }
 
 export async function saveSettings(settings: AppSettings) {

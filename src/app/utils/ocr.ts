@@ -1,4 +1,4 @@
-import { DocumentRecord, DocumentStatus, ExtractedData } from '../types';
+import { DocumentRecord, DocumentStatus, ExtractedData } from '../../types';
 
 export type DuplicateMatch = { doc: DocumentRecord; reason: string; confidence: number };
 

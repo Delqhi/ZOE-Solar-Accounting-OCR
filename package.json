@@ -32,7 +32,7 @@
     "autoprefixer": "^10.4.23",
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",
-    "pdfjs-dist": "^5.4.530",
+    "pdfjs-dist": "^3.11.174",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-hot-toast": "^2.6.0",

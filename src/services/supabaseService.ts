@@ -154,7 +154,7 @@ export async function deleteDocument(id: string): Promise<void> {
   if (!isSupabaseConfigured()) return;
 
   try {
-    await belegeService.delete(id);
+    await belegeService.remove(id);
   } catch (error) {
     console.error('Error deleting document from Supabase:', error);
     throw error;

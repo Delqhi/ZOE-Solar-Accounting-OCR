@@ -1,11 +1,13 @@
 export { belegToDb, dbToBeleg } from './converters';
-export * as belege from './belege';
-export * as steuerkategorien from './steuerkategorien';
-export * as kontierungskonten from './kontierungskonten';
-export * as lieferantenRegeln from './lieferantenRegeln';
-export * as einstellungen from './einstellungen';
 
-// Re-export for backward compatibility
+// Service exports with Service suffix for backward compatibility
+export * as belegeService from './belege';
+export * as steuerkategorienService from './steuerkategorien';
+export * as kontierungskontenService from './kontierungskonten';
+export * as lieferantenRegelnService from './lieferantenRegeln';
+export * as einstellungenService from './einstellungen';
+
+// Re-export for backward compatibility (direct function exports)
 export {
   getAll,
   getById,
