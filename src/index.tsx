@@ -3,6 +3,7 @@
  * Integrates: Error Boundaries, Context, Monitoring, Security
  */
 
+import React, { Suspense, StrictMode, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 
 // Components
@@ -13,7 +14,6 @@ import { AppProvider } from './context/AppContext';
 
 // Services & Monitoring
 import { performSecurityCheck } from './middleware/security';
-import { monitoringService } from './services/monitoringService';
 import { loadEnvConfig, logConfigSummary, getEnvironmentConfig } from './config/env';
 import { analytics } from './lib/analytics';
 
@@ -57,7 +57,7 @@ window.fetch = async (...args) => {
     return response;
   } catch (error) {
     const duration = performance.now() - start;
-    monitoringService.captureError(error as Error, {
+    console.error('Fetch error:', error, {
       url: args[0],
       duration: Math.round(duration),
     });
@@ -95,7 +95,7 @@ if ('serviceWorker' in navigator) {
 
 // Root component wrapper
 function Root() {
-  React.useEffect(() => {
+  useEffect(() => {
     // Track app load
     analytics.track('app_loaded', {
       version: envConfig.appVersion,
@@ -123,7 +123,7 @@ function Root() {
   }, []);
 
   return (
-    <React.Suspense
+    <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="text-center">
@@ -137,7 +137,7 @@ function Root() {
       <ErrorBoundary>
         <App />
       </ErrorBoundary>
-    </React.Suspense>
+    </Suspense>
   );
 }
 
@@ -151,11 +151,11 @@ const root = ReactDOM.createRoot(rootElement);
 
 // Render with Context and Security
 root.render(
-  <React.StrictMode>
+  <StrictMode>
     <AppProvider>
       <Root />
     </AppProvider>
-  </React.StrictMode>
+  </StrictMode>
 );
 
 // Export for testing

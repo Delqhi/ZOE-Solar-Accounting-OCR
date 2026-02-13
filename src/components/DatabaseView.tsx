@@ -29,7 +29,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
 
   // Filter documents
   const filteredDocuments = useMemo(() => {
-    let filtered = documents.filter(doc => {
+    const filtered = documents.filter(doc => {
       const matchesSearch = searchQuery === '' ||
         doc.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (doc.data?.lieferantName || '').toLowerCase().includes(searchQuery.toLowerCase());

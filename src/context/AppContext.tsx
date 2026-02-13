@@ -2,8 +2,8 @@
  * App Context - Centralized State Management
  * Replaces prop drilling with React Context + useReducer
  */
-import { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
-import { DocumentRecord, AppSettings, AppContextType, AppState } from '../types';
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useMemo } from 'react';
+import { DocumentRecord, AppSettings, AppContextType, AppState, ExtractedData } from '../types';
 import { getAllDocuments, saveDocument, deleteDocument, saveSettings, getSettings } from '../services/storageService';
 import { toast } from 'react-hot-toast';
 
@@ -232,11 +232,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (!source || !target) return;
 
-      // Merge data
-      const mergedData = {
+      // Merge data with type safety
+      const mergedData: ExtractedData = {
         ...target.data,
         ...source.data,
         lineItems: [...(target.data?.lineItems || []), ...(source.data?.lineItems || [])],
+        // Ensure required fields have values
+        belegDatum: source.data?.belegDatum || target.data?.belegDatum || new Date().toISOString().split('T')[0],
+        belegNummerLieferant: source.data?.belegNummerLieferant || target.data?.belegNummerLieferant || '',
+        lieferantName: source.data?.lieferantName || target.data?.lieferantName || '',
+        lieferantAdresse: source.data?.lieferantAdresse || target.data?.lieferantAdresse || '',
+        steuernummer: source.data?.steuernummer || target.data?.steuernummer || '',
+        nettoBetrag: source.data?.nettoBetrag || target.data?.nettoBetrag || 0,
+        mwstSatz0: source.data?.mwstSatz0 || target.data?.mwstSatz0 || 0,
+        mwstBetrag0: source.data?.mwstBetrag0 || target.data?.mwstBetrag0 || 0,
+        mwstSatz7: source.data?.mwstSatz7 || target.data?.mwstSatz7 || 0,
+        mwstBetrag7: source.data?.mwstBetrag7 || target.data?.mwstBetrag7 || 0,
+        mwstSatz19: source.data?.mwstSatz19 || target.data?.mwstSatz19 || 0,
+        mwstBetrag19: source.data?.mwstBetrag19 || target.data?.mwstBetrag19 || 0,
+        bruttoBetrag: source.data?.bruttoBetrag || target.data?.bruttoBetrag || 0,
+        zahlungsmethode: source.data?.zahlungsmethode || target.data?.zahlungsmethode || '',
+        kontogruppe: source.data?.kontogruppe || target.data?.kontogruppe || '',
+        konto_skr03: source.data?.konto_skr03 || target.data?.konto_skr03 || '',
+        ust_typ: source.data?.ust_typ || target.data?.ust_typ || '',
+        sollKonto: source.data?.sollKonto || target.data?.sollKonto || '',
+        habenKonto: source.data?.habenKonto || target.data?.habenKonto || '',
+        steuerKategorie: source.data?.steuerKategorie || target.data?.steuerKategorie || '',
+        eigeneBelegNummer: source.data?.eigeneBelegNummer || target.data?.eigeneBelegNummer || '',
+        zahlungsDatum: source.data?.zahlungsDatum || target.data?.zahlungsDatum || '',
+        zahlungsStatus: source.data?.zahlungsStatus || target.data?.zahlungsStatus || '',
+        aufbewahrungsOrt: source.data?.aufbewahrungsOrt || target.data?.aufbewahrungsOrt || '',
+        rechnungsEmpfaenger: source.data?.rechnungsEmpfaenger || target.data?.rechnungsEmpfaenger || '',
+        kleinbetrag: source.data?.kleinbetrag || target.data?.kleinbetrag || false,
+        vorsteuerabzug: source.data?.vorsteuerabzug || target.data?.vorsteuerabzug || false,
+        reverseCharge: source.data?.reverseCharge || target.data?.reverseCharge || false,
+        privatanteil: source.data?.privatanteil || target.data?.privatanteil || false,
+        beschreibung: source.data?.beschreibung || target.data?.beschreibung || '',
+        quantity: source.data?.quantity || target.data?.quantity || 0,
       };
 
       const updatedTarget = { ...target, data: mergedData };
@@ -282,7 +314,7 @@ export const useDocuments = () => {
   const { documents, filters } = state;
 
   // Apply filters
-  const filteredDocuments = React.useMemo(() => {
+  const filteredDocuments = useMemo(() => {
     let filtered = [...documents];
 
     if (filters.status) {

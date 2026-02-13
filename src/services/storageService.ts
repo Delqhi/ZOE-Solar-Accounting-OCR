@@ -11,7 +11,7 @@ import {
   einstellungenService
 } from './belegeService';
 
-import { ExtractedData, DocumentRecord, VendorRule } from '../types';
+import { ExtractedData, DocumentRecord, VendorRule, AppSettings } from '../types';
 
 export async function getAllDocuments(): Promise<DocumentRecord[]> {
   const result = await belegeService.getAll();
@@ -60,6 +60,7 @@ export async function getAllDocuments(): Promise<DocumentRecord[]> {
       beschreibung: beleg.beschreibung || '',
       ocr_score: beleg.ocr_score,
       ocr_rationale: beleg.ocr_rationale,
+      quantity: 0,
     },
     previewUrl: beleg.gitlab_storage_url,
     fileHash: beleg.file_hash,

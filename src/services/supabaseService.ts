@@ -4,7 +4,16 @@
  */
 
 import { belegeService } from './belegeService';
-import { DocumentRecord, ExtractedData, AppSettings } from '../types';
+import { DocumentRecord, ExtractedData, AppSettings, DocumentStatus } from '../types';
+
+// Type stubs for Supabase
+interface SupabaseClient {
+  auth: {
+    getUser(): Promise<{ data: { user: User | null } }>;
+    signInWithPassword(credentials: { email: string; password: string }): Promise<{ data: { user: User | null } }>;
+    signOut(): Promise<void>;
+  };
+}
 
 export interface User {
   id: string;
@@ -30,13 +39,13 @@ export async function getAllDocuments(): Promise<DocumentRecord[]> {
   try {
     const result = await belegeService.getAll();
     // Convert database format to DocumentRecord format
-    return result.data.map((beleg: Beleg) => ({
+    return result.data.map((beleg: any) => ({
       id: beleg.id,
       zoeId: beleg.zoe_id,
       fileName: beleg.dateiname,
       fileType: beleg.dateityp,
-      uploadDate: beleg.uploaded_at || beleg.created_at,
-      status: beleg.status,
+      uploadDate: beleg.uploaded_at || beleg.created_at || new Date().toISOString(),
+      status: beleg.status as DocumentStatus,
       data: {
         documentType: beleg.document_type,
         belegDatum: beleg.beleg_datum || '',

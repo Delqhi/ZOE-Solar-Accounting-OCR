@@ -46,8 +46,13 @@ import { applyAccountingRules, generateZoeInvoiceId } from './ruleEngine';
 import { detectPrivateDocument } from './privateDocumentDetection';
 import { normalizeExtractedData } from './extractedDataNormalization';
 import { belegeService } from './belegeService';
-import { monitoringService } from './monitoringService';
 import { DocumentStatus, ExtractedData } from '../types';
+
+// Monitoring stub - service was removed
+const monitoringService = {
+  captureMetric: (_name: string, _value: number) => {},
+  captureError: (_error: Error, _context?: Record<string, unknown>) => {},
+};
 
 // Configuration for better-upload
 export const betterUploadConfig: UploadConfig = {
@@ -151,16 +156,17 @@ export const zoeUploadHandler: UploadHandler = async (file: UploadFile, metadata
       success: true,
       documentId: zoeInvoiceId,
       status: uploadStatus,
-      data: ruledData,
+      data: ruledData as unknown as Record<string, unknown>,
       previewUrl: urlData.publicUrl,
     };
 
-  } catch (error: Error) {
-    monitoringService.captureError(error, { fileName: file.name });
+  } catch (error: unknown) {
+    const err = error as Error;
+    monitoringService.captureError(err, { fileName: file.name });
     
     return {
       success: false,
-      error: error.message || 'Upload processing failed',
+      error: err.message || 'Upload processing failed',
       status: 'error',
     };
   }

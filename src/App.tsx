@@ -63,7 +63,7 @@ export function App() {
       <div className="content-container">
         <p>Documents: {documents.length}</p>
         {selectedDocuments.size > 0 && <p>Selected: {selectedDocuments.size}</p>}
-        {notification && <p>Notification active</p>}
+        {notification !== null && <p>Notification active</p>}
         {isProcessing && <p>Processing...</p>}
         {settings.language && <p>Language: {settings.language}</p>}
       </div>

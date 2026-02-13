@@ -4,8 +4,6 @@
 
 
 import { AppSettings } from '../types';
-import { AICostDashboardCompact } from './AICostDashboard';
-import { useAuth } from '@/hooks/useAuth';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -14,7 +12,9 @@ interface SettingsViewProps {
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, onClose }) => {
-  const { user } = useAuth();
+  // Authentication and AI cost monitoring temporarily disabled
+  const user = null;
+  void onSave; // Mark as used
 
   return (
     <div className="p-6 space-y-6">
@@ -29,11 +29,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, on
         </button>
       </div>
 
-      {/* AI Cost Monitoring - Only shown if user is authenticated */}
+      {/* AI Cost Monitoring - Temporarily disabled */}
       {user && (
         <div className="space-y-3">
           <h3 className="text-lg font-semibold text-text">AI Kostenmonitoring</h3>
-          <AICostDashboardCompact />
+          <div className="p-4 bg-surface border border-border rounded-lg text-text-muted text-sm">
+            AI Cost Monitoring temporarily unavailable
+          </div>
         </div>
       )}
 

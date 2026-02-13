@@ -44,15 +44,15 @@ export function useAppState(): UseAppStateReturn {
   const [viewMode, setViewMode] = useState<ViewMode>('document');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [filterYear, _setFilterYear] = useState<string>('all');
-  const [filterQuarter, _setFilterQuarter] = useState<string>('all');
-  const [filterMonth, _setFilterMonth] = useState<string>('all');
-  const [filterStatus, _setFilterStatus] = useState<string>('all');
-  const [filterVendor, _setFilterVendor] = useState<string>('all');
+  const [filterYear, setFilterYear] = useState<string>('all');
+  const [filterQuarter, setFilterQuarter] = useState<string>('all');
+  const [filterMonth, setFilterMonth] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterVendor, setFilterVendor] = useState<string>('all');
 
   const [compareDoc, setCompareDoc] = useState<DocumentRecord | null>(null);
   const [originalDoc, setOriginalDoc] = useState<DocumentRecord | null>(null);
-  const [sidebarWidth, _setSidebarWidth] = useState(300);
+  const [sidebarWidth, setSidebarWidth] = useState(300);
 
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {

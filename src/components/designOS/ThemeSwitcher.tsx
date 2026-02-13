@@ -96,6 +96,9 @@ export function ThemeSwitcher({
       mediaQuery.addEventListener('change', handleChange);
       return () => mediaQuery.removeEventListener('change', handleChange);
     }
+    
+    // Return empty cleanup function for non-system themes
+    return undefined;
   }, [currentTheme, onThemeChange]);
 
   const handleThemeChange = (theme: Theme) => {
@@ -151,11 +154,13 @@ export function ThemeSwitcher({
 }
 
 // Hook for theme management
-export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(() => {
+export function useTheme(): { theme: Theme; setTheme: (theme: Theme) => void } {
+  const getInitialTheme = (): Theme => {
     const saved = localStorage.getItem('designos-theme') as Theme | null;
     return saved || 'dark';
-  });
+  };
+
+  const [theme, setTheme] = useState<Theme>(getInitialTheme());
 
   useEffect(() => {
     localStorage.setItem('designos-theme', theme);

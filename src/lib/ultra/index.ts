@@ -13,4 +13,3 @@ export { AuditService } from './security/audit';
 
 // AI Service exports
 export { AIService, AICircuitBreaker } from './ai/AIService';
-export { GeminiProvider, SiliconFlowProvider } from './ai/providers';

@@ -17,8 +17,12 @@ export const TypographyHeading: React.FC<{
   level?: 1 | 2 | 3 | 4 | 5 | 6;
   className?: string;
 }> = ({ children, level = 1, className }) => {
-  const Tag = `h${level}` as keyof JSX.IntrinsicElements;
-  return <Tag className={className}>{children}</Tag>;
+  if (level === 1) return <h1 className={className}>{children}</h1>;
+  if (level === 2) return <h2 className={className}>{children}</h2>;
+  if (level === 3) return <h3 className={className}>{children}</h3>;
+  if (level === 4) return <h4 className={className}>{children}</h4>;
+  if (level === 5) return <h5 className={className}>{children}</h5>;
+  return <h6 className={className}>{children}</h6>;
 };
 
 // Layout Components
