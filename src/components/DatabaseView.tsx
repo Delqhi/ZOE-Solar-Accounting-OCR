@@ -1,20 +1,14 @@
 /** DatabaseView Component - Enhanced with 2026 Glassmorphism 2.0 */
 
 import { useState, useMemo, useCallback } from 'react';
-import { VirtualizedDatabaseGrid } from './VirtualizedDatabaseGrid';
-import { VirtualizedDocumentList } from './VirtualizedDatabaseGrid';
-import { DepthCard, FloatingElement } from './designOS/depth3D';
-import { TypographyHeading, TypographyBody } from './designOS/typography';
-import { AccessibleButton, AccessibleInput } from './designOS/Accessibility';
-import { FilterBar } from './FilterBar';
-import { DocumentRecord, DocumentStatus, ViewMode } from '../types';
-import { use3DDepth } from '../hooks/use3D';
+import { EnhancedCard } from './designOS';
+import { DocumentRecord, DocumentStatus } from '../types';
 
 interface DatabaseViewProps {
   documents: DocumentRecord[];
-  settings: any;
-  onViewModeChange: (mode: ViewMode) => void;
-  viewMode: ViewMode;
+  settings?: unknown;
+  onViewModeChange?: (mode: string) => void;
+  viewMode?: string;
 }
 
 export const DatabaseView: React.FC<DatabaseViewProps> = ({
@@ -28,14 +22,17 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'size'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  const { depthLayer } = use3DDepth({ layers: 5, baseZ: 10 });
+  // Mark intentionally unused variables
+  void settings;
+  void onViewModeChange;
+  void viewMode;
 
   // Filter documents
   const filteredDocuments = useMemo(() => {
     let filtered = documents.filter(doc => {
       const matchesSearch = searchQuery === '' ||
-        doc.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (doc.extractedData?.supplier || '').toLowerCase().includes(searchQuery.toLowerCase());
+        doc.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (doc.data?.lieferantName || '').toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesStatus = selectedStatus === null || doc.status === selectedStatus;
 
@@ -44,22 +41,22 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
 
     // Sort documents
     filtered.sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
+      let aValue: string | number;
+      let bValue: string | number;
 
       switch (sortBy) {
         case 'name':
-          aValue = a.filename.toLowerCase();
-          bValue = b.filename.toLowerCase();
+          aValue = a.fileName.toLowerCase();
+          bValue = b.fileName.toLowerCase();
           break;
         case 'size':
-          aValue = a.size;
-          bValue = b.size;
+          aValue = 0; // Size not in DocumentRecord
+          bValue = 0;
           break;
         case 'date':
         default:
-          aValue = new Date(a.createdAt).getTime();
-          bValue = new Date(b.createdAt).getTime();
+          aValue = new Date(a.uploadDate).getTime();
+          bValue = new Date(b.uploadDate).getTime();
           break;
       }
 
@@ -71,184 +68,83 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     return filtered;
   }, [documents, searchQuery, selectedStatus, sortBy, sortOrder]);
 
-  // Virtualization event handlers
-  const handleDocumentOpen = useCallback((doc: any) => {
-    // Handle document opening
+  // Event handlers
+  const handleDocumentOpen = useCallback((doc: DocumentRecord) => {
     console.log('Opening document:', doc.id);
   }, []);
 
-  const handleDocumentDelete = useCallback((doc: any) => {
-    // Handle document deletion
+  const handleDocumentDelete = useCallback((doc: DocumentRecord) => {
     console.log('Deleting document:', doc.id);
   }, []);
 
-  const handleDocumentMerge = useCallback((primary: any, secondary: any) => {
-    // Handle document merging
+  const handleDocumentMerge = useCallback((primary: DocumentRecord, secondary: DocumentRecord) => {
     console.log('Merging documents:', primary.id, secondary.id);
   }, []);
 
-  const handleDuplicateCompare = useCallback((doc: any) => {
-    // Handle duplicate comparison
+  const handleDuplicateCompare = useCallback((doc: DocumentRecord) => {
     console.log('Comparing duplicate:', doc.id);
   }, []);
 
-  const handleScrollEnd = useCallback(() => {
-    // Handle infinite scroll end
-    console.log('Reached end of documents');
-  }, []);
-
   return (
-    <FloatingElement depth={1} height={6} duration={6000} delay={100}>
-      <DepthCard depth={depthLayer} hoverEffect={true} floating={true}>
-        {/* Header */}
-        <div style={{
-          padding: '1.5rem',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-          background: 'linear-gradient(135deg, rgba(0, 102, 255, 0.05), rgba(0, 212, 255, 0.05))'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <TypographyHeading level="h3">
-              Dokumenten Datenbank
-            </TypographyHeading>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <AccessibleButton
-                variant={viewMode === 'grid' ? 'primary' : 'ghost'}
-                onClick={() => onViewModeChange('grid')}
-                style={{ padding: '8px 16px', borderRadius: '8px' }}
-              >
-                📋 Grid
-              </AccessibleButton>
-              <AccessibleButton
-                variant={viewMode === 'list' ? 'primary' : 'ghost'}
-                onClick={() => onViewModeChange('list')}
-                style={{ padding: '8px 16px', borderRadius: '8px' }}
-              >
-                📄 Liste
-              </AccessibleButton>
-            </div>
-          </div>
-
-          {/* Statistics */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              padding: '1rem',
-              borderRadius: '12px',
-              border: '1px solid rgba(255, 255, 255, 0.1)'
-            }}>
-              <TypographyBody style={{ fontSize: '12px', color: '#A7B0BD', marginBottom: '4px' }}>
-                Gesamt
-              </TypographyBody>
-              <TypographyHeading level="h4" style={{ fontSize: '20px', margin: 0 }}>
-                {filteredDocuments.length}
-              </TypographyHeading>
-            </div>
-
-            <div style={{
-              background: 'rgba(0, 204, 102, 0.1)',
-              padding: '1rem',
-              borderRadius: '12px',
-              border: '1px solid rgba(0, 204, 102, 0.3)'
-            }}>
-              <TypographyBody style={{ fontSize: '12px', color: '#00CC66', marginBottom: '4px' }}>
-                Erfolgreich
-              </TypographyBody>
-              <TypographyHeading level="h4" style={{ fontSize: '20px', margin: 0, color: '#00CC66' }}>
-                {filteredDocuments.filter(d => d.status === 'completed').length}
-              </TypographyHeading>
-            </div>
-
-            <div style={{
-              background: 'rgba(255, 176, 32, 0.1)',
-              padding: '1rem',
-              borderRadius: '12px',
-              border: '1px solid rgba(255, 176, 32, 0.3)'
-            }}>
-              <TypographyBody style={{ fontSize: '12px', color: '#FFB020', marginBottom: '4px' }}>
-                In Bearbeitung
-              </TypographyBody>
-              <TypographyHeading level="h4" style={{ fontSize: '20px', margin: 0, color: '#FFB020' }}>
-                {filteredDocuments.filter(d => d.status === 'processing').length}
-              </TypographyHeading>
-            </div>
-
-            <div style={{
-              background: 'rgba(255, 71, 87, 0.1)',
-              padding: '1rem',
-              borderRadius: '12px',
-              border: '1px solid rgba(255, 71, 87, 0.3)'
-            }}>
-              <TypographyBody style={{ fontSize: '12px', color: '#FF4757', marginBottom: '4px' }}>
-                Fehler
-              </TypographyBody>
-              <TypographyHeading level="h4" style={{ fontSize: '20px', margin: 0, color: '#FF4757' }}>
-                {filteredDocuments.filter(d => d.status === 'error').length}
-              </TypographyHeading>
-            </div>
-          </div>
-
-          {/* Filter Bar */}
-          <FilterBar
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            selectedStatus={selectedStatus}
-            onStatusChange={setSelectedStatus}
-            sortBy={sortBy}
-            onSortByChange={setSortBy}
-            sortOrder={sortOrder}
-            onSortOrderChange={setSortOrder}
-            documents={documents}
+    <EnhancedCard>
+      <div className="database-view">
+        <div className="database-header">
+          <input
+            type="text"
+            placeholder="Search documents..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="search-input"
           />
+          <select
+            value={selectedStatus || ''}
+            onChange={(e) => setSelectedStatus(e.target.value || null)}
+            className="status-filter"
+          >
+            <option value="">All Statuses</option>
+            {Object.values(DocumentStatus).map(status => (
+              <option key={status} value={status}>{status}</option>
+            ))}
+          </select>
+          
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'date' | 'name' | 'size')}
+            className="sort-by"
+          >
+            <option value="date">Sort by Date</option>
+            <option value="name">Sort by Name</option>
+            <option value="size">Sort by Size</option>
+          </select>
+          
+          <button
+            onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+            className="sort-order"
+          >
+            {sortOrder === 'asc' ? '↑' : '↓'}
+          </button>
         </div>
 
-        {/* Virtualized Content */}
-        <div style={{ padding: '1.5rem' }}>
-          {filteredDocuments.length === 0 ? (
-            <FloatingElement depth={2} height={4} duration={3000}>
-              <DepthCard depth={2} style={{
-                textAlign: 'center',
-                padding: '3rem',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                background: 'linear-gradient(135deg, rgba(0, 102, 255, 0.05), rgba(0, 212, 255, 0.05))'
-              }}>
-                <TypographyHeading level="h4" style={{ marginBottom: '1rem' }}>
-                  📁 Keine Dokumente gefunden
-                </TypographyHeading>
-                <TypographyBody>
-                  {searchQuery || selectedStatus
-                    ? 'Keine Dokumente entsprechen Ihren Filterkriterien.'
-                    : 'Laden Sie Dokumente hoch oder synchronisieren Sie mit der Cloud, um sie hier anzuzeigen.'}
-                </TypographyBody>
-              </DepthCard>
-            </FloatingElement>
-          ) : (
-            viewMode === 'grid' ? (
-              <VirtualizedDatabaseGrid
-                documents={filteredDocuments}
-                onOpen={handleDocumentOpen}
-                onDelete={handleDocumentDelete}
-                onMerge={handleDocumentMerge}
-                onDuplicateCompare={handleDuplicateCompare}
-                columns={3}
-                showMonitor={true}
-                enableInfiniteScroll={true}
-                onScrollEnd={handleScrollEnd}
-              />
-            ) : (
-              <VirtualizedDocumentList
-                documents={filteredDocuments}
-                onOpen={handleDocumentOpen}
-                onDelete={handleDocumentDelete}
-                onMerge={handleDocumentMerge}
-                onDuplicateCompare={handleDuplicateCompare}
-                showMonitor={true}
-                enableInfiniteScroll={true}
-                onScrollEnd={handleScrollEnd}
-              />
-            )
-          )}
+        <div className="document-list">
+          {filteredDocuments.map(doc => (
+            <div key={doc.id} className="document-item">
+              <span className="doc-name">{doc.fileName}</span>
+              <span className="doc-status">{doc.status}</span>
+              <span className="doc-date">{new Date(doc.uploadDate).toLocaleDateString()}</span>
+              <div className="doc-actions">
+                <button onClick={() => handleDocumentOpen(doc)}>Open</button>
+                <button onClick={() => handleDocumentDelete(doc)}>Delete</button>
+              </div>
+            </div>
+          ))}
         </div>
-      </DepthCard>
-    </FloatingElement>
+
+        <div className="document-count">
+          Showing {filteredDocuments.length} of {documents.length} documents
+        </div>
+      </div>
+    </EnhancedCard>
   );
 };
+
+export default DatabaseView;

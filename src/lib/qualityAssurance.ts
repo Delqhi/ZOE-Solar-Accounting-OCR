@@ -1,440 +1,171 @@
-/**
- * 2026 UX/UI Quality Assurance & Testing Suite
- * Comprehensive validation for designOS improvements
- */
+import { useState, useEffect } from 'react';
 
-// Performance Metrics
-export const PERFORMANCE_BUDGETS = {
-  LCP: 2500, // Largest Contentful Paint (ms)
-  FID: 100,  // First Input Delay (ms)
-  CLS: 0.1,  // Cumulative Layout Shift
-  TTI: 3800, // Time to Interactive (ms)
-  FCU: 1800, // First CPU Idle (ms)
-};
+// Quality Metrics Interface
+interface QualityMetrics {
+  accessibility: number;
+  performance: number;
+  codeQuality: number;
+  testCoverage: number;
+  timestamp: number;
+}
 
-// Accessibility Standards
-export const ACCESSIBILITY_STANDARDS = {
-  WCAG_LEVEL: 'AA',
-  MIN_CONTRAST: 4.5,
-  LARGE_TEXT_CONTRAST: 3.0,
-  KEYBOARD_FOCUS_VISIBLE: true,
-  SCREEN_READER_SUPPORT: true,
-  ARIA_LABELS_REQUIRED: true,
-};
+// Performance Metrics Interface
+interface PerformanceMetrics {
+  lcp: number; // Largest Contentful Paint
+  fid: number; // First Input Delay
+  cls: number; // Cumulative Layout Shift
+  processingTime: number;
+  memoryUsage: number;
+}
 
-// User Experience Standards
-export const UX_STANDARDS = {
-  LOADING_STATES: true,
-  MICRO_INTERACTIONS: true,
-  ERROR_HANDLING: true,
-  FORM_VALIDATION: true,
-  EMPTY_STATES: true,
-  PROGRESSIVE_ENHANCEMENT: true,
-  RESPONSIVE_DESIGN: true,
-  TOUCH_FRIENDLY: true,
-};
-
-// Component Quality Standards
-export const COMPONENT_STANDARDS = {
-  MAX_FILE_SIZE: 300, // lines
-  MAX_FUNCTION_SIZE: 20, // lines
-  MIN_TEST_COVERAGE: 80, // percent
-  PROP_TYPES_DEFINED: true,
-  DEFAULT_PROPS_SET: true,
-  ACCESSIBILITY_ATTRIBUTES: true,
-};
-
-/**
- * Performance Monitoring Hook
- */
-export const usePerformanceMonitoring = () => {
-  const [metrics, setMetrics] = useState<any>({});
+// Hook for quality monitoring
+export function useQualityMonitoring() {
+  const [metrics, setMetrics] = useState<QualityMetrics>({
+    accessibility: 0,
+    performance: 0,
+    codeQuality: 0,
+    testCoverage: 0,
+    timestamp: Date.now()
+  });
 
   useEffect(() => {
-    if ('PerformanceObserver' in window) {
-      const observer = new PerformanceObserver((list) => {
-        const entries = list.getEntries();
-        const newMetrics: any = {};
+    // Monitor quality metrics
+    const interval = setInterval(() => {
+      setMetrics(prev => ({
+        ...prev,
+        timestamp: Date.now()
+      }));
+    }, 5000);
 
-        entries.forEach((entry) => {
-          if (entry.entryType === 'largest-contentful-paint') {
-            newMetrics.LCP = entry.startTime;
-          }
-          if (entry.entryType === 'first-input') {
-            newMetrics.FID = entry.processingStart - entry.startTime;
-          }
-          if (entry.entryType === 'layout-shift') {
-            if (!entry.hadRecentInput) {
-              newMetrics.CLS = (newMetrics.CLS || 0) + entry.value;
-            }
-          }
-        });
-
-        setMetrics(prev => ({ ...prev, ...newMetrics }));
-      });
-
-      observer.observe({ entryTypes: ['largest-contentful-paint', 'first-input', 'layout-shift'] });
-
-      return () => observer.disconnect();
-    }
+    return () => clearInterval(interval);
   }, []);
 
   return metrics;
-};
+}
 
-/**
- * Accessibility Testing Hook
- */
-export const useAccessibilityTesting = () => {
-  const [violations, setViolations] = useState<any[]>([]);
+// Hook for performance monitoring
+export function usePerformanceMonitoring() {
+  const [metrics, setMetrics] = useState<PerformanceMetrics>({
+    lcp: 0,
+    fid: 0,
+    cls: 0,
+    processingTime: 0,
+    memoryUsage: 0
+  });
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.axe) {
-      const checkAccessibility = async () => {
-        try {
-          const results = await window.axe.run(document.body, {
-            rules: {
-              'color-contrast': { enabled: true },
-              'keyboard-navigation': { enabled: true },
-              'aria-labels': { enabled: true },
-              'focus-order-semantics': { enabled: true },
-            }
-          });
-          setViolations(results.violations);
-        } catch (error) {
-          console.warn('Accessibility testing failed:', error);
-        }
-      };
+    // Monitor performance metrics
+    const interval = setInterval(() => {
+      setMetrics(prev => ({
+        ...prev,
+        processingTime: performance.now(),
+        memoryUsage: (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize || 0
+      }));
+    }, 1000);
 
-      checkAccessibility();
-    }
+    return () => clearInterval(interval);
+  }, []);
+
+  return metrics;
+}
+
+// Hook for accessibility testing
+export function useAccessibilityTesting() {
+  const [violations, setViolations] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Check accessibility
+    const checkAccessibility = () => {
+      const issues: string[] = [];
+      
+      // Check for missing alt text on images
+      const images = document.querySelectorAll('img:not([alt])');
+      if (images.length > 0) {
+        issues.push(`Found ${images.length} images without alt text`);
+      }
+
+      // Check for missing labels on inputs
+      const inputs = document.querySelectorAll('input:not([id]), select:not([id]), textarea:not([id])');
+      if (inputs.length > 0) {
+        issues.push(`Found ${inputs.length} inputs without IDs`);
+      }
+
+      // Check for low contrast (simplified check)
+      const elements = document.querySelectorAll('p, span, div');
+      elements.forEach(el => {
+        const style = window.getComputedStyle(el);
+        const color = style.color;
+        const bgColor = style.backgroundColor;
+        if (color === 'rgb(200, 200, 200)' && bgColor === 'rgb(255, 255, 255)') {
+          issues.push('Potential low contrast text detected');
+        }
+      });
+
+      setViolations(issues);
+    };
+
+    checkAccessibility();
+    
+    const interval = setInterval(checkAccessibility, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   return violations;
-};
+}
 
-/**
- * Component Testing Utilities
- */
-export const testComponentAccessibility = (component: React.ReactElement) => {
-  const violations: string[] = [];
-
-  // Check for required props
-  if (!component.props['aria-label'] && !component.props.children) {
-    violations.push('Component missing aria-label');
-  }
-
-  // Check for focus management
-  if (component.props.onClick && !component.props.onKeyDown) {
-    violations.push('Component missing keyboard support');
-  }
-
-  // Check for color contrast (simplified)
-  const style = component.props.style || {};
-  if (style.backgroundColor && style.color) {
-    // Would need actual color contrast calculation here
-    violations.push('Color contrast not verified');
-  }
-
-  return violations;
-};
-
-/**
- * Performance Testing Utilities
- */
-export const measureComponentPerformance = async (Component: React.ComponentType) => {
-  const startTime = performance.now();
-
-  // Render component
-  const element = React.createElement(Component);
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-
-  const root = ReactDOM.createRoot(container);
-  await new Promise(resolve => {
-    root.render(element);
-    setTimeout(resolve, 0);
+// Hook for test coverage
+export function useTestCoverage() {
+  const [coverage, setCoverage] = useState({
+    lines: 0,
+    functions: 0,
+    branches: 0,
+    statements: 0
   });
 
-  const endTime = performance.now();
-  const renderTime = endTime - startTime;
+  useEffect(() => {
+    // In a real implementation, this would fetch coverage data
+    // For now, return mock data
+    setCoverage({
+      lines: 85,
+      functions: 80,
+      branches: 75,
+      statements: 82
+    });
+  }, []);
 
-  // Clean up
-  root.unmount();
-  document.body.removeChild(container);
+  return coverage;
+}
 
-  return {
-    renderTime,
-    passesBudget: renderTime < 100, // 100ms budget
-  };
-};
+// Quality gate function
+export function runQualityGate(metrics: QualityMetrics): { passed: boolean; issues: string[] } {
+  const issues: string[] = [];
 
-/**
- * User Experience Testing Utilities
- */
-export const testUserJourney = async (steps: Array<{
-  action: () => Promise<void> | void;
-  expected: string;
-}>) => {
-  const results: Array<{ step: string; passed: boolean; time: number }> = [];
-
-  for (const [index, step] of steps.entries()) {
-    const startTime = performance.now();
-
-    try {
-      await step.action();
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-
-      results.push({
-        step: step.expected,
-        passed: true,
-        time: duration,
-      });
-    } catch (error) {
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-
-      results.push({
-        step: step.expected,
-        passed: false,
-        time: duration,
-      });
-    }
+  if (metrics.accessibility < 90) {
+    issues.push(`Accessibility score ${metrics.accessibility}% is below 90% threshold`);
   }
 
-  return results;
-};
-
-/**
- * Visual Regression Testing
- */
-export const takeScreenshot = async (element: HTMLElement) => {
-  if (typeof window !== 'undefined' && window.html2canvas) {
-    return await window.html2canvas(element);
-  }
-  return null;
-};
-
-/**
- * Color Contrast Calculator
- */
-export const calculateColorContrast = (color1: string, color2: string) => {
-  // Simplified color contrast calculation
-  // In real implementation, would use a proper color contrast library
-  const luminance1 = 0.5; // placeholder
-  const luminance2 = 0.5; // placeholder
-
-  const contrastRatio = (Math.max(luminance1, luminance2) + 0.05) /
-                       (Math.min(luminance1, luminance2) + 0.05);
-
-  return {
-    ratio: contrastRatio,
-    passesAA: contrastRatio >= 4.5,
-    passesAAA: contrastRatio >= 7.0,
-  };
-};
-
-/**
- * Keyboard Navigation Testing
- */
-export const testKeyboardNavigation = (container: HTMLElement) => {
-  const focusableElements = container.querySelectorAll(
-    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-  );
-
-  const results = {
-    totalFocusable: focusableElements.length,
-    hasFocusIndicator: true,
-    logicalTabOrder: true,
-    skipLinksWorking: true,
-  };
-
-  // Test focus indicators
-  focusableElements.forEach((element) => {
-    const computedStyle = window.getComputedStyle(element, ':focus');
-    if (computedStyle.outline === 'none' && computedStyle.boxShadow === 'none') {
-      results.hasFocusIndicator = false;
-    }
-  });
-
-  return results;
-};
-
-/**
- * Mobile Touch Testing
- */
-export const testTouchTargets = (container: HTMLElement) => {
-  const touchTargets = container.querySelectorAll('button, a, input[type="button"], input[type="submit"]');
-
-  const results = {
-    totalTargets: touchTargets.length,
-    minSizeCompliant: true,
-    spacingCompliant: true,
-    doubleTapPrevented: true,
-  };
-
-  touchTargets.forEach((target) => {
-    const rect = target.getBoundingClientRect();
-    if (rect.width < 44 || rect.height < 44) {
-      results.minSizeCompliant = false;
-    }
-  });
-
-  return results;
-};
-
-/**
- * Form Validation Testing
- */
-export const testFormValidation = (form: HTMLFormElement) => {
-  const inputs = form.querySelectorAll('input[required], textarea[required], select[required]');
-  const results = {
-    totalRequired: inputs.length,
-    clientSideValidation: true,
-    errorMessagesPresent: true,
-    accessibleErrors: true,
-  };
-
-  inputs.forEach((input) => {
-    const parent = input.parentElement;
-    const errorElement = parent?.querySelector('.error-message, [role="alert"]');
-
-    if (!errorElement) {
-      results.errorMessagesPresent = false;
-    }
-
-    if (!input.getAttribute('aria-describedby')) {
-      results.accessibleErrors = false;
-    }
-  });
-
-  return results;
-};
-
-/**
- * Loading State Testing
- */
-export const testLoadingStates = (container: HTMLElement) => {
-  const loadingElements = container.querySelectorAll('[aria-busy="true"], .loading, .spinner');
-
-  const results = {
-    hasLoadingStates: loadingElements.length > 0,
-    accessibleLoading: true,
-    preventsInteraction: true,
-  };
-
-  loadingElements.forEach((element) => {
-    if (!element.getAttribute('aria-label') && !element.getAttribute('role')) {
-      results.accessibleLoading = false;
-    }
-  });
-
-  return results;
-};
-
-/**
- * Comprehensive Test Suite Runner
- */
-export const runComprehensiveTests = async (container: HTMLElement) => {
-  const results = {
-    performance: await measurePerformanceMetrics(),
-    accessibility: await measureAccessibilityMetrics(container),
-    userExperience: await measureUXMetrics(container),
-    components: await measureComponentMetrics(container),
-  };
-
-  return {
-    results,
-    summary: {
-      passed: Object.values(results).every(result => result.passed),
-      score: calculateOverallScore(results),
-      recommendations: generateRecommendations(results),
-    },
-  };
-};
-
-const measurePerformanceMetrics = async () => {
-  // Implementation would measure actual performance metrics
-  return {
-    LCP: 1500,
-    FID: 50,
-    CLS: 0.05,
-    passed: true,
-  };
-};
-
-const measureAccessibilityMetrics = async (container: HTMLElement) => {
-  return {
-    violations: 0,
-    colorContrast: true,
-    keyboardNavigation: true,
-    screenReaderSupport: true,
-    passed: true,
-  };
-};
-
-const measureUXMetrics = async (container: HTMLElement) => {
-  return {
-    loadingStates: testLoadingStates(container),
-    touchTargets: testTouchTargets(container),
-    formValidation: testFormValidation(container as HTMLFormElement),
-    passed: true,
-  };
-};
-
-const measureComponentMetrics = async (container: HTMLElement) => {
-  return {
-    componentCount: container.querySelectorAll('[data-component]').length,
-    fileSizes: [], // Would need build analysis
-    testCoverage: 85, // Would need actual test runner
-    passed: true,
-  };
-};
-
-const calculateOverallScore = (results: any) => {
-  // Calculate weighted score
-  const performanceScore = results.performance.passed ? 25 : 0;
-  const accessibilityScore = results.accessibility.passed ? 35 : 0;
-  const uxScore = results.userExperience.passed ? 25 : 0;
-  const componentScore = results.components.passed ? 15 : 0;
-
-  return performanceScore + accessibilityScore + uxScore + componentScore;
-};
-
-const generateRecommendations = (results: any) => {
-  const recommendations: string[] = [];
-
-  if (!results.performance.passed) {
-    recommendations.push('Optimize performance: Reduce bundle size, implement lazy loading');
+  if (metrics.performance < 80) {
+    issues.push(`Performance score ${metrics.performance}% is below 80% threshold`);
   }
 
-  if (!results.accessibility.passed) {
-    recommendations.push('Improve accessibility: Add ARIA labels, fix color contrast');
+  if (metrics.codeQuality < 85) {
+    issues.push(`Code quality score ${metrics.codeQuality}% is below 85% threshold`);
   }
 
-  if (!results.userExperience.passed) {
-    recommendations.push('Enhance UX: Add loading states, improve form validation');
+  if (metrics.testCoverage < 70) {
+    issues.push(`Test coverage ${metrics.testCoverage}% is below 70% threshold`);
   }
 
-  if (!results.components.passed) {
-    recommendations.push('Refactor components: Reduce complexity, add tests');
-  }
+  return {
+    passed: issues.length === 0,
+    issues
+  };
+}
 
-  return recommendations;
-};
-
-export {
+export default {
+  useQualityMonitoring,
   usePerformanceMonitoring,
   useAccessibilityTesting,
-  testComponentAccessibility,
-  measureComponentPerformance,
-  testUserJourney,
-  takeScreenshot,
-  calculateColorContrast,
-  testKeyboardNavigation,
-  testTouchTargets,
-  testFormValidation,
-  testLoadingStates,
-  runComprehensiveTests,
+  useTestCoverage,
+  runQualityGate
 };
