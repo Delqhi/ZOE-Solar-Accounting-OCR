@@ -213,12 +213,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // Retry OCR
-  const retryOCR = useCallback(async (doc: DocumentRecord) => {
+  const retryOCR = useCallback(async (_doc: DocumentRecord) => {
     try {
       // Call OCR service (placeholder - would integrate actual service)
       toast.success('OCR wird erneut gestartet...');
       // Implementation would go here
-    } catch (error: any) {
+      void _doc; // Mark as intentionally unused for now
+    } catch (error: unknown) {
       toast.error('OCR erneut fehlgeschlagen');
     }
   }, []);

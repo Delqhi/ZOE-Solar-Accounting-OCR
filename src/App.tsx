@@ -1,13 +1,21 @@
 import { useState, useEffect } from 'react';
 import { AlertCircle, Upload, Settings } from 'lucide-react';
-import { PDFDocument } from 'pdfjs-dist';
-// import { PrivateDocuments } from './app/components/PrivateDocuments';
-// import { DocumentList } from './app/components/DocumentList';
-// import { ProcessingPanel } from './app/components/ProcessingPanel';
-// import { SettingsModal } from './app/components/SettingsModal';
-// import { NotificationCenter } from './app/components/NotificationCenter';
-import type { ProcessedDocument, AppSettings } from './app/types';
 import './App.css';
+
+// Types
+interface ProcessedDocument {
+  id: string;
+  name: string;
+  pageCount: number;
+  extractedData: Record<string, unknown>;
+  timestamp: Date;
+}
+
+interface AppSettings {
+  extractionMode: 'auto' | 'manual';
+  outputFormat: 'json' | 'csv' | 'xml';
+  language: string;
+}
 
 export function App() {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);
@@ -21,7 +29,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set());
   const [privateDocuments, setPrivateDocuments] = useState<ProcessedDocument[]>([]);
-  const [notification, setNotification] = useState<any>(null);
+  const [notification, setNotification] = useState<unknown>(null);
 
   useEffect(() => {
     setDocuments([]);
@@ -33,6 +41,13 @@ export function App() {
     setSelectedDocuments(new Set());
     setPrivateDocuments([]);
   }, []);
+
+  // Prevent unused variable warnings
+  void settings;
+  void isProcessing;
+  void showSettings;
+  void selectedDocuments;
+  void notification;
 
   const renderContent = () => {
     if (error) {
@@ -145,3 +160,6 @@ export function App() {
     </div>
   );
 }
+
+// Default export for lazy loading
+export default App;

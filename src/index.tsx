@@ -14,7 +14,7 @@ import { AppProvider } from './context/AppContext';
 // Services & Monitoring
 import { performSecurityCheck } from './middleware/security';
 import { monitoringService } from './services/monitoringService';
-import { loadEnvConfig, logConfigSummary, isFeatureEnabled, getEnvironmentConfig } from './config/env';
+import { loadEnvConfig, logConfigSummary, getEnvironmentConfig } from './config/env';
 import { analytics } from './lib/analytics';
 
 // Styles
@@ -76,8 +76,8 @@ if ('serviceWorker' in navigator) {
         });
 
         // Register periodic sync if supported
-        if ('PeriodicSyncManager' in registration) {
-          registration.periodicSync.register('content-sync', {
+        if ('periodicSync' in registration) {
+          (registration as ServiceWorkerRegistration & { periodicSync: { register: (tag: string, options: { minInterval: number }) => Promise<void> } }).periodicSync.register('content-sync', {
             minInterval: 15 * 60 * 1000, // 15 minutes
           }).catch(() => {
             // Periodic sync not supported or permission denied

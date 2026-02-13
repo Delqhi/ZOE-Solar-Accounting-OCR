@@ -2,28 +2,7 @@
  * Optimized Main App Component - 2026 UX Standards
  * Features: Improved layout, better empty states, enhanced accessibility, performance optimizations
  */
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import {
-  EnhancedLayout,
-  EnhancedHeader,
-  EnhancedSidebar,
-  EnhancedMain,
-  EnhancedFooter,
-  EnhancedGrid,
-  EnhancedEmptyState,
-  NoDocumentsState,
-  NoResultsState,
-  EnhancedButton,
-  EnhancedInput,
-  EnhancedCard,
-  useFocusManagement,
-} from '../components/designOS';
-import { DatabaseGrid } from '../components/database-grid';
-import { DocumentDetail } from '../components/DetailModal';
-import { SettingsView } from '../components/SettingsView';
-import { AuthView } from '../components/AuthView';
-import { BackupView } from '../components/BackupView';
-import { MicroInteractionsDemo } from '../components/designOS/MicroInteractionsDemo';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { analyzeDocumentWithGemini } from '../services/geminiService';
 import { applyAccountingRules, generateZoeInvoiceId } from '../services/ruleEngine';
 import * as storageService from '../services/storageService';
@@ -32,7 +11,7 @@ import { detectPrivateDocument } from '../services/privateDocumentDetection';
 import { DocumentRecord, DocumentStatus, AppSettings, ExtractedData } from '../types';
 import { normalizeExtractedData } from '../services/extractedDataNormalization';
 import { formatPreflightForDialog, runExportPreflight } from '../services/exportPreflight';
-import { User } from '../services/supabaseService';
+import type { User } from '../services/supabaseService';
 
 // Helper functions (moved to separate utils file in real implementation)
 const computeFileHash = async (file: File): Promise<string> => {

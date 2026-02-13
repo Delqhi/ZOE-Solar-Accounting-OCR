@@ -25,7 +25,7 @@ export function getContentSecurityPolicy(): string {
       'https://*.supabase.co',
       'https://*.googleapis.com',
       'https://*.google.com',
-      import.meta.env.VITE_SENTRY_DSN || '',
+      (import.meta.env['VITE_SENTRY_DSN'] as string | undefined) || '',
     ].filter(Boolean),
     'img-src': [
       "'self'",
@@ -189,7 +189,7 @@ export function performSecurityCheck(): void {
   // Log security info
   console.log('✅ Security checks passed');
   console.log(`🚀 Environment: ${import.meta.env.MODE}`);
-  console.log(`🔒 Version: ${import.meta.env.VITE_APP_VERSION || 'dev'}`);
+  console.log(`🔒 Version: ${(import.meta.env['VITE_APP_VERSION'] as string | undefined) || 'dev'}`);
 }
 
 /**

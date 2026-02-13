@@ -12,8 +12,8 @@ interface Props {
 
 interface State {
   hasError: boolean;
-  error?: Error;
-  errorInfo?: React.ErrorInfo;
+  error?: Error | undefined;
+  errorInfo?: ErrorInfo | undefined;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -50,7 +50,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidMount() {
     // Log app version for debugging
-    console.log('🚀 ZOE App Version:', import.meta.env.VITE_APP_VERSION || 'dev');
+    console.log('🚀 ZOE App Version:', (import.meta.env['VITE_APP_VERSION'] as string | undefined) || 'dev');
   }
 
   handleReset = () => {

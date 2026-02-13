@@ -17,12 +17,12 @@ interface EnvConfig {
  */
 export function loadEnvConfig(): EnvConfig {
   const config: EnvConfig = {
-    supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
-    supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-    geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY,
-    siliconFlowApiKey: import.meta.env.VITE_SILICONFLOW_API_KEY,
-    sentryDsn: import.meta.env.VITE_SENTRY_DSN,
-    appVersion: import.meta.env.VITE_APP_VERSION,
+    supabaseUrl: import.meta.env['VITE_SUPABASE_URL'] as string,
+    supabaseAnonKey: import.meta.env['VITE_SUPABASE_ANON_KEY'] as string,
+    geminiApiKey: import.meta.env['VITE_GEMINI_API_KEY'] as string,
+    siliconFlowApiKey: import.meta.env['VITE_SILICONFLOW_API_KEY'] as string | undefined,
+    sentryDsn: import.meta.env['VITE_SENTRY_DSN'] as string | undefined,
+    appVersion: import.meta.env['VITE_APP_VERSION'] as string | undefined,
   };
 
   const errors: string[] = [];
@@ -59,11 +59,11 @@ export function loadEnvConfig(): EnvConfig {
  */
 export function getApiEndpoint(service: 'gemini' | 'siliconflow'): string {
   if (service === 'gemini') {
-    return import.meta.env.VITE_GEMINI_API_ENDPOINT || 'https://generativelanguage.googleapis.com/v1beta';
+    return (import.meta.env['VITE_GEMINI_API_ENDPOINT'] as string | undefined) || 'https://generativelanguage.googleapis.com/v1beta';
   }
 
   if (service === 'siliconflow') {
-    return import.meta.env.VITE_SILICONFLOW_API_ENDPOINT || 'https://api.siliconflow.com/v1';
+    return (import.meta.env['VITE_SILICONFLOW_API_ENDPOINT'] as string | undefined) || 'https://api.siliconflow.com/v1';
   }
 
   return '';
@@ -78,7 +78,7 @@ export function isFeatureEnabled(feature: string): boolean {
     'ml-vendor-mapping': true,
     'bulk-export': true,
     'auto-backup': false, // Staged rollout
-    'sentry-monitoring': import.meta.env.PROD && !!import.meta.env.VITE_SENTRY_DSN,
+    'sentry-monitoring': import.meta.env.PROD && !!(import.meta.env['VITE_SENTRY_DSN'] as string | undefined),
   };
 
   return features[feature as keyof typeof features] || false;
@@ -162,8 +162,8 @@ export function logConfigSummary(): void {
 export function getAppMetadata() {
   return {
     name: 'ZOE Solar Accounting OCR',
-    version: import.meta.env.VITE_APP_VERSION || 'dev',
-    buildTime: import.meta.env.VITE_BUILD_TIME || new Date().toISOString(),
+    version: (import.meta.env['VITE_APP_VERSION'] as string | undefined) || 'dev',
+    buildTime: (import.meta.env['VITE_BUILD_TIME'] as string | undefined) || new Date().toISOString(),
     environment: import.meta.env.MODE,
     userAgent: navigator.userAgent,
     viewport: `${window.innerWidth}x${window.innerHeight}`,
