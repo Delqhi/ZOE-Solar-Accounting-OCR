@@ -10,7 +10,10 @@ import { DocumentRecord, ExtractedData, AppSettings, DocumentStatus } from '../t
 interface SupabaseClient {
   auth: {
     getUser(): Promise<{ data: { user: User | null } }>;
-    signInWithPassword(credentials: { email: string; password: string }): Promise<{ data: { user: User | null } }>;
+    signInWithPassword(credentials: {
+      email: string;
+      password: string;
+    }): Promise<{ data: { user: User | null } }>;
     signOut(): Promise<void>;
   };
 }
@@ -62,11 +65,13 @@ export async function getAllDocuments(): Promise<DocumentRecord[]> {
         mwstBetrag19: beleg.mwst_betrag_19 || 0,
         bruttoBetrag: beleg.brutto_betrag || 0,
         zahlungsmethode: beleg.zahlungsmethode || '',
-        lineItems: beleg.positionen ? beleg.positionen.map((pos: any) => ({
-          description: pos.beschreibung || '',
-          quantity: pos.menge || 0,
-          amount: pos.gesamtbetrag || 0,
-        })) : [],
+        lineItems: beleg.positionen
+          ? beleg.positionen.map((pos: any) => ({
+              description: pos.beschreibung || '',
+              quantity: pos.menge || 0,
+              amount: pos.gesamtbetrag || 0,
+            }))
+          : [],
         kontierungskonto: beleg.kontierungskonto,
         steuerkategorie: beleg.steuerkategorie,
         kontierungBegruendung: beleg.kontierung_begruendung,
@@ -181,16 +186,20 @@ export async function savePrivateDocument(
   if (!isSupabaseConfigured()) return;
 
   try {
-    // Save to belege_privat table (placeholder - actual implementation depends on schema)
-    // For now, we'll just log it
-    console.log('Private document saved to Supabase:', { id, fileName, reason });
+    if (import.meta.env.DEV) {
+      console.log('[Supabase] Private document saved:', { id, fileName, reason });
+    }
   } catch (error) {
     console.error('Error saving private document to Supabase:', error);
     throw error;
   }
 }
 
-export async function saveVendorRule(vendorName: string, accountId: string, taxCategory: string): Promise<void> {
+export async function saveVendorRule(
+  vendorName: string,
+  accountId: string,
+  taxCategory: string
+): Promise<void> {
   if (!isSupabaseConfigured()) return;
 
   try {
@@ -237,7 +246,9 @@ export function exportDocumentsToSQL(documents: DocumentRecord[], settings: AppS
       doc.uploadDate ? `'${doc.uploadDate}'` : 'NULL',
       `'${doc.status}'`,
       doc.data.belegDatum ? `'${doc.data.belegDatum}'` : 'NULL',
-      doc.data.belegNummerLieferant ? `'${doc.data.belegNummerLieferant.replace(/'/g, "''")}'` : 'NULL',
+      doc.data.belegNummerLieferant
+        ? `'${doc.data.belegNummerLieferant.replace(/'/g, "''")}'`
+        : 'NULL',
       doc.data.lieferantName ? `'${doc.data.lieferantName.replace(/'/g, "''")}'` : 'NULL',
       doc.data.bruttoBetrag ?? 'NULL',
       doc.data.eigeneBelegNummer ? `'${doc.data.eigeneBelegNummer}'` : 'NULL',

@@ -43,7 +43,7 @@ export function loadEnvConfig(): EnvConfig {
   // Log errors if any
   if (errors.length > 0) {
     console.error('❌ Missing environment variables:');
-    errors.forEach(err => console.error(`   - ${err}`));
+    errors.forEach((err) => console.error(`   - ${err}`));
 
     // Don't throw in development
     if (import.meta.env.PROD) {
@@ -59,11 +59,17 @@ export function loadEnvConfig(): EnvConfig {
  */
 export function getApiEndpoint(service: 'gemini' | 'siliconflow'): string {
   if (service === 'gemini') {
-    return (import.meta.env['VITE_GEMINI_API_ENDPOINT'] as string | undefined) || 'https://generativelanguage.googleapis.com/v1beta';
+    return (
+      (import.meta.env['VITE_GEMINI_API_ENDPOINT'] as string | undefined) ||
+      'https://generativelanguage.googleapis.com/v1beta'
+    );
   }
 
   if (service === 'siliconflow') {
-    return (import.meta.env['VITE_SILICONFLOW_API_ENDPOINT'] as string | undefined) || 'https://api.siliconflow.com/v1';
+    return (
+      (import.meta.env['VITE_SILICONFLOW_API_ENDPOINT'] as string | undefined) ||
+      'https://api.siliconflow.com/v1'
+    );
   }
 
   return '';
@@ -78,7 +84,8 @@ export function isFeatureEnabled(feature: string): boolean {
     'ml-vendor-mapping': true,
     'bulk-export': true,
     'auto-backup': false, // Staged rollout
-    'sentry-monitoring': import.meta.env.PROD && !!(import.meta.env['VITE_SENTRY_DSN'] as string | undefined),
+    'sentry-monitoring':
+      import.meta.env.PROD && !!(import.meta.env['VITE_SENTRY_DSN'] as string | undefined),
   };
 
   return features[feature as keyof typeof features] || false;
@@ -130,30 +137,28 @@ export function getPrivacyConfig() {
 
 /**
  * Export configuration summary for debugging
+ * Only logs in development mode with explicit opt-in
  */
 export function logConfigSummary(): void {
-  if (!import.meta.env.DEV) return;
-
   const config = loadEnvConfig();
   const env = getEnvironmentConfig();
+  const debug = env.debug && import.meta.env.DEV;
 
-  console.log('📋 Configuration Summary:');
-  console.log('  Environment:', env.environment);
-  console.log('  API URL:', env.apiUrl);
-  console.log('  Debug Mode:', env.debug);
-  console.log('  OCR Timeout:', env.ocrTimeout, 'ms');
-  console.log('  Max File Size:', (env.maxFileSize / (1024 * 1024)), 'MB');
-  console.log('  Features:', {
-    duplicateDetection: isFeatureEnabled('advanced-duplicate-detection'),
-    mlVendorMapping: isFeatureEnabled('ml-vendor-mapping'),
-    bulkExport: isFeatureEnabled('bulk-export'),
-    sentry: isFeatureEnabled('sentry-monitoring'),
-  });
+  if (!debug) return;
 
-  // Mask sensitive keys
-  console.log('  Supabase URL:', config.supabaseUrl ? '✅' : '❌');
-  console.log('  Gemini API Key:', config.geminiApiKey ? '✅ (masked)' : '❌');
-  console.log('  SiliconFlow Key:', config.siliconFlowApiKey ? '✅ (masked)' : '⚠️ (optional)');
+  const log = (msg: string, ...args: unknown[]) => {
+    if (debug) console.log(`[Config] ${msg}`, ...args);
+  };
+
+  log('Summary - Environment:', env.environment);
+  log('API URL:', env.apiUrl);
+  log('Debug Mode:', env.debug);
+  log('OCR Timeout:', env.ocrTimeout, 'ms');
+  log('Max File Size:', env.maxFileSize / (1024 * 1024), 'MB');
+
+  log('Supabase URL:', config.supabaseUrl ? 'configured' : 'missing');
+  log('Gemini API Key:', config.geminiApiKey ? 'configured' : 'missing');
+  log('SiliconFlow Key:', config.siliconFlowApiKey ? 'configured' : 'optional');
 }
 
 /**
@@ -163,7 +168,8 @@ export function getAppMetadata() {
   return {
     name: 'ZOE Solar Accounting OCR',
     version: (import.meta.env['VITE_APP_VERSION'] as string | undefined) || 'dev',
-    buildTime: (import.meta.env['VITE_BUILD_TIME'] as string | undefined) || new Date().toISOString(),
+    buildTime:
+      (import.meta.env['VITE_BUILD_TIME'] as string | undefined) || new Date().toISOString(),
     environment: import.meta.env.MODE,
     userAgent: navigator.userAgent,
     viewport: `${window.innerWidth}x${window.innerHeight}`,

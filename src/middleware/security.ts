@@ -27,19 +27,9 @@ export function getContentSecurityPolicy(): string {
       'https://*.google.com',
       (import.meta.env['VITE_SENTRY_DSN'] as string | undefined) || '',
     ].filter(Boolean),
-    'img-src': [
-      "'self'",
-      'data:',
-      'blob:',
-      'https://*.supabase.co',
-    ],
-    'font-src': [
-      "'self'",
-      'data:',
-    ],
-    'frame-src': [
-      'https://www.google.com',
-    ],
+    'img-src': ["'self'", 'data:', 'blob:', 'https://*.supabase.co'],
+    'font-src': ["'self'", 'data:'],
+    'frame-src': ['https://www.google.com'],
     'object-src': ["'none'"],
     'base-uri': ["'self'"],
     'form-action': ["'self'"],
@@ -59,7 +49,7 @@ export function getSecurityHeaders(): Record<string, string> {
     'X-Frame-Options': 'DENY',
     'X-XSS-Protection': '1; mode=block',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'Permissions-Policy': "geolocation=(), camera=(), microphone=()",
+    'Permissions-Policy': 'geolocation=(), camera=(), microphone=()',
     'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
     'Content-Security-Policy': getContentSecurityPolicy(),
   };
@@ -69,13 +59,9 @@ export function getSecurityHeaders(): Record<string, string> {
  * Validates environment variables are set
  */
 export function validateEnvironmentVariables(): void {
-  const required = [
-    'VITE_SUPABASE_URL',
-    'VITE_SUPABASE_ANON_KEY',
-    'VITE_GEMINI_API_KEY',
-  ];
+  const required = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY', 'VITE_GEMINI_API_KEY'];
 
-  const missing = required.filter(key => !import.meta.env[key]);
+  const missing = required.filter((key) => !import.meta.env[key]);
 
   if (missing.length > 0) {
     const error = `Missing required environment variables: ${missing.join(', ')}`;
@@ -107,7 +93,7 @@ export function escapeXml(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
+    .replace(/'/g, '&apos;');
 }
 
 /**
@@ -128,13 +114,7 @@ export function validateFileSecurity(file: File): { isValid: boolean; reason?: s
   }
 
   // Check MIME type
-  const validTypes = [
-    'application/pdf',
-    'image/jpeg',
-    'image/jpg',
-    'image/png',
-    'image/webp',
-  ];
+  const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
   if (!validTypes.includes(file.type) && !file.type.startsWith('image/')) {
     return { isValid: false, reason: 'Dateityp wird nicht unterstützt' };
@@ -164,32 +144,34 @@ export function sanitizeForDatabase(input: string): string {
 export function generateSecureId(length: number = 16): string {
   const array = new Uint8Array(length);
   crypto.getRandomValues(array);
-  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+  return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 /**
  * Security check on app initialization
  */
 export function performSecurityCheck(): void {
-  console.log('🔒 Running security checks...');
+  const debug = import.meta.env.DEV;
+  if (debug) console.log('[Security] Running checks...');
 
-  // Validate environment
   validateEnvironmentVariables();
 
-  // Check for dev tools (optional - for anti-tampering)
   if (import.meta.env.PROD) {
-    // Detect if console is open (basic check)
     const devtools = /./;
     devtools.toString = () => {
-      window.location.reload(); // Simple anti-debug
+      window.location.reload();
       return '';
     };
   }
 
-  // Log security info
-  console.log('✅ Security checks passed');
-  console.log(`🚀 Environment: ${import.meta.env.MODE}`);
-  console.log(`🔒 Version: ${(import.meta.env['VITE_APP_VERSION'] as string | undefined) || 'dev'}`);
+  if (debug) {
+    console.log('[Security] Checks passed');
+    console.log('[Security] Environment:', import.meta.env.MODE);
+    console.log(
+      '[Security] Version:',
+      (import.meta.env['VITE_APP_VERSION'] as string | undefined) || 'dev'
+    );
+  }
 }
 
 /**
@@ -220,12 +202,10 @@ export function createOperationProtector(
 /**
  * Privacy-focused logging (no sensitive data)
  */
-export function secureLog(message: string, data?: any): void {
-  if (import.meta.env.DEV) {
-    console.log(`[SECURE] ${message}`, data);
-  } else {
-    // In production, mask sensitive data
-    const masked = data ? '[REDACTED]' : '';
-    console.log(`[SECURE] ${message} ${masked}`);
+export function secureLog(message: string, data?: unknown): void {
+  const debug = import.meta.env.DEV;
+  if (!debug) {
+    return;
   }
+  console.log(`[SECURE] ${message}`, data);
 }
