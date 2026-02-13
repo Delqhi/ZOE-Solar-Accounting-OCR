@@ -16,17 +16,17 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'bg-primary text-white hover:bg-primary-600 focus:ring-primary-400',
-  secondary: 'bg-secondary text-white hover:bg-secondary-600 focus:ring-secondary-400',
-  accent: 'bg-accent text-background hover:bg-accent-600 focus:ring-accent-400',
-  ghost: 'bg-transparent text-text hover:bg-surface-hover focus:ring-primary-400',
-  outline: 'border-2 border-primary text-primary hover:bg-primary-100 focus:ring-primary-400',
+  primary: 'btn-primary',
+  secondary: 'btn-secondary',
+  accent: 'btn-accent',
+  ghost: 'btn-ghost',
+  outline: 'btn-outline',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'px-3 py-1.5 text-sm',
-  md: 'px-4 py-2 text-base',
-  lg: 'px-6 py-3 text-lg',
+  sm: 'py-sm px-sm text-sm',
+  md: 'py-md px-md text-base',
+  lg: 'py-lg px-lg text-lg',
 };
 
 export function Button({
@@ -58,13 +58,13 @@ export function Button({
       {loading && (
         <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
       )}
-      
+
       {icon && iconPosition === 'left' && !loading && (
         <span className="inline-flex">{icon}</span>
       )}
-      
+
       {children}
-      
+
       {icon && iconPosition === 'right' && !loading && (
         <span className="inline-flex">{icon}</span>
       )}

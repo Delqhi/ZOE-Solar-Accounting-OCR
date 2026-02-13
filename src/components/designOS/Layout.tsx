@@ -78,9 +78,9 @@ export function Grid({
     6: 'grid-cols-6',
     12: 'grid-cols-12',
   };
-  
+
   return (
-    <div className={`grid ${columnMap[columns]} ${spacingMap[gap]} ${className}`} {...props}>
+    <div className={`grid ${columnMap[columns]} gap-${gap} ${className}`} {...props}>
       {children}
     </div>
   );
@@ -105,8 +105,8 @@ export function Flex({
   return (
     <div
       className={`
-        flex ${justifyMap[justify]} ${alignMap[gap]}
-        ${spacingMap[gap]}
+        flex ${justifyMap[justify]} ${alignMap[align]}
+        gap-${gap}
         ${wrap ? 'flex-wrap' : 'flex-nowrap'}
         ${className}
       `}
@@ -138,14 +138,14 @@ export function Container({
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & { size?: 'sm' | 'md' | 'lg' | 'xl' }) {
   const sizeMap = {
-    sm: 'max-w-screen-sm mx-auto px-4',
-    md: 'max-w-screen-md mx-auto px-4',
-    lg: 'max-w-screen-lg mx-auto px-4',
-    xl: 'max-w-screen-xl mx-auto px-4',
+    sm: 'max-w-sm',
+    md: 'max-w-md',
+    lg: 'max-w-lg',
+    xl: 'max-w-xl',
   };
   
   return (
-    <div className={`${sizeMap[size]} ${className}`} {...props}>
+    <div className={`${sizeMap[size]} mx-auto px-md ${className}`} {...props}>
       {children}
     </div>
   );

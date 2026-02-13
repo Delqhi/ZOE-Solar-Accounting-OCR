@@ -95,7 +95,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
   };
 
   return (
-    <div className="flex flex-col bg-white border rounded-lg overflow-hidden">
+    <div className="flex flex-col bg-surface border-border rounded-lg overflow-hidden border">
       {/* Filter Bar */}
       <FilterBar
         filters={table.filters}
@@ -121,7 +121,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
 
       {/* Empty State */}
       {table.sortedDocuments.length === 0 && (
-        <div className="p-8 text-center text-gray-500">
+        <div className="p-8 text-center text-text-muted">
           <svg className="w-16 h-16 mx-auto mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
           </svg>
@@ -134,7 +134,7 @@ export const DatabaseGrid: React.FC<DatabaseGridProps> = ({
         <>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-gray-50 sticky top-0 z-10">
+              <thead className="bg-surface border-b border-border sticky top-0 z-10">
                 <tr className="border-b">
                   <th className="p-2">
                     <input

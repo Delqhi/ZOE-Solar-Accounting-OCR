@@ -19,15 +19,15 @@ interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, '
 }
 
 const variantStyles: Record<InputVariant, string> = {
-  filled: 'bg-surface border border-border hover:border-primary-400 focus:border-primary-500',
-  outline: 'bg-transparent border-2 border-border hover:border-primary-400 focus:border-primary-500',
-  underline: 'bg-transparent border-b-2 border-border hover:border-primary-400 focus:border-primary-500 border-t-0 border-l-0 border-r-0',
+  filled: 'input-field',
+  outline: 'input-field',
+  underline: 'input-field',
 };
 
 const sizeStyles: Record<InputSize, string> = {
-  sm: 'px-2 py-1 text-sm',
-  md: 'px-3 py-2 text-base',
-  lg: 'px-4 py-3 text-lg',
+  sm: 'p-sm text-sm',
+  md: 'p-md text-base',
+  lg: 'p-lg text-lg',
 };
 
 const validationStyles: Record<ValidationState, string> = {
@@ -87,7 +87,7 @@ export function Input({
             ${variantStyles[variant]}
             ${sizeStyles[inputSize]}
             ${validationStyles[validation]}
-            ${icon ? (iconPosition === 'left' ? 'pl-10' : 'pr-10') : ''}
+            pl-10
             ${className}
           `}
           disabled={disabled}
@@ -95,11 +95,7 @@ export function Input({
         />
         
         {icon && iconPosition === 'right' && (
-          <span className={`
-            absolute right-3 pointer-events-none
-            ${validation === 'default' ? 'text-text-muted' : validationStyles[validation].replace(/border-\w+/, 'text-')}
-            ${inputSize === 'sm' ? 'text-sm' : inputSize === 'lg' ? 'text-lg' : 'text-base'}
-          `}>
+          <span className="absolute right-3 pointer-events-none text-text-muted text-sm">
             {icon}
           </span>
         )}

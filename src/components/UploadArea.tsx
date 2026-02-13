@@ -21,12 +21,13 @@ interface UploadAreaProps {
 }
 
 interface UploadState {
-  status: 'idle' | 'uploading' | 'processing' | 'completed' | 'error';
+  status: 'idle' | 'uploading' | 'processing' | 'completed' | 'error' | 'validating';
   progress: number;
   fileName: string;
   error: string | null;
   documentId?: string;
   previewUrl?: string;
+  filePreview?: string;
 }
 
 export const UploadArea: React.FC<UploadAreaProps> = ({ onUploadComplete, onUploadError }) => {
@@ -39,52 +40,95 @@ export const UploadArea: React.FC<UploadAreaProps> = ({ onUploadComplete, onUplo
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const validateFiles = (files: File[]): boolean => {
+  const validateFiles = async (files: File[]): Promise<boolean> => {
     const maxSize = 50 * 1024 * 1024; // 50MB
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/bmp', 'image/tiff', 'image/tif'];
+    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif'];
 
     for (const file of files) {
-      if (!allowedTypes.includes(file.type)) {
+      const extension = '.' + file.name.split('.').pop()?.toLowerCase();
+
+      if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(extension || '')) {
         setUploadState(prev => ({ ...prev, status: 'error', error: `Dateityp nicht unterstützt: ${file.name}` }));
         return false;
       }
+
       if (file.size > maxSize) {
         setUploadState(prev => ({ ...prev, status: 'error', error: `Datei zu groß (max 50MB): ${file.name}` }));
         return false;
+      }
+
+      // PDF validation
+      if (file.type === 'application/pdf') {
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          const header = String.fromCharCode(...uint8Array.slice(0, 4));
+          if (header !== '%PDF') {
+            setUploadState(prev => ({ ...prev, status: 'error', error: `Ungültige PDF-Datei: ${file.name}` }));
+            return false;
+          }
+        } catch (error) {
+          setUploadState(prev => ({ ...prev, status: 'error', error: `PDF-Validierung fehlgeschlagen: ${file.name}` }));
+          return false;
+        }
       }
     }
 
     return true;
   };
 
-  const simulateProgress = (interval: number, duration: number) => {
-    let progress = 0;
-    const step = 100 / (duration / interval);
-    
+  const simulateProgress = (interval: number, duration: number, startValue: number = 0) => {
+    let progress = startValue;
+    const step = (100 - startValue) / (duration / interval);
+
     const timer = setInterval(() => {
       progress += step;
-      if (progress >= 90) {
+      if (progress >= 95) {
         clearInterval(timer);
-        progress = 90;
+        progress = 95;
       }
-      setUploadState(prev => ({ ...prev, progress: Math.min(progress, 90) }));
+      setUploadState(prev => ({ ...prev, progress: Math.min(progress, 95) }));
     }, interval);
 
     return timer;
+  };
+
+  const createFilePreview = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.readAsDataURL(file);
+      } else {
+        resolve('');
+      }
+    });
   };
 
   const handleFileUpload = async (file: File) => {
     // Create UploadFile interface for better-upload handler
     const uploadFile = {
       name: file.name,
-      size: file.type.length, // Placeholder - actual size from file
+      size: file.size,
       type: file.type,
       arrayBuffer: async () => await file.arrayBuffer(),
     };
 
     try {
+      // Start with validation
+      setUploadState(prev => ({ ...prev, status: 'validating', progress: 10 }));
+
+      // Validate file
+      if (!(await validateFiles([file]))) {
+        return;
+      }
+
+      // Create preview
+      const filePreview = await createFilePreview(file);
+
       // Start progress simulation
-      const progressTimer = simulateProgress(200, 5000);
+      const progressTimer = simulateProgress(200, 5000, 20);
 
       // Call upload handler
       const result = await zoeUploadHandler(uploadFile);
@@ -100,6 +144,7 @@ export const UploadArea: React.FC<UploadAreaProps> = ({ onUploadComplete, onUplo
           error: null,
           documentId: result.documentId,
           previewUrl: result.previewUrl,
+          filePreview,
         });
 
         onUploadComplete?.(result);
@@ -118,18 +163,18 @@ export const UploadArea: React.FC<UploadAreaProps> = ({ onUploadComplete, onUplo
           status: 'error',
           progress: 0,
           fileName: file.name,
-          error: result.error || 'Upload failed',
+          error: result.error || 'Upload fehlgeschlagen',
         });
-        onUploadError?.(result.error || 'Upload failed');
+        onUploadError?.(result.error || 'Upload fehlgeschlagen');
       }
     } catch (error: any) {
       setUploadState({
         status: 'error',
         progress: 0,
         fileName: file.name,
-        error: error.message || 'Unexpected error occurred',
+        error: error.message || 'Unerwarteter Fehler aufgetreten',
       });
-      onUploadError?.(error.message || 'Unexpected error occurred');
+      onUploadError?.(error.message || 'Unerwarteter Fehler aufgetreten');
     }
   };
 
@@ -318,44 +363,66 @@ export const UploadArea: React.FC<UploadAreaProps> = ({ onUploadComplete, onUplo
                   </p>
                 </div>
 
-                {/* Action Buttons */}
-                <div style={{ 
-                  display: 'flex', 
-                  gap: 'var(--spacing-sm)', 
-                  justifyContent: 'center', 
-                  paddingTop: 'var(--spacing-md)' 
-                }}>
-                  <PrimaryButton
-                    onClick={triggerFileInput}
-                    disabled={uploadState.status === 'uploading' || uploadState.status === 'processing'}
-                    size="md"
+              {/* Action Buttons */}
+              {uploadState.status === 'idle' && (
+                <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      triggerFileInput();
+                    }}
+                    className="glass-card border-primary/30 bg-primary/10 text-text py-3 px-6 rounded-xl font-semibold hover:bg-primary/20 transition-all duration-300 hover:scale-105"
                   >
                     Dateien auswählen
-                  </PrimaryButton>
-                  <GhostButton
-                    onClick={triggerFileInput}
-                    disabled={uploadState.status === 'uploading' || uploadState.status === 'processing'}
-                    size="md"
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      triggerFileInput();
+                    }}
+                    className="glass-card border border-border text-text py-3 px-6 rounded-xl font-semibold hover:bg-surface-hover transition-all duration-300 hover:scale-105"
                   >
                     Oder hier klicken
-                  </GhostButton>
+                  </button>
                 </div>
+              )}
 
-                {/* Hidden File Input */}
-                <input
-                  ref={fileInputRef}
-                  id="dropzone-file"
-                  type="file"
-                  style={{ display: 'none' }}
-                  multiple
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={handleFileInput}
-                  disabled={uploadState.status === 'uploading' || uploadState.status === 'processing'}
-                />
-              </div>
-            </Center>
-          </Stack>
-        </Card>
+              {/* Reset Button */}
+              {(uploadState.status === 'completed' || uploadState.status === 'error') && (
+                <div className="mt-6">
+                  <button
+                    onClick={() => setUploadState({
+                      status: 'idle',
+                      progress: 0,
+                      fileName: '',
+                      error: null,
+                    })}
+                    className="glass-card border border-border text-text py-3 px-6 rounded-xl font-semibold hover:bg-surface-hover transition-all duration-300 hover:scale-105"
+                  >
+                    {uploadState.status === 'completed' ? 'Weiteren Beleg hochladen' : 'Erneut versuchen'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Hidden File Input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.jpg,.jpeg,.png,.bmp,.tiff,.tif"
+              className="hidden"
+              onChange={async (e) => {
+                const files = e.target.files;
+                if (files && files.length > 0) {
+                  await handleFiles(files);
+                }
+                e.target.value = ''; // Reset input
+              }}
+              disabled={uploadState.status === 'uploading' || uploadState.status === 'processing'}
+            />
+          </div>
+        </div>
       </div>
     </ErrorBoundary>
   );

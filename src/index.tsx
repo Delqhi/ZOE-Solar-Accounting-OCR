@@ -19,6 +19,7 @@ import { analytics } from './lib/analytics';
 
 // Styles
 import './styles/global.css';
+import './styles/typography.css';
 
 // Components (lazy loaded for performance)
 const App = React.lazy(() => import('./App'));
@@ -63,6 +64,34 @@ window.fetch = async (...args) => {
     throw error;
   }
 };
+
+// Register Service Worker for background sync
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then((registration) => {
+        console.log('[SW] Registered:', registration.scope);
+        analytics.track('service_worker_registered', {
+          scope: registration.scope,
+        });
+
+        // Register periodic sync if supported
+        if ('PeriodicSyncManager' in registration) {
+          registration.periodicSync.register('content-sync', {
+            minInterval: 15 * 60 * 1000, // 15 minutes
+          }).catch(() => {
+            // Periodic sync not supported or permission denied
+          });
+        }
+      })
+      .catch((error) => {
+        console.error('[SW] Registration failed:', error);
+        analytics.track('service_worker_error', {
+          error: error.message,
+        });
+      });
+  });
+}
 
 // Root component wrapper
 function Root() {

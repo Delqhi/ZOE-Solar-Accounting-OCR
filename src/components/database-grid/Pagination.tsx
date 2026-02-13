@@ -58,9 +58,9 @@ export const Pagination: React.FC<PaginationProps> = ({
   };
 
   return (
-    <div className="bg-white border-t p-3 flex items-center justify-between flex-wrap gap-2">
+    <div className="bg-surface border-t border-border p-3 flex items-center justify-between flex-wrap gap-2">
       {/* Info */}
-      <div className="text-sm text-gray-600">
+      <div className="text-sm text-text-muted">
         Zeige {startItem}-{endItem} von {totalItems} Dokumenten
       </div>
 
@@ -69,7 +69,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         <button
           onClick={onPrev}
           disabled={!hasPrev}
-          className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300"
+          className="px-3 py-1.5 text-sm bg-surface text-text border border-border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface-hover"
         >
           ← Zurück
         </button>
@@ -81,14 +81,14 @@ export const Pagination: React.FC<PaginationProps> = ({
               onClick={() => onGoToPage(page)}
               className={`px-3 py-1.5 text-sm rounded ${
                 currentPage === page
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-primary text-white'
+                  : 'bg-surface text-text border border-border hover:bg-surface-hover'
               }`}
             >
               {page}
             </button>
           ) : (
-            <span key={idx} className="px-2 text-gray-400">
+            <span key={idx} className="px-2 text-text-muted">
               {page}
             </span>
           )
@@ -97,7 +97,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         <button
           onClick={onNext}
           disabled={!hasMore}
-          className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300"
+          className="px-3 py-1.5 text-sm bg-surface text-text border border-border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface-hover"
         >
           Weiter →
         </button>

@@ -21,67 +21,67 @@ export const TableRow: React.FC<TableRowProps> = ({
   onDuplicate,
 }) => {
   const statusColors: Record<string, string> = {
-    COMPLETED: 'bg-green-100 text-green-700 border-green-200',
-    REVIEW_NEEDED: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    DUPLICATE: 'bg-purple-100 text-purple-700 border-purple-200',
-    ERROR: 'bg-red-100 text-red-700 border-red-200',
-    PROCESSING: 'bg-blue-100 text-blue-700 border-blue-200',
-    PRIVATE: 'bg-gray-100 text-gray-700 border-gray-200',
+    COMPLETED: 'bg-emerald-900/30 text-emerald-300 border-emerald-700/50',
+    REVIEW_NEEDED: 'bg-amber-900/30 text-amber-300 border-amber-700/50',
+    DUPLICATE: 'bg-purple-900/30 text-purple-300 border-purple-700/50',
+    ERROR: 'bg-red-900/30 text-red-300 border-red-700/50',
+    PROCESSING: 'bg-blue-900/30 text-blue-300 border-blue-700/50',
+    PRIVATE: 'bg-gray-900/30 text-gray-300 border-gray-700/50',
   };
 
   return (
-    <tr className={`border-b hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : ''}`}>
+    <tr className={`border-b hover:bg-surface-hover transition-colors ${isSelected ? 'bg-primary/10' : ''}`}>
       {/* Checkbox */}
       <td className="p-2 text-center">
         <input
           type="checkbox"
           checked={isSelected}
           onChange={onToggleSelect}
-          className="rounded border-gray-300"
+          className="rounded border-border"
         />
       </td>
 
       {/* ZOE ID */}
       <td className="p-2">
-        <div className="font-mono text-xs text-gray-600">{document.data?.eigeneBelegNummer || '-'}</div>
+        <div className="font-mono text-xs text-text-muted">{document.data?.eigeneBelegNummer || '-'}</div>
       </td>
 
       {/* Date */}
       <td className="p-2">
-        <div className="text-sm text-gray-900">{document.data?.belegDatum || '-'}</div>
-        <div className="text-xs text-gray-500">{document.uploadDate}</div>
+        <div className="text-sm text-text">{document.data?.belegDatum || '-'}</div>
+        <div className="text-xs text-text-muted">{document.uploadDate}</div>
       </td>
 
       {/* Vendor */}
       <td className="p-2">
-        <div className="text-sm font-medium text-gray-900 truncate max-w-[200px]">
+        <div className="text-sm font-medium text-text truncate max-w-[200px]">
           {document.data?.lieferantName || document.fileName}
         </div>
       </td>
 
       {/* Amounts */}
       <td className="p-2 text-right">
-        <div className="text-sm text-gray-900 font-mono">
+        <div className="text-sm text-text font-mono">
           {document.data?.bruttoBetrag?.toFixed(2)} €
         </div>
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-text-muted">
           N: {document.data?.nettoBetrag?.toFixed(2)} · M: {document.data?.mwstBetrag19?.toFixed(2)}
         </div>
       </td>
 
       {/* Account */}
       <td className="p-2">
-        <div className="text-sm font-mono text-gray-700">{document.data?.kontierungskonto || '-'}</div>
-        <div className="text-xs text-gray-500">{document.data?.steuerkategorie || '-'}</div>
+        <div className="text-sm font-mono text-text">{document.data?.kontierungskonto || '-'}</div>
+        <div className="text-xs text-text-muted">{document.data?.steuerkategorie || '-'}</div>
       </td>
 
       {/* Status */}
       <td className="p-2">
-        <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${statusColors[document.status] || 'bg-gray-100 text-gray-700'}`}>
+        <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${statusColors[document.status] || 'bg-gray-900/30 text-gray-300 border-gray-700/50'}`}>
           {document.status}
         </span>
         {document.duplicateOfId && (
-          <div className="text-xs text-purple-600 mt-1">Link zum Original</div>
+          <div className="text-xs text-purple-300 mt-1">Link zum Original</div>
         )}
       </td>
 
@@ -90,14 +90,14 @@ export const TableRow: React.FC<TableRowProps> = ({
         <div className="flex gap-1 justify-end">
           <button
             onClick={onOpen}
-            className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="px-2 py-1 text-xs bg-primary text-white rounded hover:bg-primary-hover"
             title="Öffnen"
           >
             Öffnen
           </button>
           <button
             onClick={onExport}
-            className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
+            className="px-2 py-1 text-xs bg-surface border border-border text-text rounded hover:bg-surface-hover"
             title="Export"
           >
             PDF
@@ -113,7 +113,7 @@ export const TableRow: React.FC<TableRowProps> = ({
           )}
           <button
             onClick={onDelete}
-            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+            className="px-2 py-1 text-xs bg-error text-white rounded hover:bg-error-hover"
             title="Löschen"
           >
             ×

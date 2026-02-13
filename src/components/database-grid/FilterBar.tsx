@@ -30,26 +30,26 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   const allSelected = selectionCount === totalItems && totalItems > 0;
 
   return (
-    <div className="bg-white border-b p-3 space-y-3">
+    <div className="bg-surface border-b border-border p-3 space-y-3">
       {/* Selection & Actions */}
       <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={onSelectAll}
           className={`px-3 py-1.5 text-sm rounded border transition-colors ${
             allSelected
-              ? 'bg-blue-600 text-white border-blue-600'
-              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              ? 'bg-primary text-white border-primary'
+              : 'bg-surface text-text border-border hover:bg-surface-hover'
           }`}
         >
           {allSelected ? 'Alle abwählen' : 'Alle wählen'}
         </button>
 
         {selectionCount > 0 && (
-          <div className="flex items-center gap-2 bg-blue-50 px-3 py-1.5 rounded text-sm text-blue-800">
-            <span className="font-semibold">{selectionCount}</span> ausgewählt
+          <div className="flex items-center gap-2 bg-surface border border-border px-3 py-1.5 rounded text-sm text-text">
+            <span className="font-semibold text-primary">{selectionCount}</span> ausgewählt
             <button
               onClick={onClearSelection}
-              className="text-blue-600 underline hover:text-blue-800"
+              className="text-error underline hover:text-error-hover"
             >
               Löschen
             </button>
@@ -60,7 +60,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
         <button
           onClick={onReset}
-          className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+          className="px-3 py-1.5 text-sm bg-surface text-text border border-border rounded hover:bg-surface-hover"
         >
           Filter zurücksetzen
         </button>
@@ -69,11 +69,11 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       {/* Filter Inputs */}
       <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-2">
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Jahr</label>
+          <label className="block text-xs text-text-muted mb-1">Jahr</label>
           <select
             value={filters.year}
             onChange={(e) => onFilterChange({ year: e.target.value })}
-            className="w-full border rounded px-2 py-1 text-sm"
+            className="w-full border border-border bg-surface text-text rounded px-2 py-1 text-sm focus:border-primary focus:outline-none"
           >
             <option value="">Alle</option>
             {years.map(y => (
@@ -83,11 +83,11 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         </div>
 
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Quartal</label>
+          <label className="block text-xs text-text-muted mb-1">Quartal</label>
           <select
             value={filters.quarter}
             onChange={(e) => onFilterChange({ quarter: e.target.value })}
-            className="w-full border rounded px-2 py-1 text-sm"
+            className="w-full border border-border bg-surface text-text rounded px-2 py-1 text-sm focus:border-primary focus:outline-none"
           >
             <option value="">Alle</option>
             {quarters.map(q => (
@@ -97,11 +97,11 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         </div>
 
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Monat</label>
+          <label className="block text-xs text-text-muted mb-1">Monat</label>
           <select
             value={filters.month}
             onChange={(e) => onFilterChange({ month: e.target.value })}
-            className="w-full border rounded px-2 py-1 text-sm"
+            className="w-full border border-border bg-surface text-text rounded px-2 py-1 text-sm focus:border-primary focus:outline-none"
           >
             <option value="">Alle</option>
             {months.map(m => (
@@ -111,11 +111,11 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         </div>
 
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Status</label>
+          <label className="block text-xs text-text-muted mb-1">Status</label>
           <select
             value={filters.status}
             onChange={(e) => onFilterChange({ status: e.target.value })}
-            className="w-full border rounded px-2 py-1 text-sm"
+            className="w-full border border-border bg-surface text-text rounded px-2 py-1 text-sm focus:border-primary focus:outline-none"
           >
             <option value="">Alle</option>
             {statuses.map(s => (
@@ -125,13 +125,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         </div>
 
         <div className="col-span-1 md:col-span-2">
-          <label className="block text-xs text-gray-500 mb-1">Lieferant</label>
+          <label className="block text-xs text-text-muted mb-1">Lieferant</label>
           <input
             type="text"
             value={filters.vendor}
             onChange={(e) => onFilterChange({ vendor: e.target.value })}
             placeholder="Suchen..."
-            className="w-full border rounded px-2 py-1 text-sm"
+            className="w-full border border-border bg-surface text-text rounded px-2 py-1 text-sm focus:border-primary focus:outline-none"
           />
         </div>
       </div>

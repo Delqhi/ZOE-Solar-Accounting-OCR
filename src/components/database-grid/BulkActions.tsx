@@ -18,8 +18,8 @@ export const BulkActions: React.FC<BulkActionsProps> = ({
   if (selectedIds.size === 0) return null;
 
   return (
-    <div className="bg-purple-50 border border-purple-200 p-3 flex gap-2 items-center flex-wrap">
-      <span className="text-sm font-semibold text-purple-900">Aktionen für {selectedIds.size} Dokumente:</span>
+    <div className="bg-purple-900/20 border border-purple-700/40 p-3 flex gap-2 items-center flex-wrap">
+      <span className="text-sm font-semibold text-purple-200">Aktionen für {selectedIds.size} Dokumente:</span>
 
       <button
         onClick={onBulkExport}
@@ -37,7 +37,7 @@ export const BulkActions: React.FC<BulkActionsProps> = ({
 
       <button
         onClick={onBulkMarkPrivate}
-        className="px-3 py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
+        className="px-3 py-1.5 text-sm bg-surface border border-border text-text rounded hover:bg-surface-hover"
       >
         Als Privat markieren
       </button>
