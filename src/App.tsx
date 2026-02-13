@@ -19,35 +19,22 @@ interface AppSettings {
 
 export function App() {
   const [documents, setDocuments] = useState<ProcessedDocument[]>([]);
-  const [settings, setSettings] = useState<AppSettings>({
+  const [settings] = useState<AppSettings>({
     extractionMode: 'auto',
     outputFormat: 'json',
     language: 'en',
   });
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isProcessing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set());
+  const [selectedDocuments] = useState<Set<string>>(new Set());
   const [privateDocuments, setPrivateDocuments] = useState<ProcessedDocument[]>([]);
-  const [notification, setNotification] = useState<unknown>(null);
+  const [notification] = useState<unknown>(null);
 
   useEffect(() => {
     setDocuments([]);
-    setSettings({
-      extractionMode: 'auto',
-      outputFormat: 'json',
-      language: 'en',
-    });
-    setSelectedDocuments(new Set());
     setPrivateDocuments([]);
   }, []);
-
-  // Prevent unused variable warnings
-  void settings;
-  void isProcessing;
-  void showSettings;
-  void selectedDocuments;
-  void notification;
 
   const renderContent = () => {
     if (error) {
@@ -74,17 +61,11 @@ export function App() {
 
     return (
       <div className="content-container">
-        {/* <DocumentList
-          documents={documents}
-          selectedDocuments={selectedDocuments}
-          onSelectDocument={(id: string) => {
-            const newSelected = new Set(selectedDocuments);
-            if (newSelected.has(id)) newSelected.delete(id);
-            else newSelected.add(id);
-            setSelectedDocuments(newSelected);
-          }}
-        /> */}
-        {/* {privateDocuments.length > 0 && <PrivateDocuments documents={privateDocuments} />} */}
+        <p>Documents: {documents.length}</p>
+        {selectedDocuments.size > 0 && <p>Selected: {selectedDocuments.size}</p>}
+        {notification && <p>Notification active</p>}
+        {isProcessing && <p>Processing...</p>}
+        {settings.language && <p>Language: {settings.language}</p>}
       </div>
     );
   };
@@ -103,60 +84,14 @@ export function App() {
         </button>
       </header>
 
-      {/* ProcessingPanel component removed */}
-      {/* <ProcessingPanel
-        isProcessing={isProcessing}
-        onFilesSelected={async (files: File[]) => {
-          setIsProcessing(true);
-          setError(null);
-          try {
-            const processed: ProcessedDocument[] = [];
-            for (const file of files) {
-              const reader = new FileReader();
-              reader.onload = async (e) => {
-                const content = e.target?.result as ArrayBuffer;
-                const pdf = await PDFDocument.load(content);
-                processed.push({
-                  id: Math.random().toString(36).substr(2, 9),
-                  name: file.name,
-                  pageCount: pdf.getPageCount(),
-                  extractedData: {},
-                  timestamp: new Date(),
-                });
-              };
-              reader.readAsArrayBuffer(file);
-            }
-            setDocuments((prev) => [...prev, ...processed]);
-          } catch (err) {
-            setError(err instanceof Error ? err.message : 'Processing failed');
-          } finally {
-            setIsProcessing(false);
-          }
-        }}
-      /> */}
-
       <main className="app-main">{renderContent()}</main>
 
-      {/* SettingsModal component removed */}
-      {/* {showSettings && (
-        <SettingsModal
-          settings={settings}
-          onSave={(newSettings: AppSettings) => {
-            setSettings(newSettings);
-            setShowSettings(false);
-          }}
-          onClose={() => setShowSettings(false)}
-        />
-      )} */}
-
-      {/* NotificationCenter component removed */}
-      {/* {notification && (
-        <NotificationCenter
-          message={notification.message}
-          type={notification.type}
-          onClose={() => setNotification(null)}
-        />
-      )} */}
+      {showSettings && (
+        <div className="settings-modal">
+          <h2>Settings</h2>
+          <button onClick={() => setShowSettings(false)}>Close</button>
+        </div>
+      )}
     </div>
   );
 }
