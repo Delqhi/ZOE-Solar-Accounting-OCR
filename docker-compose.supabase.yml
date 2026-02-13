@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: supabase/postgres:15.1.0.103
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - ./supabase/db/init:/docker-entrypoint-initdb.d
+      - supabase_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kong:
+    image: kong:3.0
+    ports:
+      - "8000:8000"
+      - "8443:8443"
+    environment:
+      - KONG_DATABASE=postgres
+      - KONG_PG_DATABASE=supabase
+      - KONG_PG_HOST=postgres
+      - KONG_PG_USER=postgres
+      - KONG_PG_PASSWORD=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  gotrue:
+    image: supabase/gotrue:v2.148.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - GOTRUE_DB_DRIVER=postgres
+      - GOTRUE_DB_STRING=postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable
+      - GOTRUE_SITE_URL=http://localhost:3000
+      - GOTRUE_JWT_SECRET=your-super-secret-jwt-key-change-this
+      - GOTRUE_ADMIN_EMAIL=jeremyschulze93@gmail.com
+      - GOTRUE_ADMIN_PASSWORD=ZOE.jerry2024
+      - API_EXTERNAL_URL=http://localhost:8000
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable
+    ports:
+      - "9999:9999"
+
+  postgrest:
+    image: postgrest/postgrest:v12.0.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - PGRST_DB_URI=postgres://postgres:postgres@postgres:5432/supabase?sslmode=disable
+      - PGRST_DB_SCHEMAS=public,storage
+      - PGRST_DB_ANON_ROLE=anon
+      - PGRST_JWT_SECRET=your-super-secret-jwt-key-change-this
+    ports:
+      - "3001:3000"
+
+volumes:
+  supabase_pg_data:
+
+networks:
+  default:
+    name: supabase_network

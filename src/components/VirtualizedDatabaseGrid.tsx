@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { VirtualizedGrid, VirtualizationMonitor } from '../hooks/useVirtualization';
+import { VirtualizedGrid, VirtualizedList, VirtualizationMonitor } from './designOS/virtualization';
 import { DepthCard, FloatingElement } from './designOS/depth3D';
 import { TypographyBody, TypographyHeading } from './designOS/typography';
 import { AccessibleButton } from './designOS/Accessibility';

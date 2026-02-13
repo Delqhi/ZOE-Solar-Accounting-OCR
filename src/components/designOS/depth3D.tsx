@@ -4,7 +4,7 @@
  * Version: 2026.0 | Source: 2026 Best Practices
  */
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   use3DDepth,
   useParallax,
@@ -13,10 +13,9 @@ import {
   use3DStack,
   useInteractiveDepth,
   usePerspectiveGrid,
-  use3DCarousel,
-  useDepthObserver
+  use3DCarousel
 } from '../../hooks/use3D';
-import { TypographyHeading, TypographyBody, TypographyGradient } from './typography';
+import { TypographyHeading, TypographyBody } from './typography';
 
 interface DepthContainerProps {
   children: React.ReactNode;

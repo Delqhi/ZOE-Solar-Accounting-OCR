@@ -48,6 +48,31 @@ belege-uploads, docs, e2e, oci-ssh-keys, src, wiki
 
 ## 🔄 Update Log
 2026-01-10T11:06:13.170Z - Initial knowledge base created
+2026-01-10T21:47:00.000Z - Supabase secrets documented in SUPABASE_SECRETS.md
+
+## 🔐 Supabase Infrastructure
+**URL:** https://supabase.aura-call.de
+**Studio:** https://studio.aura-call.de
+**Status:** ✅ Active
+**Documentation:** [SUPABASE_SECRETS.md](../SUPABASE_SECRETS.md)
+
+### Key Variables (Secure Storage):
+- `NEXT_PUBLIC_SUPABASE_URL` - API Endpoint
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Frontend Key
+- `SUPABASE_SERVICE_ROLE_KEY` - Backend Admin Key
+- `SUPABASE_JWT_SECRET` - Token Validation
+- `SUPABASE_DB_PASSWORD` - Database Password
+- `DATABASE_URL` - Direct PostgreSQL Connection
+
+### Database Structure:
+- Primary DB: postgres
+- Tables: channels, channel_workflows, projects, team_secrets, auth.users
+- Users: postgres (superuser), supabase_auth_admin, supabase_storage_admin
+
+### Docker Services:
+- Container: ngze-techstack-supabase-db-1
+- Services: supabase-db, postgrest, kong, supabase-studio
+- Kong Dashboard: http://localhost:8081 (admin / Ngz3C0nTr0llD4sh2026!)
 
 ---
 *This file persists across sessions*

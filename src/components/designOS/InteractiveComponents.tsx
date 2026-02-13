@@ -5,10 +5,7 @@
  */
 
 import React, { useRef, useEffect, useState } from 'react';
-import { useMicroInteractions, MicroInteractionUtils } from '../../hooks/useMicroInteractions';
-import { AccessibleButton, AccessibleInput } from '../Accessibility';
-import { DepthCard, FloatingElement } from './depth3D';
-import { TypographyBody } from './typography';
+import { useMicroInteractions } from '../../hooks/useMicroInteractions';
 
 export interface InteractiveButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
