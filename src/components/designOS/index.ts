@@ -103,3 +103,24 @@ export type {
   ToastPosition,
   UseToastReturn 
 } from './Toast';
+
+// Stubs for experimental components (App2026, App3D)
+export {
+  TypographyBody,
+  TypographyHeading,
+  EnhancedLayout,
+  EnhancedSidebar,
+  EnhancedMain,
+  EnhancedHeader,
+  EnhancedFooter,
+  EnhancedCard,
+  DepthCard,
+  EnhancedButton,
+  EnhancedInput,
+  EnhancedEmptyState,
+  NoDocumentsState,
+  NoResultsState,
+  EnhancedGrid,
+  useFocusManagement,
+  useLazyImage,
+} from './stubs';

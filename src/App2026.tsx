@@ -12,6 +12,20 @@ import { DocumentRecord, DocumentStatus, AppSettings, ExtractedData } from '../t
 import { normalizeExtractedData } from '../services/extractedDataNormalization';
 import { formatPreflightForDialog, runExportPreflight } from '../services/exportPreflight';
 import type { User } from '../services/supabaseService';
+import {
+  EnhancedLayout,
+  EnhancedSidebar,
+  EnhancedMain,
+  EnhancedHeader,
+  EnhancedFooter,
+  EnhancedCard,
+  EnhancedButton,
+  EnhancedInput,
+  useFocusManagement,
+  NoDocumentsState,
+  NoResultsState,
+} from '../components/designOS';
+import { clsx } from 'clsx';
 
 // Helper functions (moved to separate utils file in real implementation)
 const computeFileHash = async (file: File): Promise<string> => {
