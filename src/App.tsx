@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { MicroInteractionsDemo } from './components/designOS/MicroInteractionsDemo';
 import { DatabaseGrid } from './components/database-grid';
 import { DocumentDetail } from './components/DetailModal';

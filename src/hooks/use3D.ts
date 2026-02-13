@@ -97,13 +97,11 @@ export function useParallax(config: ParallaxConfig = {}) {
   }, [enabled, speed, intensity]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return undefined;
 
     const container = containerRef.current?.closest('.parallax-scroll') || window;
-    if (container) {
-      container.addEventListener('scroll', handleScroll, { passive: true });
-      return () => container.removeEventListener('scroll', handleScroll);
-    }
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
   }, [enabled, handleScroll]);
 
   const getParallaxStyle = useCallback(() => {

@@ -15,6 +15,8 @@ export interface User {
 // Supabase client placeholder - actual client is initialized in supabaseClient.ts
 const supabaseClient: any = null;
 
+/// <reference types="vite/client" />
+
 export function isSupabaseConfigured(): boolean {
   // Check if Supabase URL and anon key are configured
   const url = import.meta.env.VITE_SUPABASE_URL;
