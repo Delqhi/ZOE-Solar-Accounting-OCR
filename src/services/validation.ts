@@ -112,7 +112,7 @@ export function truncate(str: string, maxLength: number): string {
 
 // ==================== Missing Exports for Compatibility ====================
 
-export function isPresent(value: any): boolean {
+export function isPresent(value: unknown): boolean {
   return value !== null && value !== undefined && value !== '';
 }
 
@@ -134,7 +134,7 @@ export interface ValidationResult {
   warnings: string[];
 }
 
-export function validateDocumentData(data: any): ValidationResult {
+export function validateDocumentData(data: unknown): ValidationResult {
   const result: ValidationResult = {
     isValid: true,
     errors: [],
@@ -242,7 +242,7 @@ export function validateBatchUpload(files: FileList): ValidationResult {
 
 // ==================== API Response Validation ====================
 
-export function validateOCRResponse(response: any): ValidationResult {
+export function validateOCRResponse(response: unknown): ValidationResult {
   const result: ValidationResult = {
     isValid: true,
     errors: [],

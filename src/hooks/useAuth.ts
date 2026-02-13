@@ -18,7 +18,7 @@ export interface AuthState {
   user: User | null;
   loading: boolean;
   error: Error | null;
-  session: any | null;
+  session: Session | null;
 }
 
 export function useAuth(): AuthState & {

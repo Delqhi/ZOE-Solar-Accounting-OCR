@@ -13,7 +13,7 @@ export interface User {
 }
 
 // Supabase client placeholder - actual client is initialized in supabaseClient.ts
-const supabaseClient: any = null;
+const supabaseClient: SupabaseClient | null = null;
 
 /// <reference types="vite/client" />
 
@@ -30,7 +30,7 @@ export async function getAllDocuments(): Promise<DocumentRecord[]> {
   try {
     const result = await belegeService.getAll();
     // Convert database format to DocumentRecord format
-    return result.data.map((beleg: any) => ({
+    return result.data.map((beleg: Beleg) => ({
       id: beleg.id,
       zoeId: beleg.zoe_id,
       fileName: beleg.dateiname,

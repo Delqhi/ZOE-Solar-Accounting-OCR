@@ -24,7 +24,7 @@ export interface UploadResult {
   error?: string;
   status: 'rejected' | 'error' | 'completed' | 'processing';
   documentId?: string;
-  data?: any;
+  data?: Record<string, unknown>;
   previewUrl?: string;
 }
 
@@ -155,7 +155,7 @@ export const zoeUploadHandler: UploadHandler = async (file: UploadFile, metadata
       previewUrl: urlData.publicUrl,
     };
 
-  } catch (error: any) {
+  } catch (error: Error) {
     monitoringService.captureError(error, { fileName: file.name });
     
     return {

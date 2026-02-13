@@ -327,7 +327,7 @@ export class AuditService {
   private loadFromLocalStorage(): void {
     try {
       const logs = JSON.parse(localStorage.getItem('audit-logs') || '[]');
-      this.logs = logs.map((log: any) => ({
+      this.logs = logs.map((log: AuditLogEntry) => ({
         ...log,
         timestamp: new Date(log.timestamp),
       }));

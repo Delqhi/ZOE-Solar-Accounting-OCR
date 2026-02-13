@@ -96,7 +96,7 @@ export async function deleteDocument(id: string) {
   return await belegeService.delete(id);
 }
 
-export async function saveSettings(settings: any) {
+export async function saveSettings(settings: AppSettings) {
   return await einstellungenService.set('app_settings', JSON.stringify(settings));
 }
 
